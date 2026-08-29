@@ -1,0 +1,17 @@
+{
+  "name": "vessel",
+  "private": true,
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "keeper": "tsx --env-file=.env scripts/keeper.ts",
+    "test": "forge test --root contracts --offline",
+    "test:fuzz": "forge test --root contracts --offline --fuzz-runs 10000"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "viem": "^2.56.0"
+  }
+}

@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0d0c;
+  --panel: #121412;
+  --ink: #e8e6e1;
+  --muted: #8a8880;
+  --line: #242822;
+  --hull: #c4a36a;
+  --ballast: #3d9b8f;
+  --sim: #e3b341;
+  --real: #8fd9b4;
+  --impair: #e25d5d;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-hull: var(--hull);
+  --color-ballast: var(--ballast);
+  --color-sim: var(--sim);
+  --color-real: var(--real);
+  --color-impair: var(--impair);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fall {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.waterfall-play {
+  animation: fall 0.45s ease-out;
+}
+
+@keyframes pulse-bar {
+  from {
+    width: 0;
+  }
+}
+
+.bar-fill {
+  animation: pulse-bar 0.7s ease-out;
+}

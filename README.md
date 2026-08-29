@@ -1,2 +1,207 @@
-# vessel
-The dollar leverage pays for. Delta-neutral yield on  @Monad .
+# Vessel
+
+**The dollar leverage pays for.** Delta-neutral tranche yield on Monad.
+
+![Built at Monad Blitz New Delhi V4](https://img.shields.io/badge/Monad_Blitz-New_Delhi_V4-c4a36a)
+![Testnet](https://img.shields.io/badge/network-testnet-3d9b8f)
+![Unaudited](https://img.shields.io/badge/audit-none-e25d5d)
+
+Live: [vessel.wtf](https://vessel.wtf) · [testnet.vessel.wtf](https://testnet.vessel.wtf) · [docs.vessel.wtf](https://docs.vessel.wtf)
+
+**Unaudited. Demo dollars (dUSD) have no value.**
+
+---
+
+## What is real vs simulated
+
+| Leg | Status |
+| --- | --- |
+| Spot (dUSD ↔ WMON via the wired router) | **On-chain.** Accounting is real. On a fresh DemoUSD deploy there is no Puddle pool, so the script wires **MockRouter + MockWMON** (1:1 6dec↔18dec). Canonical Puddle / WMON addresses live in `ADDRESSES.json` `refs` for the swap-in. |
+| Vault (ERC-4626) + Hull / Ballast + waterfall `settle` | **On-chain and real.** Conservation: `ΔhullNAV + ΔbalNAV + Δreserve + Δtreasury == grossYield`. |
+| Short-leg funding market | **Simulated.** `SimVenue` implements `IVenue` so hedge accounting is demonstrable today. `isSimulated() == true`. |
+| Perp venue | `venues/PerplVenue.stub.sol` — compiles, reverts `NotImplemented()`. Swap = one contract. See [PerplFoundation/api-docs](https://github.com/PerplFoundation/api-docs). |
+
+Guardian can **only pause**. It cannot move funds or change params. There is **no privileged mint** anywhere (dUSD faucet is 100 / hour, lifetime 1,000 per address).
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  User -->|dUSD| Tranches
+  Tranches -->|deposit/withdraw| Vault[BlitzVault]
+  Vault -->|pull / return| Engine[EngineLite]
+  Engine -->|half dUSD margin + half swap| Spot[WMON spot]
+  Engine -->|openShort equal notional| Venue[IVenue]
+  Venue -->|SimVenue today| Sim[funding pot]
+  Engine -->|crank: funding + mark PnL| Tranches
+  Tranches -->|Hull 8% then residual| Hull
+  Tranches -->|first loss| Ballast
+```
+
+Hull is senior at `HULL_RATE_BPS = 800` (8% annualized). Fee `FEE_BPS = 1000` (10% of positive gross). Reserve target `200` bps of TVL. Subordination floor: Ballast ≥ 20% of deck TVL (`THETA_MIN_BPS = 2000`), except exits that **improve** the ratio. Negative yield eats Ballast, then reserve; if both would be exhausted the crank reverts `HullImpairment()` — v0 does not silently haircut Hull.
+
+---
+
+## Addresses
+
+Source of truth: [`ADDRESSES.json`](./ADDRESSES.json) (deploy writes it; `pnpm sync` copies ABIs + generates `app/lib/addresses.ts`).
+
+Explorer: testnet [MonadVision](https://testnet.monadvision.com) · mainnet [MonadVision](https://monadvision.com).
+
+| Contract | Testnet (10143) | Mainnet (143) |
+| --- | --- | --- |
+| DemoUSD | *not yet — run Deploy.s.sol* | — |
+| Guardian | — | — |
+| BlitzVault | — | — |
+| Tranches | — | — |
+| Hull | — | — |
+| Ballast | — | — |
+| SimVenue | — | — |
+| PerplVenue (stub) | — | — |
+| EngineLite | — | — |
+| MockWMON / MockRouter | local / testnet until a real dUSD/WMON pool exists | — |
+
+The committed `ADDRESSES.json` is the last **local Anvil** deploy (`chainId: 31337`). After testnet broadcast, commit the new file and re-run `pnpm sync`. Verified Sourcify links: `https://testnet.monadvision.com/address/<addr>` (tick appears once `forge verify-contract` succeeds).
+
+Canonical refs (never guessed — from [docs.monad.xyz/developer-essentials/network-information](https://docs.monad.xyz/developer-essentials/network-information) and Puddle):
+
+| Ref | Address / URL |
+| --- | --- |
+| Testnet RPC | `https://testnet-rpc.monad.xyz` |
+| Mainnet RPC | `https://rpc.monad.xyz` |
+| WMON testnet | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
+| WMON mainnet | `0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A` |
+| Puddle UniswapV2Router02 | `0x430c23895c8D44883526e3E0B09327dAD8766660` |
+
+---
+
+## Quickstart
+
+Need: [Foundry](https://book.getfoundry.sh/getting-started/installation), Node 20+, [pnpm](https://pnpm.io).
+
+```bash
+git clone https://github.com/Lemma-Development-Labs/vessel.git
+cd vessel
+pnpm install
+cd app && pnpm install && cd ..
+```
+
+### Env
+
+| File | Vars |
+| --- | --- |
+| `contracts/.env` | `MONAD_TESTNET_RPC=https://testnet-rpc.monad.xyz` · `MONAD_MAINNET_RPC=https://rpc.monad.xyz` · `DEPLOYER_PK=` |
+| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` for stage; `0` after deploy. RPC/chain: testnet `10143` or Anvil `31337` + `http://127.0.0.1:8545`. Explorer `https://testnet.monadvision.com`. |
+| `.env` (keeper) | `RPC_URL` · `KEEPER_PK` (gas-only wallet) · `CRANK_INTERVAL_SEC=300` |
+
+```bash
+cp contracts/.env.example contracts/.env
+cp app/.env.example app/.env.local
+cp .env.example .env
+```
+
+### Tests (must be green before any deploy)
+
+```bash
+cd contracts
+forge test -vvv --offline
+forge test --offline --fuzz-runs 10000
+```
+
+### Local machine (Anvil)
+
+```bash
+anvil --host 0.0.0.0
+# other terminal
+cd contracts
+forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+cd .. && pnpm sync
+# app/.env.local → NEXT_PUBLIC_USE_MOCK=0  NEXT_PUBLIC_CHAIN_ID=31337  NEXT_PUBLIC_RPC=http://127.0.0.1:8545
+cd app && pnpm dev
+```
+
+SimVenue is seeded with **100 dUSD** (one faucet). The token has no admin mint and a 1,000 lifetime cap; extra venue seed after the 1-hour cooldown.
+
+### Testnet deploy + verify
+
+```bash
+cd contracts
+source .env
+forge test --offline --fuzz-runs 10000
+forge script script/Deploy.s.sol --rpc-url $MONAD_TESTNET_RPC --broadcast --private-key $DEPLOYER_PK
+```
+
+Verify every contract ([guide](https://docs.monad.xyz/guides/verify-smart-contract)):
+
+```bash
+# Sourcify (Monad)
+forge verify-contract <ADDR> src/DemoUSD.sol:DemoUSD --chain 10143 \
+  --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/
+# repeat for Guardian, BlitzVault, Tranches, SimVenue, PerplVenue, EngineLite, MockWMON, MockRouter
+```
+
+```bash
+cd .. && pnpm sync
+# app/.env.local: NEXT_PUBLIC_USE_MOCK=0  NEXT_PUBLIC_CHAIN_ID=10143
+cd app && pnpm dev
+```
+
+Mainnet mirror (chain 143): same script with `MONAD_MAINNET_RPC`. Deployer needs 2–5 real MON. `ADDRESSES.json` is a single object — re-run deploy on mainnet overwrites unless you snapshot the testnet file first.
+
+### App + keeper
+
+```bash
+cd app && pnpm dev          # http://localhost:3000  (USE_MOCK=1 works with no wallet)
+# production-style:
+pnpm build && pnpm start  # binds 0.0.0.0, honors $PORT
+
+# from repo root, after funding the keeper (≥ 0.5 native)
+pnpm keeper               # or: node --env-file=.env --import tsx scripts/keeper.ts
+```
+
+`crank()` is permissionless. The keeper key cannot pause, mint, or move user funds.
+
+### Bad-day demo
+
+```bash
+cd contracts
+SIM_VENUE=<from ADDRESSES.json> RATE_BPS=-1200 \
+  forge script script/SetRate.s.sol --rpc-url $RPC --broadcast --private-key $DEPLOYER_PK
+# then one crank — Ballast (then reserve) drains on screen; HullImpairment if the hole is too big
+```
+
+Stage wallets (after each has faucet'd):
+
+```bash
+DUSD=… TRANCHES=… ALICE_PK=… BOB_PK=… forge script script/Seed.s.sol --broadcast --rpc-url $RPC
+```
+
+---
+
+## Demo script (stage)
+
+1. Open the app (`USE_MOCK=1` is enough for a dry run; `=0` on a fresh wallet for the real path).
+2. **Faucet** 100 dUSD.
+3. **Join Ballast** first (20% floor). Then **Join Hull**.
+4. **Deploy hedge** (engine pulls 90% of vault assets, swaps half to WMON, opens an equal short).
+5. Wait ≥ 1s, **Crank** — waterfall animates from the `Waterfall` event fields (gross, fee, toReserve, toTreasury, hullAccrual, toBallast, fromBallast, fromReserve).
+6. **Exit**. On a live book, large exits may need `unwind()` first so the vault has idle cash (10% buffer otherwise).
+
+Keeper: leave it running; the waterfall list is the auto-crank tape.
+
+---
+
+## Repo
+
+```
+contracts/     Foundry ^0.8.24  (DemoUSD, BlitzVault, Tranches, EngineLite, venues, Guardian)
+app/           Next.js  — UI + VesselDataProvider (MockProvider | ChainProvider)
+scripts/       sync.mjs · keeper.ts
+ADDRESSES.json deploy output
+```
+
+`pnpm sync` copies six ABIs from `contracts/out` into `app/lib/abis/` and regenerates `app/lib/addresses.ts` (typed, `assertChain`).
+
+License: MIT.
