@@ -97,7 +97,7 @@ flowchart LR
 | --- | --- |
 | `DemoUSD` | 6-dec faucet token. 100 dUSD / hour, 1,000 lifetime cap. No admin mint. |
 | `Guardian` | Ownable pause. Pause-only. |
-| `BlitzVault` | ERC-4626 over dUSD. `DEPLOYABLE_BPS = 9000`. Dead shares: 100 dUSD to `dEaD` at deploy. `_decimalsOffset() = 6`. |
+| `BlitzVault` | ERC-4626 over dUSD. `DEPLOYABLE_BPS = 9000`. `deposit`/`mint` restricted to `Tranches`; previews open. Dead shares: 100 dUSD to `dEaD` via one-shot `seedDeadShares()`. `_decimalsOffset() = 6`. |
 | `Tranches` | Join/exit Hull & Ballast. `settle(grossYield)` waterfall. |
 | `TrancheToken` | `HULL` / `BAL` ERC-20s minted by Tranches. |
 | `EngineLite` | Wire-once. `deployLiquidity` / `crank` / `unwind`. Permissionless crank. |
@@ -439,6 +439,6 @@ External security audit (the hard gate) · real venue: PerplVenue against Perpl�
 
 Until every line here is crossed, the banner stays amber and the first word stays **unaudited**.
 
-Known v0 limits (also in SECURITY.md): public ERC-4626 bypasses the 20% Ballast floor; `settle` can book NAV above vault cash until `unwind`; SimVenue not Perpl; single-key owner.
+Known v0 limits (also in SECURITY.md): the dead-share seed strands a share of every yield credit, so a full final exit can revert; `settle` can book NAV above vault cash until `unwind`; SimVenue not Perpl; single-key owner. Share issuance is no longer public — `deposit`/`mint` are restricted to `Tranches`.
 
 License: MIT.
