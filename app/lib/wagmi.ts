@@ -1,6 +1,7 @@
 "use client";
 
 import { createConfig, http, injected } from "wagmi";
+import { walletConnect } from "wagmi/connectors/walletConnect";
 import { defineChain, fallback, type Chain } from "viem";
 import { foundry } from "viem/chains";
 import { CHAIN_ID } from "./addresses";
@@ -26,8 +27,7 @@ function rpcList(): string[] {
 
 const rpcs = rpcList();
 
-const explorer =
-  process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
+const explorer = process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
 
 const envChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? CHAIN_ID);
 
@@ -36,7 +36,7 @@ export const monadTestnet = defineChain({
   name: "Monad Testnet",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
   rpcUrls: { default: { http: rpcs } },
-  blockExplorers: { default: { name: "MonadVision", url: explorer } },
+  blockExplorers: { default: { name: "Monad Testnet Explorer", url: explorer } },
 });
 
 function makeChain(): Chain {
@@ -53,9 +53,7 @@ function makeChain(): Chain {
       name: "Monad",
       nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
       rpcUrls: { default: { http: rpcs } },
-      blockExplorers: {
-        default: { name: "MonadVision", url: "https://monadvision.com" },
-      },
+      blockExplorers: { default: { name: "Monad Explorer", url: "https://monadvision.com" } },
     });
   }
   return monadTestnet;
@@ -63,9 +61,43 @@ function makeChain(): Chain {
 
 export const vesselChain = makeChain();
 
+/**
+ * PHASE 3.1 — mobile access.
+ *
+ * Injected-only meant the app was unusable on mobile Safari, which is most of
+ * the people who open a link from a phone: there is no injected provider there,
+ * so "Connect" did nothing. WalletConnect v2 is the path that works.
+ *
+ * It is opt-in on the project id: without NEXT_PUBLIC_WC_PROJECT_ID the
+ * connector would fail at runtime, so we omit it rather than ship a button
+ * that throws. `WC_ENABLED` lets the UI explain the gap instead of hiding it.
+ */
+export const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+export const WC_ENABLED = Boolean(WC_PROJECT_ID);
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://testnet.vessel.wtf";
+
+const connectors = [
+  injected({ shimDisconnect: true }),
+  ...(WC_PROJECT_ID
+    ? [
+        walletConnect({
+          projectId: WC_PROJECT_ID,
+          showQrModal: true,
+          metadata: {
+            name: "Vessel (testnet)",
+            description: "Delta-neutral tranched vault on Monad testnet. Demo assets, unaudited.",
+            url: APP_URL,
+            icons: [`${APP_URL}/favicon.ico`],
+          },
+        }),
+      ]
+    : []),
+];
+
 export const wagmiConfig = createConfig({
   chains: [vesselChain],
-  connectors: [injected()],
+  connectors,
   transports: {
     [vesselChain.id]: fallback(rpcs.map((u) => http(u))),
   },
@@ -74,3 +106,26 @@ export const wagmiConfig = createConfig({
 
 export const EXPLORER = explorer;
 export const TARGET_CHAIN_ID = vesselChain.id;
+
+/** Chain params for wallet_addEthereumChain, from the configured chain. */
+export const ADD_CHAIN_PARAMS = {
+  chainId: `0x${TARGET_CHAIN_ID.toString(16)}`,
+  chainName: vesselChain.name,
+  nativeCurrency: vesselChain.nativeCurrency,
+  rpcUrls: [vesselChain.rpcUrls.default.http[0]],
+  blockExplorerUrls: vesselChain.blockExplorers ? [vesselChain.blockExplorers.default.url] : [],
+} as const;
+
+/**
+ * Where a stranger gets gas. Gas comes before dUSD: without MON no
+ * transaction can be sent at all, including the dUSD faucet, so this link has
+ * to come first in the onboarding order.
+ */
+export const MONAD_FAUCET_URL =
+  process.env.NEXT_PUBLIC_MONAD_FAUCET ?? "https://faucet.monad.xyz";
+
+/** True on phones/tablets, where WalletConnect should lead. SSR-safe. */
+export function isMobileUA(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile Safari/i.test(navigator.userAgent);
+}

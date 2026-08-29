@@ -3,14 +3,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { MIN_JOIN } from "./gas";
 import { VesselContext } from "./context";
+import { ok, type Live } from "./live";
 import {
   COPY,
-  EMPTY_META,
   thetaWouldHold,
   type DeckKind,
-  type DeckStats,
-  type EngineView,
-  type PositionMeta,
   type Toast,
   type VesselDataProvider,
   type WaterfallEvent,
@@ -18,6 +15,50 @@ import {
 
 const MOCK_ADDR = "0xA11CE00000000000000000000000000000000ace" as const;
 const TX_MS = 1_800;
+
+/**
+ * The demo provider keeps plain values internally — its simulation logic is
+ * unchanged — and lifts them into `Live<T>` only at the boundary, tagged
+ * `source: "mock"`. That tag is what lets the UI say "demo data · not chain
+ * state" instead of quietly passing fiction off as a reading.
+ */
+type RawDeck = {
+  hullTvl: bigint;
+  balTvl: bigint;
+  reserve: bigint;
+  treasuryAccrued: bigint;
+  hullSupply: bigint;
+  balSupply: bigint;
+  lastSettle: bigint;
+  thetaBps: bigint;
+};
+
+type RawEngine = {
+  spotQty: bigint;
+  spotValue: bigint;
+  shortNotional: bigint;
+  netDelta: bigint;
+  netDeltaBps: bigint;
+  fundingAccrued: bigint;
+  fundingRateBps: bigint;
+  lastCrankTs: bigint;
+  lastBlock: number;
+  venueName: string;
+  simulated: boolean;
+  shortId: bigint;
+  keeperActive: boolean;
+  lastCrankBy: `0x${string}`;
+};
+
+type RawMeta = { boardedAt: number; principal: bigint; spark: number[] };
+
+const RAW_EMPTY_META: RawMeta = { boardedAt: 0, principal: 0n, spark: [] };
+
+/** Protocol constants the mock mirrors from the contracts. */
+const MOCK_HULL_RATE_BPS = 800n;
+const MOCK_RESERVE_TARGET_BPS = 200n;
+const MOCK_THETA_MIN_BPS = 2_000n;
+const MOCK_FEE_BPS = 1_000n;
 
 function dusd(n: number): bigint {
   return BigInt(Math.round(n * 1e6));
@@ -37,7 +78,7 @@ function fakeHash(): string {
   return `0xmock${Date.now().toString(16)}`;
 }
 
-const SEEDED_DECK: DeckStats = {
+const SEEDED_DECK: RawDeck = {
   hullTvl: dusd(41_250),
   balTvl: dusd(12_930.55),
   reserve: dusd(487.2),
@@ -46,12 +87,9 @@ const SEEDED_DECK: DeckStats = {
   balSupply: 12_930n * 10n ** 12n,
   lastSettle: BigInt(Math.floor(Date.now() / 1000) - 12),
   thetaBps: 2387n,
-  hullRateBps: 800n,
-  balLeveredAprBps: 1940n,
-  reserveTargetBps: 200n,
 };
 
-function seededEngine(t: number): EngineView {
+function seededEngine(t: number): RawEngine {
   const drift = Math.sin(t / 8000) * 0.4;
   const bps = BigInt(Math.round(drift * 100));
   return {
@@ -61,6 +99,7 @@ function seededEngine(t: number): EngineView {
     netDelta: dusd(16.04 + drift * 50),
     netDeltaBps: bps,
     fundingAccrued: dusd(14.211) + BigInt(Math.floor((t % 1_000_000) * 0.2)),
+    fundingRateBps: 1_200n,
     lastCrankTs: BigInt(Math.floor(Date.now() / 1000) - 18),
     lastBlock: 8_214_551,
     venueName: "SimVenue",
@@ -128,7 +167,7 @@ export function MockVesselProvider({
   const [balShares, setBalShares] = useState(() =>
     boarded ? (demo === "floor" ? dusd(80) * 10n ** 12n : dusd(250) * 10n ** 12n) : 0n,
   );
-  const [deck, setDeck] = useState<DeckStats>(() => {
+  const [deck, setDeck] = useState<RawDeck>(() => {
     if (demo === "floor") {
       return {
         ...SEEDED_DECK,
@@ -146,19 +185,19 @@ export function MockVesselProvider({
   const [lastFaucet, setLastFaucet] = useState(0);
   const [cooldownTick, setCooldown] = useState(0);
   const [hedged, setHedged] = useState(demo !== "undeployed");
-  const [hullMeta, setHullMeta] = useState<PositionMeta>(() =>
+  const [hullMeta, setHullMeta] = useState<RawMeta>(() =>
     boarded
       ? { boardedAt: Date.now() / 1000 - 3600, principal: dusd(250), spark: spark(250) }
-      : EMPTY_META,
+      : RAW_EMPTY_META,
   );
-  const [balMeta, setBalMeta] = useState<PositionMeta>(() =>
+  const [balMeta, setBalMeta] = useState<RawMeta>(() =>
     boarded
       ? {
           boardedAt: Date.now() / 1000 - 3600,
           principal: demo === "floor" ? dusd(80) : dusd(250),
           spark: spark(250.4),
         }
-      : EMPTY_META,
+      : RAW_EMPTY_META,
   );
 
   useEffect(() => {
@@ -396,35 +435,79 @@ export function MockVesselProvider({
     return e;
   }, [error, now]);
 
-  const value = useMemo<VesselDataProvider>(
-    () => ({
-      dusdBalance: emptyUser ? dusdBalance : dusdBalance,
-      hullShares: emptyUser ? 0n : hullShares,
-      balShares: emptyUser ? 0n : balShares,
-      deck,
+  const value = useMemo<VesselDataProvider>(() => {
+    const nowSec = Math.floor(now / 1000);
+    /** Lift a demo value. The "mock" tag travels with it to the UI. */
+    const M = <T,>(v: T): Live<T> => ok(v, "mock", nowSec);
+
+    // Vault liquidity model. After deployLiquidity ~90% of cash sits at the
+    // engine, so only the idle remainder can settle an exit. `?demo=illiquid`
+    // squeezes idle to almost nothing so the needs-unwind path is reachable
+    // in the demo without a live chain.
+    const totalAssets = deck.hullTvl + deck.balTvl + deck.reserve + deck.treasuryAccrued + dusd(100);
+    const deployedNow = hedged ? (totalAssets * 90n) / 100n : 0n;
+    const idleNow = demo === "illiquid" ? dusd(10) : totalAssets - deployedNow;
+
+    const rawMeta = (m: RawMeta) => ({
+      boardedAt: M(m.boardedAt),
+      principal: M(m.principal),
+      spark: M(m.spark),
+    });
+
+    return {
+      dusdBalance: M(dusdBalance),
+      hullShares: M(emptyUser ? 0n : hullShares),
+      balShares: M(emptyUser ? 0n : balShares),
+      deck: {
+        hullTvl: M(deck.hullTvl),
+        balTvl: M(deck.balTvl),
+        reserve: M(deck.reserve),
+        treasuryAccrued: M(deck.treasuryAccrued),
+        hullSupply: M(deck.hullSupply),
+        balSupply: M(deck.balSupply),
+        lastSettle: M(deck.lastSettle),
+        thetaBps: M(deck.thetaBps),
+        hullRateBps: M(MOCK_HULL_RATE_BPS),
+        reserveTargetBps: M(MOCK_RESERVE_TARGET_BPS),
+        thetaMinBps: M(MOCK_THETA_MIN_BPS),
+        feeBps: M(MOCK_FEE_BPS),
+      },
       engine: {
-        ...engine,
-        lastBlock: engine.lastBlock + (Math.floor(now / 4000) % 20),
-        shortId: hedged ? 1n : 0n,
-        spotQty: hedged ? engine.spotQty : 0n,
-        spotValue: hedged ? engine.spotValue : 0n,
-        shortNotional: hedged ? engine.shortNotional : 0n,
-        fundingAccrued: hedged ? engine.fundingAccrued : 0n,
-        netDelta: hedged ? engine.netDelta : 0n,
-        netDeltaBps: hedged ? engine.netDeltaBps : 0n,
+        spotQty: M(hedged ? engine.spotQty : 0n),
+        spotValue: M(hedged ? engine.spotValue : 0n),
+        shortNotional: M(hedged ? engine.shortNotional : 0n),
+        netDelta: M(hedged ? engine.netDelta : 0n),
+        netDeltaBps: M(hedged ? engine.netDeltaBps : 0n),
+        fundingAccrued: M(hedged ? engine.fundingAccrued : 0n),
+        fundingRateBps: M(engine.fundingRateBps),
+        lastCrankTs: M(engine.lastCrankTs),
+        lastBlock: M(engine.lastBlock + (Math.floor(now / 4000) % 20)),
+        venueName: M(engine.venueName),
+        simulated: M(engine.simulated),
+        shortId: M(hedged ? 1n : 0n),
+        keeperActive: M(engine.keeperActive),
+        lastCrankBy: M(engine.lastCrankBy),
+      },
+      vault: { idle: M(idleNow), deployed: M(deployedNow) },
+      faucetState: {
+        cooldownSec: M(cooldownTick),
+        lifetimeRemaining: M(dusd(1_000)),
       },
       waterfall,
+      historySource: "mock",
+      paused: M(demo === "paused"),
+
       loading: false,
       connected,
       address: connected ? MOCK_ADDR : undefined,
       chainId: 10143,
       wrongNetwork: demo === "wrongnet",
       reconnecting: error,
-      paused: demo === "paused",
       impaired,
-      faucetCooldownSec: cooldownTick,
-      hullMeta: emptyUser ? EMPTY_META : hullMeta,
-      balMeta: emptyUser ? EMPTY_META : balMeta,
+      isMock: true,
+
+      hullMeta: rawMeta(emptyUser ? RAW_EMPTY_META : hullMeta),
+      balMeta: rawMeta(emptyUser ? RAW_EMPTY_META : balMeta),
       toasts,
       faucet,
       deposit: (amount, kind) => joinDeck(amount, kind),
@@ -441,41 +524,28 @@ export function MockVesselProvider({
         }
         await runMockTx("Deploy hedge", () => setHedged(true));
       },
+      unwind: async () => {
+        if (!hedged) {
+          push({ kind: "error", text: "No hedge to unwind" });
+          return;
+        }
+        await runMockTx("Unwind hedge", () => setHedged(false));
+      },
+      connectors: [
+        { id: "injected", name: "Browser wallet", ready: true },
+        { id: "walletConnect", name: "WalletConnect", ready: true },
+      ],
       connect: async () => setConnected(true),
       disconnect: async () => setConnected(false),
       switchNetwork: async () => {},
       dismissToast,
-    }),
-    [
-      balMeta,
-      balShares,
-      connected,
-      cooldownTick,
-      crank,
-      deck,
-      demo,
-      dusdBalance,
-      emptyUser,
-      engine,
-      error,
-      exitBallast,
-      exitHull,
-      faucet,
-      hedged,
-      hullMeta,
-      hullShares,
-      impaired,
-      joinBallast,
-      joinDeck,
-      joinHull,
-      now,
-      push,
-      runMockTx,
-      toasts,
-      waterfall,
-      dismissToast,
-    ],
-  );
+    };
+  }, [
+    balMeta, balShares, connected, cooldownTick, crank, deck, demo, dusdBalance,
+    emptyUser, engine, error, exitBallast, exitHull, faucet, hedged, hullMeta,
+    hullShares, impaired, joinBallast, joinDeck, joinHull, now, push, runMockTx,
+    toasts, waterfall, dismissToast,
+  ]);
 
   return <VesselContext.Provider value={value}>{children}</VesselContext.Provider>;
 }

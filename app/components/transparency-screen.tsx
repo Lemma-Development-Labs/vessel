@@ -1,35 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useVessel } from "@/lib/context";
 import { ADDRESSES } from "@/lib/addresses";
-import { formatDusd, formatDusd4, formatTs, formatWmon, shorten } from "@/lib/format";
+import { formatDusd, formatDusd4, formatTs, formatWmon } from "@/lib/format";
 import { useNowSec } from "@/lib/now";
+import { map2, mapLive, valueOrForLogic } from "@/lib/live";
 import { AddressChip, Badge, Button, Card, Gauge, Skeleton } from "@/components/ui";
+import { ChartUnavailable, SourceChip, Unavailable, Val } from "@/components/live";
 import { DeployHedgeCta } from "@/components/hedge-cta";
+import { UnwindCard } from "@/components/exit-flow";
 import type { WaterfallEvent } from "@/lib/provider";
 
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
+
+/** One crank interval. Older reads render dim with an age label. */
+const STALE_AFTER_SEC = 300;
 
 export function TransparencyScreen() {
   const v = useVessel();
   const nowSec = useNowSec();
   const [freeze, setFreeze] = useState(false);
-  const pct = Number(v.engine.netDeltaBps) / 100;
-  const [jitter, setJitter] = useState(0);
 
-  useEffect(() => {
-    if (freeze) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) return;
-    const id = window.setInterval(() => {
-      setJitter((Math.random() * 2 - 1) * 0.03);
-    }, 2000);
-    return () => window.clearInterval(id);
-  }, [freeze]);
-
-  const undeployed = v.engine.shortId === 0n;
-  const spotVia = v.engine.simulated ? "MockRouter" : "DEX router";
+  const shortId = valueOrForLogic(v.engine.shortId, 0n);
+  const undeployed = shortId === 0n;
+  const simulated = valueOrForLogic(v.engine.simulated, true);
 
   if (v.loading) {
     return (
@@ -50,53 +45,93 @@ export function TransparencyScreen() {
       <p className="mt-3 max-w-xl text-base text-dim">
         Everything the engine does, visible and live. Demo dollars. Unaudited.
       </p>
+      <p className="mt-3 text-sm text-dim">
+        Every number on this page is a chain read. Anything we could not read shows as{" "}
+        <span className="num text-steel/60">—</span>, never as a zero.
+      </p>
 
       <Card className="mt-10 p-5 md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="display text-lg">{undeployed ? "The hedge, pending" : "The hedge, live"}</h2>
             <p className="num mt-1 text-[11.5px] text-steel">
-              last update: block {v.engine.lastBlock.toLocaleString()} ·{" "}
-              {v.engine.lastCrankTs
-                ? `${Math.max(0, nowSec - Number(v.engine.lastCrankTs))}s ago`
-                : "—"}
+              last update: block{" "}
+              <Val of={v.engine.lastBlock}>{(b) => b.toLocaleString()}</Val> ·{" "}
+              <Val of={v.engine.lastCrankTs}>
+                {(t) => (t > 0n ? `${Math.max(0, nowSec - Number(t))}s ago` : "no crank yet")}
+              </Val>
             </p>
           </div>
-          {v.engine.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}
+          {simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-xl border border-white/8">
           <HedgeRow
             label="SPOT LEG"
-            a={`WMON ${formatWmon(v.engine.spotQty)}`}
-            b={`value ${formatDusd(v.engine.spotValue)} dUSD`}
-            c={spotVia}
+            a={
+              <Val of={v.engine.spotQty} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
+                {(q) => `WMON ${formatWmon(q)}`}
+              </Val>
+            }
+            b={
+              <Val of={v.engine.spotValue} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
+                {(x) => `value ${formatDusd(x)} dUSD`}
+              </Val>
+            }
+            c={simulated ? "MockRouter" : "DEX router"}
           />
           <HedgeRow
             label="SHORT LEG"
-            a={`notional ${formatDusd(v.engine.shortNotional)} dUSD`}
-            b={v.engine.simulated ? "SimVenue" : v.engine.venueName}
-            c={
-              v.engine.shortNotional === 0n
-                ? "no position"
-                : `margin ${formatDusd(v.engine.shortNotional / 2n)}`
+            a={
+              <Val of={v.engine.shortNotional} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
+                {(n) => `notional ${formatDusd(n)} dUSD`}
+              </Val>
             }
-            amber={v.engine.simulated}
+            b={<Val of={v.engine.venueName}>{(n) => n}</Val>}
+            c={
+              // SimVenue models no margin account, so we do not invent one.
+              // The old screen showed "margin = notional / 2", which was a
+              // guess presented in the same style as a reading.
+              <span className="text-steel/60" title="SimVenue does not expose a margin balance.">
+                margin not exposed by venue
+              </span>
+            }
+            amber={simulated}
           />
           <HedgeRow
             label="FUNDING"
-            a={`accrued today ${v.engine.fundingAccrued >= 0n ? "+" : ""}${formatDusd4(v.engine.fundingAccrued)} dUSD`}
-            b="rate 12.00% APR"
+            a={
+              <Val of={v.engine.fundingAccrued} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
+                {(f) => `accrued ${f >= 0n ? "+" : ""}${formatDusd4(f)} dUSD`}
+              </Val>
+            }
+            b={
+              <Val of={v.engine.fundingRateBps}>
+                {(r) => `rate ${(Number(r) / 100).toFixed(2)}% APR`}
+              </Val>
+            }
             phosphor
           />
         </div>
 
         <div className="mt-6">
-          <Gauge pct={pct + jitter} freeze={freeze} />
+          {/* The gauge previously had ±0.03% of random jitter added to make it
+              look alive. On the screen whose argument is "watch the hedge",
+              synthetic movement on the risk metric is the worst possible
+              flourish. It renders the read, or nothing. */}
+          {v.engine.netDeltaBps.status === "ok" ? (
+            <Gauge pct={Number(v.engine.netDeltaBps.value) / 100} freeze={freeze} />
+          ) : (
+            <ChartUnavailable
+              className="min-h-[64px]"
+              reason={`net delta unavailable — ${v.engine.netDeltaBps.reason}`}
+            />
+          )}
         </div>
       </Card>
 
       <DeployHedgeCta className="mt-6" />
+      <UnwindCard className="mt-6" />
 
       <Card className="mt-6 p-5 sm:p-6">
         <Button
@@ -112,19 +147,30 @@ export function TransparencyScreen() {
         <p className="mt-3 text-center text-sm text-dim">
           Anyone can crank. Settlement is a public function.
         </p>
-        {v.engine.keeperActive ? (
-          <p className="num mt-2 text-center text-[11px] text-steel">
-            Auto-crank every 5 min — last by {v.engine.lastCrankBy ? shorten(v.engine.lastCrankBy) : "keeper"}
-          </p>
-        ) : null}
+        <p className="num mt-2 text-center text-[11px] text-steel">
+          {v.engine.keeperActive.status === "ok" && v.engine.keeperActive.value ? (
+            <>Hosted keeper is configured — see the status page for its last run.</>
+          ) : (
+            <Unavailable reason={
+              v.engine.keeperActive.status === "unavailable"
+                ? v.engine.keeperActive.reason
+                : "no hosted keeper"
+            } />
+          )}
+        </p>
       </Card>
 
       <div className="mt-6">
-        <h2 className="display text-lg">Waterfall log</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-lg">Waterfall log</h2>
+          <SourceChip source={v.historySource} />
+        </div>
         <div className="mt-4 flex flex-col gap-4">
           {v.waterfall.length === 0 ? (
             <Card className="px-4 py-10 text-center text-sm text-dim">
-              No settle yet. Crank to see the split.
+              {v.historySource === "none"
+                ? "History unavailable — no stats service and the RPC returned no logs."
+                : "No settle yet. Crank to see the split."}
             </Card>
           ) : (
             v.waterfall.map((ev, i) => (
@@ -132,6 +178,11 @@ export function TransparencyScreen() {
                 key={ev.txHash}
                 ev={ev}
                 animate={i === 0 && !freeze}
+                hullRateLabel={
+                  v.deck.hullRateBps.status === "ok"
+                    ? `${(Number(v.deck.hullRateBps.value) / 100).toFixed(0)}% APR × TVL × dt`
+                    : null
+                }
               />
             ))
           )}
@@ -163,8 +214,16 @@ export function TransparencyScreen() {
               <span className="num text-[11px] tracking-[0.14em] text-steel">{name}</span>
               <div className="flex min-w-0 items-center gap-3">
                 <AddressChip address={addr} href={`${EXPLORER}/address/${addr}`} />
-                <a href={`${EXPLORER}/address/${addr}`} className="text-phosphor">
-                  <Badge kind="verified" />
+                {/* Every row used to carry a "verified" badge. Only DemoUSD's
+                    Sourcify verification is confirmed (see FACTS.md), so we
+                    link to the explorer and let the reader check, rather than
+                    asserting a status we have not established for each one. */}
+                <a
+                  href={`${EXPLORER}/address/${addr}`}
+                  className="num text-[11px] text-purple"
+                  title="Check verification status on the explorer"
+                >
+                  explorer ↗
                 </a>
               </div>
             </div>
@@ -191,9 +250,9 @@ function HedgeRow({
   amber,
 }: {
   label: string;
-  a: string;
-  b: string;
-  c?: string;
+  a: React.ReactNode;
+  b: React.ReactNode;
+  c?: React.ReactNode;
   phosphor?: boolean;
   amber?: boolean;
 }) {
@@ -207,29 +266,42 @@ function HedgeRow({
   );
 }
 
-function WaterfallPlay({ ev, animate }: { ev: WaterfallEvent; animate: boolean }) {
+function WaterfallPlay({
+  ev,
+  animate,
+  hullRateLabel,
+}: {
+  ev: WaterfallEvent;
+  animate: boolean;
+  hullRateLabel: string | null;
+}) {
   const negative = ev.gross < 0n;
   const mag = ev.gross < 0n ? -ev.gross : ev.gross;
-  const hullShare = mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / (mag === 0n ? 1n : mag));
-  const cls = animate ? "" : "";
+  const hullShare = mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / mag);
 
   if (negative) {
+    // Width is the real Ballast share of the loss, not a fixed 62% bar.
+    const absorbed = ev.fromBallast + ev.fromReserve;
+    const balPct = absorbed === 0n ? 0 : Number((ev.fromBallast * 100n) / absorbed);
     return (
       <Card className="overflow-hidden p-4">
         <div className={`h-8 rounded-md bg-red/20 ${animate ? "waterfall-gross" : ""}`}>
           <span className="num px-3 text-[12px] leading-8 text-red">GROSS −{formatDusd4(mag)} dUSD</span>
         </div>
         <div className="mt-3 h-6 overflow-hidden rounded-md bg-brass/40">
-          <div className="h-full bg-brass" style={{ width: "62%" }} />
+          <div className="h-full bg-brass" style={{ width: `${Math.max(2, balPct)}%` }} />
         </div>
-        <p className="num mt-2 text-[11px] text-brass">absorbed by Ballast</p>
+        <p className="num mt-2 text-[11px] text-brass">
+          absorbed by Ballast {formatDusd4(ev.fromBallast)}
+          {ev.fromReserve > 0n ? ` · reserve ${formatDusd4(ev.fromReserve)}` : ""}
+        </p>
         <Row ev={ev} />
       </Card>
     );
   }
 
   return (
-    <Card className={`overflow-hidden p-4 ${cls}`}>
+    <Card className="overflow-hidden p-4">
       <div className={`relative h-9 overflow-hidden rounded-md bg-phosphor/20 ${animate ? "waterfall-gross" : ""}`}>
         <span className="num px-3 text-[12px] leading-9">GROSS +{formatDusd4(mag)} dUSD</span>
       </div>
@@ -241,11 +313,12 @@ function WaterfallPlay({ ev, animate }: { ev: WaterfallEvent; animate: boolean }
       <div className="mt-3 h-7 overflow-hidden rounded-md bg-white/5">
         <div
           className={`h-full bg-steel/80 ${animate ? "waterfall-hull" : ""}`}
-          style={{ width: `${Math.max(6, hullShare)}%` }}
+          style={{ width: `${Math.max(2, hullShare)}%` }}
         />
       </div>
       <p className="num mt-1 text-[11px] text-steel">
-        HULL ACCRUAL +{formatDusd4(ev.hullAccrual)} (8% APR × TVL × dt)
+        HULL ACCRUAL +{formatDusd4(ev.hullAccrual)}
+        {hullRateLabel ? ` (${hullRateLabel})` : ""}
       </p>
       <div className={`mt-2 h-7 rounded-md bg-brass/80 ${animate ? "waterfall-ballast" : ""}`}>
         <span className="num px-3 text-[12px] leading-7 text-[#0A0A14]">
@@ -264,12 +337,14 @@ function Row({ ev }: { ev: WaterfallEvent }) {
       <span>G {formatDusd4(ev.gross < 0n ? -ev.gross : ev.gross)}</span>
       <span>fee {formatDusd4(ev.fee)}</span>
       <span>hull {formatDusd4(ev.hullAccrual)}</span>
-      <span>bal {formatDusd4(ev.toBallast || ev.fromBallast)}</span>
+      <span>bal {formatDusd4(ev.toBallast > 0n ? ev.toBallast : ev.fromBallast)}</span>
       {ev.txHash ? (
         <a href={`${EXPLORER}/tx/${ev.txHash}`} className="text-purple">
-          {ev.blockNumber ? `#${ev.blockNumber.toString()}` : "tx"} ↗
+          {ev.blockNumber !== undefined ? `#${ev.blockNumber.toString()}` : "tx"} ↗
         </a>
       ) : null}
     </div>
   );
 }
+
+export { map2, mapLive };

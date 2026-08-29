@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useVessel } from "@/lib/context";
 import { COPY, thetaWouldHold, type DeckKind } from "@/lib/provider";
 import { MIN_JOIN } from "@/lib/gas";
-import { formatBps, formatDusd, parseDusd } from "@/lib/format";
+import { formatDusd, parseDusd } from "@/lib/format";
+import { map2, mapLive, valueOrForLogic, type Live } from "@/lib/live";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { Val } from "@/components/live";
 import { DeployHedgeCta } from "@/components/hedge-cta";
+import { ConnectButton, GasFirstCard } from "@/components/connect";
 
 export function DepositScreen() {
   const v = useVessel();
@@ -16,20 +19,34 @@ export function DepositScreen() {
   const [deck, setDeck] = useState<DeckKind>("ballast");
   const [done, setDone] = useState<{ amount: bigint; deck: DeckKind } | null>(null);
 
+  const balance = valueOrForLogic(v.dusdBalance, 0n);
+  const hullTvlN = valueOrForLogic(v.deck.hullTvl, 0n);
+  const balTvlN = valueOrForLogic(v.deck.balTvl, 0n);
+  const paused = valueOrForLogic(v.paused, false);
+  const cooldown = valueOrForLogic(v.faucetState.cooldownSec, 0);
+  const lifetimeLeft = v.faucetState.lifetimeRemaining;
+
   const validShape = /^\d+(\.\d{0,6})?$/.test(amt.trim());
   const parsed = validShape ? parseDusd(amt) : 0n;
-  const over = parsed > v.dusdBalance;
-  const hullAfter = deck === "hull" ? v.deck.hullTvl + parsed : v.deck.hullTvl;
-  const balAfter = deck === "ballast" ? v.deck.balTvl + parsed : v.deck.balTvl;
+  const over = v.dusdBalance.status === "ok" && parsed > balance;
+  const hullAfter = deck === "hull" ? hullTvlN + parsed : hullTvlN;
+  const balAfter = deck === "ballast" ? balTvlN + parsed : balTvlN;
   const floorOk = thetaWouldHold(hullAfter, balAfter);
+
   const joinOk =
     v.connected &&
     validShape &&
     parsed >= MIN_JOIN &&
     !over &&
     floorOk &&
-    !v.paused &&
-    !v.wrongNetwork;
+    !paused &&
+    !v.wrongNetwork &&
+    v.deck.hullTvl.status === "ok" &&
+    v.deck.balTvl.status === "ok";
+
+  // Only claim the faucet is on cooldown when we actually read the timestamp.
+  const faucetBlocked = v.faucetState.cooldownSec.status === "ok" && cooldown > 0;
+  const capReached = lifetimeLeft.status === "ok" && lifetimeLeft.value === 0n;
 
   if (v.loading) {
     return (
@@ -44,12 +61,9 @@ export function DepositScreen() {
   if (!v.connected) {
     return (
       <div className="mx-auto max-w-[720px] px-4 py-16 sm:px-5">
-        <EmptyState
-          title="Connect to board"
-          action={<Button onClick={() => void v.connect()}>Connect wallet</Button>}
-        />
+        <EmptyState title="Connect to board" action={<ConnectButton />} />
         <p className="mt-4 text-center text-sm text-dim">
-          Use a Monad-ready wallet in this browser (Phantom, MetaMask). Demo dollars only.
+          Use a Monad-ready wallet. On a phone, use WalletConnect. Demo dollars only.
         </p>
       </div>
     );
@@ -65,22 +79,37 @@ export function DepositScreen() {
         Deposit demo dollars. Choose how you ride the yield.
       </p>
 
+      <GasFirstCard className="mt-8" />
+
       <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="num text-[10px] tracking-[0.16em] text-steel">dUSD BALANCE</p>
-          <p className="num mt-1 text-3xl">{formatDusd(v.dusdBalance)}</p>
+          <p className="num mt-1 text-3xl">
+            <Val of={v.dusdBalance}>{(b) => formatDusd(b)}</Val>
+          </p>
         </div>
         <Button
           variant="ghost"
           onClick={() => void v.faucet()}
-          tooltip={v.faucetCooldownSec > 0 ? COPY.cooldown(v.faucetCooldownSec) : undefined}
-          disabled={v.faucetCooldownSec > 0}
+          tooltip={
+            capReached
+              ? "Lifetime faucet cap reached for this address (1,000 dUSD)."
+              : faucetBlocked
+                ? COPY.cooldown(cooldown)
+                : v.faucetState.cooldownSec.status !== "ok"
+                  ? `Cooldown unknown — ${v.faucetState.cooldownSec.reason}`
+                  : undefined
+          }
+          disabled={faucetBlocked || capReached}
         >
           Get test dollars
         </Button>
       </div>
-      {v.dusdBalance === 0n ? (
+      {v.dusdBalance.status === "ok" && balance === 0n ? (
         <p className="mt-2 text-sm text-amber">Zero balance — faucet 100 dUSD to board.</p>
+      ) : null}
+      {faucetBlocked ? (
+        <p className="num mt-2 text-sm text-steel">{COPY.cooldown(cooldown)}</p>
       ) : null}
 
       <div className="mt-8 border-b border-white/12 pb-4">
@@ -88,8 +117,9 @@ export function DepositScreen() {
           <span className="num text-[10.5px] tracking-[0.16em] text-steel">AMOUNT</span>
           <button
             type="button"
-            className="num min-h-11 text-[11px] text-purple"
-            onClick={() => setAmt(formatDusd(v.dusdBalance).replace(/,/g, ""))}
+            className="num min-h-11 text-[11px] text-purple disabled:opacity-40"
+            disabled={v.dusdBalance.status !== "ok"}
+            onClick={() => setAmt(formatDusd(balance).replace(/,/g, ""))}
           >
             MAX
           </button>
@@ -104,9 +134,7 @@ export function DepositScreen() {
         <p className="mt-2 text-sm text-dim">
           You&apos;re depositing {validShape ? formatDusd(parsed) : "0.00"} dUSD
         </p>
-        {over ? (
-          <p className="mt-2 text-sm text-red">Amount exceeds your dUSD balance.</p>
-        ) : null}
+        {over ? <p className="mt-2 text-sm text-red">Amount exceeds your dUSD balance.</p> : null}
       </div>
 
       <div role="radiogroup" aria-label="Deck" className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -116,6 +144,8 @@ export function DepositScreen() {
           onSelect={() => setDeck("hull")}
           tvl={v.deck.hullTvl}
           theta={v.deck.thetaBps}
+          thetaMin={v.deck.thetaMinBps}
+          rate={mapLive(v.deck.hullRateBps, (r) => `${(Number(r) / 100).toFixed(2)}% APR — fixed`)}
         />
         <DeckPick
           kind="ballast"
@@ -123,7 +153,14 @@ export function DepositScreen() {
           onSelect={() => setDeck("ballast")}
           tvl={v.deck.balTvl}
           theta={v.deck.thetaBps}
-          leverage={v.deck.balLeveredAprBps}
+          thetaMin={v.deck.thetaMinBps}
+          // Ballast's return is the residual after Hull's coupon and the fee.
+          // There is no on-chain "levered APR" to read, and the old screen
+          // printed a fixed "≈ 19.4%" as if there were. We describe the rule
+          // instead of inventing a rate.
+          rate={map2(v.deck.hullRateBps, v.deck.feeBps, (h, f) =>
+            `residual after ${(Number(h) / 100).toFixed(2)}% Hull coupon and ${(Number(f) / 100).toFixed(0)}% fee`,
+          )}
         />
       </div>
 
@@ -154,13 +191,15 @@ export function DepositScreen() {
               className="w-full"
               disabled={!joinOk}
               tooltip={
-                !floorOk && deck === "hull"
-                  ? COPY.hullFull
-                  : over
-                    ? "Amount exceeds balance"
-                    : parsed > 0n && parsed < MIN_JOIN
-                      ? "Min join is 1 dUSD"
-                      : undefined
+                v.deck.hullTvl.status !== "ok"
+                  ? `Deck state unavailable — ${v.deck.hullTvl.reason}`
+                  : !floorOk && deck === "hull"
+                    ? COPY.hullFull
+                    : over
+                      ? "Amount exceeds balance"
+                      : parsed > 0n && parsed < MIN_JOIN
+                        ? "Min join is 1 dUSD"
+                        : undefined
               }
               onClick={() => {
                 void (async () => {
@@ -190,24 +229,30 @@ function DeckPick({
   onSelect,
   tvl,
   theta,
-  leverage,
+  thetaMin,
+  rate,
 }: {
   kind: DeckKind;
   selected: boolean;
   onSelect: () => void;
-  tvl: bigint;
-  theta: bigint;
-  leverage?: bigint;
+  tvl: Live<bigint>;
+  theta: Live<bigint>;
+  thetaMin: Live<bigint>;
+  rate: Live<string>;
 }) {
   const hull = kind === "hull";
-  const thetaN = Number(theta) / 100;
-  const cushion =
-    thetaN >= 20
-      ? `${thetaN.toFixed(1)}% — above the 20% floor`
-      : thetaN >= 19
-        ? `${thetaN.toFixed(1)}% — near the 20% floor`
-        : `${thetaN.toFixed(1)}% — below the 20% floor`;
-  const cushionTone = thetaN >= 20 ? "text-phosphor" : thetaN >= 19 ? "text-amber" : "text-red";
+
+  // The floor is read from Tranches.THETA_MIN_BPS, not assumed to be 20%.
+  const cushion = map2(theta, thetaMin, (t, min) => {
+    const pct = Number(t) / 100;
+    const floor = Number(min) / 100;
+    const label =
+      pct >= floor
+        ? `${pct.toFixed(1)}% — above the ${floor.toFixed(0)}% floor`
+        : `${pct.toFixed(1)}% — below the ${floor.toFixed(0)}% floor`;
+    const tone = pct >= floor + 1 ? "text-phosphor" : pct >= floor ? "text-amber" : "text-red";
+    return { label, tone };
+  });
 
   return (
     <button
@@ -243,8 +288,8 @@ function DeckPick({
         {hull ? "HULL" : "BALLAST"}
       </h2>
       <p className="mt-1 text-sm text-dim">{hull ? "Fixed. Protected." : "Levered. First-loss."}</p>
-      <p className="num mt-4 text-[20px] sm:text-[22px]">
-        {hull ? "8.00% APR — fixed" : "≈ 19.4% APR — variable, levered residual"}
+      <p className="num mt-4 text-[17px] sm:text-[19px]">
+        <Val of={rate}>{(r) => r}</Val>
       </p>
       <ul className="mt-4 space-y-1 text-[13.5px] text-steel">
         {hull ? (
@@ -257,19 +302,17 @@ function DeckPick({
           <>
             <li>Absorbs shocks first — and gets paid for it</li>
             <li>Yield = everything above Hull&apos;s rate</li>
-            <li>Exit guarded by the 20% floor</li>
+            <li>Exit guarded by the subordination floor</li>
           </>
         )}
       </ul>
       <div className="mt-5 flex flex-wrap justify-between gap-2 text-[12px]">
         <span className="num text-dim">
-          {hull ? "Hull" : "Bal"} TVL {formatDusd(tvl)}
+          {hull ? "Hull" : "Bal"} TVL <Val of={tvl}>{(t) => formatDusd(t)}</Val>
         </span>
-        {hull ? (
-          <span className={`num ${cushionTone}`}>{cushion}</span>
-        ) : (
-          <span className="num text-brass">leverage {leverage ? formatBps(leverage) : "—"}</span>
-        )}
+        <span className="num">
+          <Val of={cushion}>{(c) => <span className={c.tone}>{c.label}</span>}</Val>
+        </span>
       </div>
     </button>
   );
