@@ -223,15 +223,18 @@ calls `multicall`/`readContract` at a historical `blockNumber`. On a non-archive
 endpoint those reads fail. Confirm archive support with the provider before
 choosing one.
 
-### Explorer URL — unresolved discrepancy
+### Explorer URL — RESOLVED 2026-08-29
 
-`.agents/skills/addresses/SKILL.md` gives the Monad testnet explorer as
-**`testnet.monadscan.com`**. This repo hardcodes **`testnet.monadvision.com`** in
-`ADDRESSES.json`, `app/lib/wagmi.ts`, `app/.env.example` and the transparency
-screen. Both return HTTP 403 to `curl` (bot protection), so neither could be
-confirmed or ruled out from the CLI. **Verify in a browser and make the repo
-consistent with whichever is canonical** — every "verify it yourself" link on the
-transparency screen depends on it.
+Both are official. `docs.monad.xyz/developer-essentials/network-information`
+lists **MonadVision** (`monadvision.com`) and **Monadscan** (`monadscan.com`)
+side by side as block explorers, and the Monad docs use `monadvision.com` in
+their own address links. `testnet.monadexplorer.com` 308-redirects and is a
+third-party mirror.
+
+This repo standardises on `testnet.monadvision.com`, which is correct and needs
+no change. The earlier 403s from `curl` were bot protection on both hosts, not
+absence — a plain HEAD request cannot distinguish "blocked" from "does not
+exist", which is why this stayed open until the canonical list settled it.
 
 ---
 

@@ -29,6 +29,27 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+
+/**
+ * Live<T> fields on the provider. `connected`, `wrongNetwork`, `loading`,
+ * `impaired` and `isMock` are plain booleans and are legitimately truthy-tested.
+ */
+const LIVE_TOP = "dusdBalance|hullShares|balShares|paused";
+const LIVE_GROUP = "engine|deck|vault|faucetState|hullMeta|balMeta";
+
+/** `v.paused ?`, `!v.paused`, `v.engine.shortId &&` — object in a boolean slot. */
+function truthinessHits(line: string): string[] {
+  const out: string[] = [];
+  const pats = [
+    new RegExp(`\\bv\\.(?:${LIVE_TOP})\\s*(?:\\?(?!\\.)|&&|\\|\\|)`, "g"),
+    new RegExp(`!\\s*v\\.(?:${LIVE_TOP})\\b(?!\\s*\\.)`, "g"),
+    new RegExp(`\\bv\\.(?:${LIVE_GROUP})\\.[A-Za-z0-9_]+\\s*(?:\\?(?!\\.)|&&|\\|\\|)`, "g"),
+    new RegExp(`!\\s*v\\.(?:${LIVE_GROUP})\\.[A-Za-z0-9_]+\\b(?!\\s*\\.)`, "g"),
+  ];
+  for (const re of pats) for (const m of line.matchAll(re)) out.push(m[0].trim());
+  return out;
+}
+
 /**
  * The structural half of Rule 0. These tests are the reason a fabricated live
  * value cannot come back by accident: they fail the build, not a review.
@@ -107,6 +128,46 @@ describe("Rule 0 — the live provider never lies", () => {
     expect(problems, `Unguarded .value access on provider fields:\n${problems.join("\n")}`).toEqual(
       [],
     );
+  });
+
+  it("no component tests a Live<T> for truthiness", () => {
+    // A Live<T> is always an OBJECT, so `v.paused ? …` is ALWAYS true. That
+    // shipped: the shell rendered "Guardian pause is on" on every screen while
+    // the chain reported paused=false. It is the same fabrication class as a
+    // defaulted zero, but the type system cannot catch it — an object in a
+    // boolean position is legal TypeScript — so it has to be caught here.
+    const files = walk(join(APP, "components")).concat(walk(join(APP, "app")));
+    const problems: string[] = [];
+    for (const f of files) {
+      readFileSync(f, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (line.includes("rule0-ok")) return;
+          for (const hit of truthinessHits(line)) {
+            problems.push(`${f.replace(APP + "/", "")}:${i + 1}: ${hit}`);
+          }
+        });
+    }
+    expect(
+      problems,
+      `Live<T> tested for truthiness (always true — check .status instead):\n${problems.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("the truthiness detector actually catches a planted violation", () => {
+    const bad = [
+      "      {v.paused ? <Banner /> : null}",
+      "      if (!v.dusdBalance) return null;",
+      "      const x = v.engine.shortId && other;",
+    ];
+    const good = [
+      '      {v.paused.status === "ok" && v.paused.value ? <Banner /> : null}',
+      "      const n = valueOrForLogic(v.dusdBalance, 0n);",
+      "      <Val of={v.engine.shortId}>{(s) => String(s)}</Val>",
+      "      if (v.connected && !v.wrongNetwork) return null;",
+    ];
+    expect(bad.flatMap(truthinessHits)).toHaveLength(3);
+    expect(good.flatMap(truthinessHits)).toHaveLength(0);
   });
 
   it("the guard check actually catches an unguarded read", () => {
