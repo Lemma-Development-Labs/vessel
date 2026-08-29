@@ -29,6 +29,10 @@ contract TranchesTest is Test {
         tranches = new Tranches(address(vault), address(guardian), treasury);
         vault.setEngine(address(this)); // unused by these tests
         tranches.setEngine(address(this));
+        dusd.faucet();
+        dusd.approve(address(vault), 100e6);
+        vault.seedDeadShares(100e6);
+        vault.setTranches(address(tranches));
         vm.stopPrank();
         _fill(alice, 10);
         _fill(bob, 10);
@@ -256,10 +260,14 @@ contract TranchesTest is Test {
     function test_unfundedSettleDivergesLedgerFromVaultCash() public {
         _seedDecks(400e6, 400e6);
         uint256 cash = vault.totalAssets();
+        // What Tranches' own vBLITZ can actually pay out. `cash` also covers the dead-share
+        // seed, so the ledger must be compared against the redeemable value of its shares.
+        uint256 redeemable = vault.previewRedeem(vault.balanceOf(address(tranches)));
         vm.warp(block.timestamp + 1);
         tranches.settle(1e6);
         uint256 ledger = tranches.hullTvl() + tranches.balTvl() + tranches.reserve() + tranches.treasuryAccrued();
-        assertGt(ledger, cash);
+        assertGt(ledger, redeemable);
+        assertEq(vault.previewRedeem(vault.balanceOf(address(tranches))), redeemable);
         assertEq(vault.totalAssets(), cash);
     }
 }

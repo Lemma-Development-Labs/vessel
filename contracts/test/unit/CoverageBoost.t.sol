@@ -32,11 +32,9 @@ contract CoverageBoostTest is Fixture {
     }
 
     function test_vaultMintAndReturnZero() public {
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 10e6);
-        uint256 shares = vault.mint(1e12, alice);
-        assertGt(shares, 0);
-        vm.stopPrank();
+        uint256 assets = _vaultMintAsTranches(1e12, alice);
+        assertGt(assets, 0);
+        assertEq(vault.balanceOf(alice), 1e12);
         vm.prank(address(engine));
         vault.returnFromEngine(0);
     }

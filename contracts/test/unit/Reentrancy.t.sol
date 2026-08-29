@@ -13,6 +13,7 @@ import {SimVenue} from "../../src/venues/SimVenue.sol";
 import {MockWMON} from "../../src/mocks/MockWMON.sol";
 import {MockRouter} from "../../src/mocks/MockRouter.sol";
 import {IVenue} from "../../src/interfaces/IVenue.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract HookToken is ERC20 {
     address public hook;
@@ -39,8 +40,13 @@ contract HookToken is ERC20 {
         bool ok = super.transferFrom(from, to, amt);
         if (armed && hook != address(0)) {
             armed = false;
-            (bool success,) = hook.call(data);
-            require(success);
+            (bool success, bytes memory ret) = hook.call(data);
+            // Bubble the inner revert verbatim so tests can assert *why* the callback failed.
+            if (!success) {
+                assembly {
+                    revert(add(ret, 0x20), mload(ret))
+                }
+            }
         }
         return ok;
     }
@@ -88,17 +94,39 @@ contract ReenteringVenue is IVenue {
 }
 
 contract ReentrancyTest is Test {
-    function test_maliciousTokenCannotReenterDeposit() public {
-        HookToken token = new HookToken();
+    /// @dev The asset token calls back into the vault mid-`deposit` (inside `transferIn`).
+    ///      Two independent gates must stop it: the shared ReentrancyGuard, and NotTranches.
+    function _reentrancyRig() internal returns (HookToken token, BlitzVault vault) {
+        token = new HookToken();
         Guardian guardian = new Guardian(address(this));
-        BlitzVault vault = new BlitzVault(token, address(guardian));
+        vault = new BlitzVault(token, address(guardian));
         vault.setEngine(address(this));
 
         token.mint(address(this), 1_000e6);
         token.approve(address(vault), type(uint256).max);
-        token.arm(address(vault), abi.encodeWithSelector(vault.deposit.selector, 1e6, address(this)));
+        // Seed while unarmed, then hand the minting role to this test contract.
+        vault.seedDeadShares(100e6);
+        vault.setTranches(address(this));
+    }
 
-        vm.expectRevert();
+    function test_maliciousTokenCannotReenterVaultDuringDeposit() public {
+        (HookToken token, BlitzVault vault) = _reentrancyRig();
+
+        // Re-enter a non-gated mutative function: only the ReentrancyGuard can stop this.
+        token.arm(
+            address(vault), abi.encodeWithSelector(vault.withdraw.selector, uint256(1), address(this), address(this))
+        );
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        vault.deposit(10e6, address(this));
+    }
+
+    function test_maliciousTokenCannotReenterDeposit() public {
+        (HookToken token, BlitzVault vault) = _reentrancyRig();
+
+        // Re-entering deposit itself is stopped by the minting gate: the callback's
+        // msg.sender is the token, not Tranches.
+        token.arm(address(vault), abi.encodeWithSelector(vault.deposit.selector, 1e6, address(this)));
+        vm.expectRevert(BlitzVault.NotTranches.selector);
         vault.deposit(10e6, address(this));
     }
 
@@ -120,7 +148,13 @@ contract ReentrancyTest is Test {
 
         dusd.faucet();
         dusd.approve(address(vault), 100e6);
-        vault.deposit(100e6, address(this));
+        vault.seedDeadShares(100e6);
+        vault.setTranches(address(tranches));
+
+        vm.warp(block.timestamp + 1 hours);
+        dusd.faucet();
+        dusd.approve(address(tranches), 100e6);
+        tranches.joinBallast(100e6);
         engine.deployLiquidity();
 
         vm.warp(block.timestamp + 1);

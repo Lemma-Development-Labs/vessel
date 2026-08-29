@@ -23,6 +23,10 @@ contract RoundingTest is Test {
         tranches = new Tranches(address(vault), address(guardian), treasury);
         vault.setEngine(address(this));
         tranches.setEngine(address(this));
+        dusd.faucet();
+        dusd.approve(address(vault), 100e6);
+        vault.seedDeadShares(100e6);
+        vault.setTranches(address(tranches));
         _fill(alice, 5);
         _fill(bob, 5);
     }
