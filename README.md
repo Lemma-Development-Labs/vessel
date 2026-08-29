@@ -13,6 +13,26 @@ Live: [vessel.wtf](https://vessel.wtf) · [testnet.vessel.wtf](https://testnet.v
 
 **Unaudited. Demo dollars (dUSD) have no value.** See [SECURITY.md](./SECURITY.md) and [HARDENING.md](./HARDENING.md).
 
+Copy-paste announce (thread; [full notes](./docs/announce.md)):
+
+```
+Contracts are live on @monad testnet. Verified, source published, read them yourself.
+
+VESSEL — long spot, short the perp, funding streams through a two-tranche waterfall.
+
+https://github.com/Lemma-Development-Labs/vessel
+
+@monad_dev @geeky_kartikey
+```
+
+```
+Vault    0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823
+Tranches 0x9350A360b01bA4F87Df1164da97Dcc066c37986d
+Engine   0x9FB500D00618C27088c439EdE6EED2c6FeB02455
+
+https://testnet.monadvision.com/address/0x9FB500D00618C27088c439EdE6EED2c6FeB02455
+```
+
 ---
 
 ## What is real vs simulated
