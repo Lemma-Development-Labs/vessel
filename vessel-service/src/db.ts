@@ -334,8 +334,23 @@ class PgStore implements Store {
   }
 }
 
+/**
+ * Whether to negotiate TLS to Postgres.
+ *
+ * Not every managed Postgres speaks SSL. Railway's private network
+ * (`*.railway.internal`) does not, and forcing `ssl` there fails the connection
+ * outright with "The server does not support SSL connections" — the traffic is
+ * already confined to the project's private network. Public/proxied endpoints
+ * still get TLS.
+ *
+ * `?sslmode=disable` in the URL is honoured, since that is the standard way to
+ * say so and node-postgres ignores it once an explicit `ssl` option is set.
+ */
 function pgSsl(connectionString: string): boolean | { rejectUnauthorized: boolean } {
-  if (/localhost|127\.0\.0\.1/.test(connectionString)) return false;
+  if (/[?&]sslmode=disable\b/.test(connectionString)) return false;
+  if (/localhost|127\.0\.0\.1|\.railway\.internal|\.internal(?::\d+)?\//.test(connectionString)) {
+    return false;
+  }
   return { rejectUnauthorized: false };
 }
 
