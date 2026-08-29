@@ -2,13 +2,16 @@
 
 **The dollar leverage pays for.** Delta-neutral tranche yield on Monad.
 
+**Unaudited.**
+
+![CI](https://github.com/Lemma-Development-Labs/vessel/actions/workflows/ci.yml/badge.svg)
 ![Built at Monad Blitz New Delhi V4](https://img.shields.io/badge/Monad_Blitz-New_Delhi_V4-c4a36a)
 ![Testnet](https://img.shields.io/badge/network-testnet-3d9b8f)
 ![Unaudited](https://img.shields.io/badge/audit-none-e25d5d)
 
 Live: [vessel.wtf](https://vessel.wtf) · [testnet.vessel.wtf](https://testnet.vessel.wtf) · [docs.vessel.wtf](https://docs.vessel.wtf)
 
-**Unaudited. Demo dollars (dUSD) have no value.**
+**Unaudited. Demo dollars (dUSD) have no value.** See [SECURITY.md](./SECURITY.md) and [HARDENING.md](./HARDENING.md).
 
 ---
 
@@ -22,6 +25,8 @@ Live: [vessel.wtf](https://vessel.wtf) · [testnet.vessel.wtf](https://testnet.v
 | Perp venue | `venues/PerplVenue.stub.sol` — compiles, reverts `NotImplemented()`. Swap = one contract. See [PerplFoundation/api-docs](https://github.com/PerplFoundation/api-docs). |
 
 Guardian can **only pause**. It cannot move funds or change params. There is **no privileged mint** anywhere (dUSD faucet is 100 / hour, lifetime 1,000 per address).
+
+**Oracle / spot mark (A6):** EngineLite marks the WMON spot leg from `router.getAmountsOut` (pool mid). That price is manipulable. For v0 this misprices `grossYield` between cranks. Mitigation: per-crank spot PnL is capped at **±5%** of the last marked spot value (`EngineLite.SPOT_PNL_CAP_BPS = 500`). The real fix is a TWAP/oracle — listed in the honest gap below and in [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -63,7 +68,7 @@ Explorer: testnet [MonadVision](https://testnet.monadvision.com) · mainnet [Mon
 | EngineLite | — | — |
 | MockWMON / MockRouter | local / testnet until a real dUSD/WMON pool exists | — |
 
-The committed `ADDRESSES.json` is the last **local Anvil** deploy (`chainId: 31337`). After testnet broadcast, commit the new file and re-run `pnpm sync`. Verified Sourcify links: `https://testnet.monadvision.com/address/<addr>` (tick appears once `forge verify-contract` succeeds).
+The committed `ADDRESSES.json` is the last **local Anvil** deploy (`chainId: 31337`). After testnet broadcast, commit the new file and re-run `pnpm sync`. Verified Sourcify links: `https://testnet.monadvision.com/address/<addr>` (green tick appears once `forge verify-contract` succeeds). **No testnet/mainnet broadcast exists in this repo yet — explorer columns stay "—" until a funded deployer verifies.** See [docs/ADDRESSES.md](./docs/ADDRESSES.md) and [FACTS.md](./FACTS.md).
 
 Canonical refs (never guessed — from [docs.monad.xyz/developer-essentials/network-information](https://docs.monad.xyz/developer-essentials/network-information) and Puddle):
 
@@ -92,9 +97,9 @@ cd app && pnpm install && cd ..
 
 | File | Vars |
 | --- | --- |
-| `contracts/.env` | `MONAD_TESTNET_RPC=https://testnet-rpc.monad.xyz` · `MONAD_MAINNET_RPC=https://rpc.monad.xyz` · `DEPLOYER_PK=` |
-| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` for stage; `0` after deploy. RPC/chain: testnet `10143` or Anvil `31337` + `http://127.0.0.1:8545`. Explorer `https://testnet.monadvision.com`. |
-| `.env` (keeper) | `RPC_URL` · `KEEPER_PK` (gas-only wallet) · `CRANK_INTERVAL_SEC=300` |
+| `contracts/.env` | `MONAD_TESTNET_RPC` · `MONAD_MAINNET_RPC` · `DEPLOYER_PK` · `SEEDER_PK` (must ≠ deployer) |
+| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` for stage; `0` after deploy. `NEXT_PUBLIC_RPC` (CSV ok) + `NEXT_PUBLIC_RPC_FALLBACK`. Chain 10143 or Anvil 31337. |
+| `.env` (keeper / e2e) | `RPC_URL` · `KEEPER_PK` (gas-only, ≠ deployer) · `E2E_PK` (burner, ≠ both) · `CRANK_INTERVAL_SEC=300` · `DEPLOYER_PK` (SetRate only) |
 
 ```bash
 cp contracts/.env.example contracts/.env
@@ -107,8 +112,11 @@ cp .env.example .env
 ```bash
 cd contracts
 forge test -vvv --offline
-forge test --offline --fuzz-runs 10000
+forge test --offline --fuzz-runs 10000          # local
+FOUNDRY_PROFILE=ci forge test --offline --fuzz-runs 25000
 ```
+
+`pnpm e2e` proves a live (or Anvil) deploy with assertions. See [HARDENING.md](./HARDENING.md).
 
 ### Local machine (Anvil)
 
@@ -196,12 +204,26 @@ Keeper: leave it running; the waterfall list is the auto-crank tape.
 ## Repo
 
 ```
-contracts/     Foundry ^0.8.24  (DemoUSD, BlitzVault, Tranches, EngineLite, venues, Guardian)
-app/           Next.js  — UI + VesselDataProvider (MockProvider | ChainProvider)
-scripts/       sync.mjs · keeper.ts
-ADDRESSES.json deploy output
+contracts/        Foundry ^0.8.24
+app/              Next.js app — /deposit · /portfolio · /transparency
+                  MockProvider (USE_MOCK=1) or ChainProvider (USE_MOCK=0)
+vessel-service/   Railway keeper + indexer + GET /stats · /waterfall · /health
+scripts/          sync.mjs · keeper.ts · e2e.ts
+ADDRESSES.json    deploy output (single source for app, docs, service)
+HARDENING.md      security sweep (not an audit)
+SECURITY.md       unaudited disclosure
 ```
 
-`pnpm sync` copies six ABIs from `contracts/out` into `app/lib/abis/` and regenerates `app/lib/addresses.ts` (typed, `assertChain`).
+App routes: [testnet.vessel.wtf](https://testnet.vessel.wtf) — Deposit / Portfolio / Transparency. Stage fallback: `NEXT_PUBLIC_USE_MOCK=1`. Demo states: `/demo` and `?demo=empty|negative|disconnected|floor`.
+
+`pnpm sync` (alias `pnpm sync-abis`) copies ABIs into `app/lib/abis/` and regenerates `app/lib/addresses.ts`.
+
+Keeper/stats: see [vessel-service/README.md](./vessel-service/README.md). CORS allows vessel.wtf, testnet.vessel.wtf, docs.vessel.wtf. The app prefers `NEXT_PUBLIC_STATS_URL/waterfall` and falls back to `getLogs`.
+
+## The honest gap
+
+External security audit (the hard gate) · real venue: PerplVenue against Perpl's order/margin/liquidation surface · real USDC and removal of DemoUSD/faucet · TWAP/oracle pricing for the spot mark (A6) · timelock + multisig replacing single-key ownership; guardian policy published · deposit caps + progressive limits · monitoring/alerting beyond logs · legal review before vUSD.
+
+Until every line here is crossed, the banner stays amber and the first word stays **unaudited**.
 
 License: MIT.

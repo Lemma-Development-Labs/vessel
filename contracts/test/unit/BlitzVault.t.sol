@@ -16,7 +16,7 @@ contract BlitzVaultTest is Fixture {
         dusd.approve(address(vault), 500e6);
         vault.deposit(500e6, alice);
         vm.stopPrank();
-        assertEq(vault.deployable(), 450e6);
+        assertEq(vault.deployable(), 540e6);
         assertEq(vault.deployed(), 0);
     }
 

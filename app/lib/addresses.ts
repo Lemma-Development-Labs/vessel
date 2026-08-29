@@ -4,27 +4,27 @@ export const DEPLOYED_BLOCK = 0 as const;
 export const VENUE_MODE = "sim" as const;
 
 export const ADDRESSES = {
-  "DemoUSD": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  "Guardian": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "BlitzVault": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-  "Tranches": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-  "Hull": "0xd8058efe0198ae9dD7D563e1b4938Dcbc86A1F81",
   "Ballast": "0x6D544390Eb535d61e196c87d6B9c80dCD8628Acd",
-  "SimVenue": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-  "PerplVenue": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  "BlitzVault": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "DemoUSD": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "EngineLite": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+  "Guardian": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "Hull": "0xd8058efe0198ae9dD7D563e1b4938Dcbc86A1F81",
+  "MockRouter": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
   "MockWMON": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-  "MockRouter": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+  "PerplVenue": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  "SimVenue": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  "Tranches": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 } as const;
 
 export const REFS = {
-  "rpcTestnet": "https://testnet-rpc.monad.xyz",
-  "rpcMainnet": "https://rpc.monad.xyz",
-  "explorerTestnet": "https://testnet.monadvision.com",
   "explorerMainnet": "https://monadvision.com",
-  "wmonTestnet": "0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541",
+  "explorerTestnet": "https://testnet.monadvision.com",
+  "puddleRouter": "0x430c23895c8D44883526e3E0B09327dAD8766660",
+  "rpcMainnet": "https://rpc.monad.xyz",
+  "rpcTestnet": "https://testnet-rpc.monad.xyz",
   "wmonMainnet": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
-  "puddleRouter": "0x430c23895c8D44883526e3E0B09327dAD8766660"
+  "wmonTestnet": "0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541"
 } as const;
 
 export function assertChain(chainId: number) {

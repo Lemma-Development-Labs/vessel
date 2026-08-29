@@ -61,6 +61,32 @@
   },
   {
     "type": "function",
+    "name": "MAX_YIELD_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_JOIN",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "RESERVE_TARGET_BPS",
     "inputs": [],
     "outputs": [
@@ -656,6 +682,11 @@
   },
   {
     "type": "error",
+    "name": "BelowMinJoin",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "DtZero",
     "inputs": []
   },
@@ -667,6 +698,11 @@
   {
     "type": "error",
     "name": "HullImpairment",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ImplausibleYield",
     "inputs": []
   },
   {

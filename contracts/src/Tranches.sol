@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IGuardian} from "./interfaces/IGuardian.sol";
 import {TrancheToken} from "./TrancheToken.sol";
 
@@ -14,6 +15,13 @@ import {TrancheToken} from "./TrancheToken.sol";
 ///      ΔhullNAV + ΔbalNAV + Δreserve + Δtreasury == grossYield exactly.
 ///      Subordination: after any state change, balTvl * 10_000 >= THETA_MIN_BPS * (hullTvl + balTvl),
 ///      except exits that improve the ratio, which are always allowed.
+///
+///      Rounding (always favors protocol + senior):
+///        - share mints floor
+///        - share burns floor assets out
+///        - Hull accrual floors
+///        - protocol fee ceils
+///        - losses charged to Ballast take the full integer (no truncation that spares Ballast)
 contract Tranches is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -24,6 +32,8 @@ contract Tranches is ReentrancyGuard {
     uint256 public constant YEAR = 365 days;
     uint256 public constant BPS = 10_000;
     uint256 public constant SHARES_OFFSET = 1e12; // 6-dec assets → 18-dec shares
+    uint256 public constant MIN_JOIN = 1e6; // 1 dUSD
+    uint256 public constant MAX_YIELD_BPS = 5_000; // |G| ≤ 50% of TVL per epoch
 
     address public immutable deployer;
     IGuardian public immutable guardian;
@@ -33,7 +43,7 @@ contract Tranches is ReentrancyGuard {
     TrancheToken public immutable ballastToken;
 
     address public engine;
-    address public treasury;
+    address public immutable treasury;
 
     uint256 public hullTvl;
     uint256 public balTvl;
@@ -50,6 +60,8 @@ contract Tranches is ReentrancyGuard {
     error HullImpairment();
     error DtZero();
     error ZeroAmount();
+    error BelowMinJoin();
+    error ImplausibleYield();
 
     event EngineWired(address indexed engine, uint256 lastSettle);
     event JoinedHull(address indexed user, uint256 assets, uint256 shares);
@@ -99,7 +111,7 @@ contract Tranches is ReentrancyGuard {
     }
 
     /// @notice Wire EngineLite and start the settle clock. Single-use.
-    function setEngine(address engine_) external onlyDeployer {
+    function setEngine(address engine_) external onlyDeployer whenNotPaused nonReentrant {
         if (engine != address(0)) revert EngineAlreadySet();
         if (engine_ == address(0)) revert ZeroAddress();
         engine = engine_;
@@ -109,35 +121,38 @@ contract Tranches is ReentrancyGuard {
 
     /// @notice Join the Hull deck. Deposits `assets` dUSD into the vault at current Hull NAV.
     function joinHull(uint256 assets) external whenNotPaused nonReentrant returns (uint256 shares) {
-        if (assets == 0) revert ZeroAmount();
+        if (assets < MIN_JOIN) revert BelowMinJoin();
         uint256 newHull = hullTvl + assets;
         _assertFloor(newHull, balTvl, false);
-        _pullAndDeposit(assets);
-        shares = _mintDeck(hullToken, hullTvl, assets, msg.sender);
+        shares = _previewMint(hullToken, hullTvl, assets);
         hullTvl = newHull;
+        hullToken.mint(msg.sender, shares);
+        _pullAndDeposit(assets);
         emit JoinedHull(msg.sender, assets, shares);
     }
 
     /// @notice Join the Ballast deck. Deposits `assets` dUSD into the vault at current Ballast NAV.
     function joinBallast(uint256 assets) external whenNotPaused nonReentrant returns (uint256 shares) {
-        if (assets == 0) revert ZeroAmount();
+        if (assets < MIN_JOIN) revert BelowMinJoin();
         uint256 newBal = balTvl + assets;
         _assertFloor(hullTvl, newBal, false);
-        _pullAndDeposit(assets);
-        shares = _mintDeck(ballastToken, balTvl, assets, msg.sender);
+        shares = _previewMint(ballastToken, balTvl, assets);
         balTvl = newBal;
+        ballastToken.mint(msg.sender, shares);
+        _pullAndDeposit(assets);
         emit JoinedBallast(msg.sender, assets, shares);
     }
 
     /// @notice Exit Hull. Always allowed when it improves the ballast ratio.
+    /// @dev Share burn floors assets out (dust stays in the deck — protocol/remaining seniors).
     function exitHull(uint256 shares) external whenNotPaused nonReentrant returns (uint256 assetsOut) {
         if (shares == 0) revert ZeroAmount();
         uint256 supply = hullToken.totalSupply();
-        assetsOut = (shares * hullTvl) / supply;
+        assetsOut = (shares * hullTvl) / supply; // floor
         uint256 newHull = hullTvl - assetsOut;
         _assertFloor(newHull, balTvl, true);
-        hullToken.burn(msg.sender, shares);
         hullTvl = newHull;
+        hullToken.burn(msg.sender, shares);
         _withdrawTo(msg.sender, assetsOut);
         emit ExitedHull(msg.sender, shares, assetsOut);
     }
@@ -146,11 +161,11 @@ contract Tranches is ReentrancyGuard {
     function exitBallast(uint256 shares) external whenNotPaused nonReentrant returns (uint256 assetsOut) {
         if (shares == 0) revert ZeroAmount();
         uint256 supply = ballastToken.totalSupply();
-        assetsOut = (shares * balTvl) / supply;
+        assetsOut = (shares * balTvl) / supply; // floor
         uint256 newBal = balTvl - assetsOut;
         _assertFloor(hullTvl, newBal, true);
-        ballastToken.burn(msg.sender, shares);
         balTvl = newBal;
+        ballastToken.burn(msg.sender, shares);
         _withdrawTo(msg.sender, assetsOut);
         emit ExitedBallast(msg.sender, shares, assetsOut);
     }
@@ -159,6 +174,7 @@ contract Tranches is ReentrancyGuard {
     function settle(int256 grossYield) external onlyEngine whenNotPaused nonReentrant {
         uint256 dt = block.timestamp - lastSettle;
         if (dt == 0) revert DtZero();
+        _assertPlausible(grossYield);
         lastSettle = block.timestamp;
 
         uint256 fee;
@@ -171,7 +187,8 @@ contract Tranches is ReentrancyGuard {
 
         if (grossYield > 0) {
             uint256 g = uint256(grossYield);
-            fee = (g * FEE_BPS) / BPS;
+            fee = Math.mulDiv(g, FEE_BPS, BPS, Math.Rounding.Ceil);
+            if (fee > g) fee = g;
             uint256 userTvl = hullTvl + balTvl;
             uint256 target = (userTvl * RESERVE_TARGET_BPS) / BPS;
             if (reserve < target) {
@@ -179,11 +196,10 @@ contract Tranches is ReentrancyGuard {
             }
             toTreasury = fee - toReserve;
             uint256 remainder = g - fee;
-            uint256 hullTarget = (hullTvl * HULL_RATE_BPS * dt) / (BPS * YEAR);
+            uint256 hullTarget = Math.mulDiv(hullTvl, HULL_RATE_BPS * dt, BPS * YEAR, Math.Rounding.Floor);
             hullAccrual = hullTarget < remainder ? hullTarget : remainder;
             toBallast = remainder - hullAccrual;
 
-            // If hull-heavy accrual would breach the floor, spill the excess to ballast.
             uint256 newHull = hullTvl + hullAccrual;
             uint256 newBal = balTvl + toBallast;
             if (_breaches(newHull, newBal) && hullAccrual > 0) {
@@ -260,9 +276,18 @@ contract Tranches is ReentrancyGuard {
         thetaBps = _ratioBps(hullTvl, balTvl);
     }
 
+    function _assertPlausible(int256 grossYield) internal view {
+        if (grossYield == 0) return;
+        if (grossYield == type(int256).min) revert ImplausibleYield();
+        uint256 mag = grossYield > 0 ? uint256(grossYield) : uint256(-grossYield);
+        uint256 tvl = hullTvl + balTvl + reserve;
+        if (tvl == 0 || mag > Math.mulDiv(tvl, MAX_YIELD_BPS, BPS)) revert ImplausibleYield();
+    }
+
     function _pullAndDeposit(uint256 assets) internal {
         asset.safeTransferFrom(msg.sender, address(this), assets);
-        asset.safeIncreaseAllowance(address(vault), assets);
+        asset.forceApprove(address(vault), 0);
+        asset.forceApprove(address(vault), assets);
         vault.deposit(assets, address(this));
     }
 
@@ -270,8 +295,10 @@ contract Tranches is ReentrancyGuard {
         vault.withdraw(assetsOut, to, address(this));
     }
 
-    function _mintDeck(TrancheToken token, uint256 tvlBefore, uint256 assets, address to)
+    /// @dev Share mint floors. First deposit: assets * 1e12 (exact).
+    function _previewMint(TrancheToken token, uint256 tvlBefore, uint256 assets)
         internal
+        view
         returns (uint256 shares)
     {
         uint256 supply = token.totalSupply();
@@ -280,7 +307,6 @@ contract Tranches is ReentrancyGuard {
         } else {
             shares = (assets * supply) / tvlBefore;
         }
-        token.mint(to, shares);
     }
 
     function _ratioBps(uint256 h, uint256 b) internal pure returns (uint256) {
@@ -300,14 +326,12 @@ contract Tranches is ReentrancyGuard {
         if (isExit) {
             uint256 oldBps = _ratioBps(hullTvl, balTvl);
             uint256 newBps = _ratioBps(newH, newB);
-            if (newBps >= oldBps) return; // exit improves (or holds) the ratio
+            if (newBps >= oldBps) return;
         }
         revert SubordinationFloor(_ratioBps(newH, newB));
     }
 
     function _spillToKeepFloor(uint256 newH, uint256 newB, uint256 hullAccrual) internal pure returns (uint256 spill) {
-        // Need newB * BPS >= THETA_MIN * (newH + newB)
-        // Spill s from hull to bal: (newB+s)*BPS >= THETA * (newH-s + newB+s) = THETA*(newH+newB)
         uint256 sum = newH + newB;
         uint256 needB = (THETA_MIN_BPS * sum + BPS - 1) / BPS;
         if (needB <= newB) return 0;

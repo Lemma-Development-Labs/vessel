@@ -49,14 +49,18 @@ contract ConservationFuzz is Test {
         uint256 dt = bound(uint256(rawDt), 1, 365 days * 2);
         vm.warp(block.timestamp + dt);
 
-        int256 maxLoss = int256(tranches.balTvl() + tranches.reserve());
-        int256 hi = int256(uint256(200e6));
-        int256 G = _boundInt(int256(rawG), maxLoss == 0 ? int256(0) : -maxLoss, hi);
-
         uint256 h0 = tranches.hullTvl();
         uint256 b0 = tranches.balTvl();
         uint256 r0 = tranches.reserve();
         uint256 t0 = tranches.treasuryAccrued();
+        uint256 tvl = h0 + b0 + r0;
+        uint256 cap = tvl * 5_000 / 10_000;
+
+        int256 maxLoss = int256(tranches.balTvl() + tranches.reserve());
+        if (uint256(maxLoss) > cap) maxLoss = int256(cap);
+        int256 hi = int256(uint256(200e6));
+        if (uint256(hi) > cap) hi = int256(cap);
+        int256 G = _boundInt(int256(rawG), maxLoss == 0 ? int256(0) : -maxLoss, hi);
 
         if (G < 0 && uint256(-G) > balPlus(r0, b0)) {
             vm.expectRevert(Tranches.HullImpairment.selector);
@@ -75,6 +79,20 @@ contract ConservationFuzz is Test {
         if (b0 + r0 > 0) {
             assertGe(tranches.hullTvl(), h0, "hull never decreases while junior capital remains");
         }
+
+        assertEq(vault.totalAssets(), dusd.balanceOf(address(vault)) + vault.deployed(), "vault identity");
+    }
+
+    function testFuzz_sharePriceMonotoneOnNonNegativeG(uint256 rawG, uint32 rawDt) public {
+        uint256 dt = bound(uint256(rawDt), 1, 365 days);
+        vm.warp(block.timestamp + dt);
+        uint256 tvl = tranches.hullTvl() + tranches.balTvl() + tranches.reserve();
+        uint256 cap = tvl * 5_000 / 10_000;
+        uint256 p0 = vault.previewRedeem(1e18);
+        uint256 mag = bound(rawG, 0, cap);
+        tranches.settle(int256(mag));
+        assertGe(vault.previewRedeem(1e18), p0, "vBLITZ share price monotone under G>=0");
+        assertEq(vault.totalAssets(), dusd.balanceOf(address(vault)) + vault.deployed());
     }
 
     function testFuzz_floorHoldsOnJoinsExits(uint8 action, uint256 amtRaw) public {
@@ -132,6 +150,9 @@ contract ConservationFuzz is Test {
         if (h + b > 0) {
             assertGe(b * 10_000, 2_000 * (h + b), "floor");
         }
+        assertEq(vault.totalAssets(), dusd.balanceOf(address(vault)) + vault.deployed(), "vault identity");
+        uint256 preview = vault.previewRedeem(1e18);
+        assertGt(preview, 0);
     }
 
     function balPlus(uint256 r, uint256 b) internal pure returns (uint256) {

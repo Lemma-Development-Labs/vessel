@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { ChainVesselProvider } from "./chain";
@@ -11,6 +12,7 @@ import { wagmiConfig } from "./wagmi";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "0";
 
 export function Providers({ children }: { children: ReactNode }) {
+  const demo = useSearchParams().get("demo");
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -21,7 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   const inner = USE_MOCK ? (
-    <MockVesselProvider>{children}</MockVesselProvider>
+    <MockVesselProvider demo={demo}>{children}</MockVesselProvider>
   ) : (
     <ChainVesselProvider>{children}</ChainVesselProvider>
   );

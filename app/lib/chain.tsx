@@ -17,11 +17,15 @@ import { decodeVesselError } from "./errors";
 import {
   COPY,
   EMPTY_DECK,
+  EMPTY_META,
+  type DeckKind,
   type Toast,
   type VesselDataProvider,
   type WaterfallEvent,
 } from "./provider";
 import { EXPLORER, TARGET_CHAIN_ID, vesselChain } from "./wagmi";
+import { GAS } from "./gas";
+import { fetchWaterfall, statsUrl } from "./stats";
 import demoAbiJson from "./abis/DemoUSD.json";
 import engineAbiJson from "./abis/EngineLite.json";
 import guardianAbiJson from "./abis/Guardian.json";
@@ -109,16 +113,63 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
         ],
         allowFailure: true,
       });
-      return { dusd, hull, bal, deck, netDelta, netDeltaBps, shortId, simulated, venueName, paused };
+      const sid = (shortId.result as bigint) ?? 0n;
+      const extra = await publicClient.multicall({
+        contracts: [
+          {
+            address: ADDRESSES.MockWMON,
+            abi: demoAbi,
+            functionName: "balanceOf",
+            args: [ADDRESSES.EngineLite],
+          },
+          { address: ADDRESSES.EngineLite, abi: engineAbi, functionName: "lastCrank" },
+          { address: ADDRESSES.EngineLite, abi: engineAbi, functionName: "lastSpotValue" },
+        ],
+        allowFailure: true,
+      });
+      let shortNotional = 0n;
+      if (sid !== 0n) {
+        try {
+          const pos = (await publicClient.readContract({
+            address: ADDRESSES.SimVenue,
+            abi: simAbi,
+            functionName: "position",
+            args: [sid],
+          })) as readonly [bigint, bigint];
+          shortNotional = pos[0];
+        } catch {
+          shortNotional = 0n;
+        }
+      }
+      const lastBlock = Number(await publicClient.getBlockNumber());
+      return {
+        dusd,
+        hull,
+        bal,
+        deck,
+        netDelta,
+        netDeltaBps,
+        shortId,
+        simulated,
+        venueName,
+        paused,
+        spotQty: extra[0],
+        lastCrank: extra[1],
+        lastSpot: extra[2],
+        shortNotional,
+        lastBlock,
+      };
     },
   });
 
   const logs = useQuery({
     queryKey: ["waterfall", CHAIN_ID, DEPLOYED_BLOCK],
-    enabled: !!publicClient,
+    enabled: !!publicClient || Boolean(statsUrl()),
     placeholderData: keepPreviousData,
     refetchInterval: 8_000,
     queryFn: async () => {
+      const fromApi = await fetchWaterfall(50);
+      if (fromApi && fromApi.length) return fromApi.slice(0, 50);
       if (!publicClient) return [] as WaterfallEvent[];
       const evs = await publicClient.getContractEvents({
         address: ADDRESSES.Tranches,
@@ -157,6 +208,9 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
       try {
         const hash = await fn();
         const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+        if (receipt && receipt.status !== "success") {
+          throw new Error("transaction reverted");
+        }
         dismissToast(pending);
         push({
           kind: "success",
@@ -189,6 +243,7 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
         abi: demoAbi,
         functionName: "approve",
         args: [ADDRESSES.Tranches, assets],
+        gas: GAS.approve,
       });
       await publicClient.waitForTransactionReceipt({ hash });
     },
@@ -207,6 +262,9 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
           balSupply: (deckRaw[5] as bigint) ?? 0n,
           lastSettle: (deckRaw[6] as bigint) ?? 0n,
           thetaBps: (deckRaw[7] as bigint) ?? 0n,
+          hullRateBps: 800n,
+          balLeveredAprBps: 1940n,
+          reserveTargetBps: 200n,
         }
       : EMPTY_DECK;
 
@@ -218,19 +276,70 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
       merged.push(ev);
     }
 
+    const joinHull = (assets: bigint) =>
+      runTx("Join Hull", async () => {
+        await ensureApprove(assets);
+        return writeContractAsync({
+          address: ADDRESSES.Tranches,
+          abi: tranchesAbi,
+          functionName: "joinHull",
+          args: [assets],
+          gas: GAS.join,
+        });
+      });
+    const joinBallast = (assets: bigint) =>
+      runTx("Join Ballast", async () => {
+        await ensureApprove(assets);
+        return writeContractAsync({
+          address: ADDRESSES.Tranches,
+          abi: tranchesAbi,
+          functionName: "joinBallast",
+          args: [assets],
+          gas: GAS.join,
+        });
+      });
+    const exitHull = (shares: bigint) =>
+      runTx("Exit Hull", () =>
+        writeContractAsync({
+          address: ADDRESSES.Tranches,
+          abi: tranchesAbi,
+          functionName: "exitHull",
+          args: [shares],
+          gas: GAS.exit,
+        }),
+      );
+    const exitBallast = (shares: bigint) =>
+      runTx("Exit Ballast", () =>
+        writeContractAsync({
+          address: ADDRESSES.Tranches,
+          abi: tranchesAbi,
+          functionName: "exitBallast",
+          args: [shares],
+          gas: GAS.exit,
+        }),
+      );
+
     return {
       dusdBalance: (reads.data?.dusd?.result as bigint) ?? 0n,
       hullShares: (reads.data?.hull?.result as bigint) ?? 0n,
       balShares: (reads.data?.bal?.result as bigint) ?? 0n,
       deck,
       engine: {
+        spotQty: (reads.data?.spotQty?.result as bigint) ?? 0n,
+        spotValue: (reads.data?.lastSpot?.result as bigint) ?? 0n,
+        shortNotional: reads.data?.shortNotional ?? 0n,
         netDelta: (reads.data?.netDelta?.result as bigint) ?? 0n,
         netDeltaBps: (reads.data?.netDeltaBps?.result as bigint) ?? 0n,
-        shortId: (reads.data?.shortId?.result as bigint) ?? 0n,
-        simulated: Boolean(reads.data?.simulated?.result ?? true),
+        fundingAccrued: 0n,
+        lastCrankTs: (reads.data?.lastCrank?.result as bigint) ?? 0n,
+        lastBlock: reads.data?.lastBlock ?? 0,
         venueName: String(reads.data?.venueName?.result ?? "SimVenue"),
+        simulated: Boolean(reads.data?.simulated?.result ?? true),
+        shortId: (reads.data?.shortId?.result as bigint) ?? 0n,
+        keeperActive: Boolean(statsUrl()),
       },
-      waterfall: merged.slice(0, 24),
+      waterfall: merged.slice(0, 50),
+      loading: reads.isLoading && !reads.data,
       connected: isConnected,
       address,
       chainId: chainId ?? 0,
@@ -238,59 +347,34 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
       reconnecting: reads.isError,
       paused: Boolean(reads.data?.paused?.result),
       impaired,
+      faucetCooldownSec: 0,
+      hullMeta: EMPTY_META,
+      balMeta: EMPTY_META,
       toasts,
+      deposit: (amount: bigint, kind: DeckKind) =>
+        kind === "hull" ? joinHull(amount) : joinBallast(amount),
+      withdraw: (shares: bigint, kind: DeckKind) =>
+        kind === "hull" ? exitHull(shares) : exitBallast(shares),
       faucet: () =>
         runTx("Faucet", () =>
           writeContractAsync({
             address: ADDRESSES.DemoUSD,
             abi: demoAbi,
             functionName: "faucet",
+            gas: GAS.faucet,
           }),
         ),
-      joinHull: (assets) =>
-        runTx("Join Hull", async () => {
-          await ensureApprove(assets);
-          return writeContractAsync({
-            address: ADDRESSES.Tranches,
-            abi: tranchesAbi,
-            functionName: "joinHull",
-            args: [assets],
-          });
-        }),
-      joinBallast: (assets) =>
-        runTx("Join Ballast", async () => {
-          await ensureApprove(assets);
-          return writeContractAsync({
-            address: ADDRESSES.Tranches,
-            abi: tranchesAbi,
-            functionName: "joinBallast",
-            args: [assets],
-          });
-        }),
-      exitHull: (shares) =>
-        runTx("Exit Hull", () =>
-          writeContractAsync({
-            address: ADDRESSES.Tranches,
-            abi: tranchesAbi,
-            functionName: "exitHull",
-            args: [shares],
-          }),
-        ),
-      exitBallast: (shares) =>
-        runTx("Exit Ballast", () =>
-          writeContractAsync({
-            address: ADDRESSES.Tranches,
-            abi: tranchesAbi,
-            functionName: "exitBallast",
-            args: [shares],
-          }),
-        ),
+      joinHull,
+      joinBallast,
+      exitHull,
+      exitBallast,
       crank: () =>
         runTx("Crank", () =>
           writeContractAsync({
             address: ADDRESSES.EngineLite,
             abi: engineAbi,
             functionName: "crank",
+            gas: GAS.crank,
           }),
         ),
       deployLiquidity: () =>
@@ -299,11 +383,16 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
             address: ADDRESSES.EngineLite,
             abi: engineAbi,
             functionName: "deployLiquidity",
+            gas: GAS.deployLiquidity,
           }),
         ),
       connect: async () => {
-        const c = connectors[0];
-        if (c) await connectAsync({ connector: c, chainId: TARGET_CHAIN_ID });
+        try {
+          const c = connectors[0];
+          if (c) await connectAsync({ connector: c, chainId: TARGET_CHAIN_ID });
+        } catch {
+          /* wallet reject is quiet */
+        }
       },
       disconnect: async () => {
         disconnect();
@@ -312,23 +401,27 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
         try {
           await switchChainAsync({ chainId: TARGET_CHAIN_ID });
         } catch {
-          const eth = (window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } })
-            .ethereum;
-          if (!eth) return;
-          await eth.request({
-            method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: `0x${TARGET_CHAIN_ID.toString(16)}`,
-                chainName: vesselChain.name,
-                nativeCurrency: vesselChain.nativeCurrency,
-                rpcUrls: [vesselChain.rpcUrls.default.http[0]],
-                blockExplorerUrls: vesselChain.blockExplorers
-                  ? [vesselChain.blockExplorers.default.url]
-                  : [],
-              },
-            ],
-          });
+          try {
+            const eth = (window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } })
+              .ethereum;
+            if (!eth) return;
+            await eth.request({
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: `0x${TARGET_CHAIN_ID.toString(16)}`,
+                  chainName: vesselChain.name,
+                  nativeCurrency: vesselChain.nativeCurrency,
+                  rpcUrls: [vesselChain.rpcUrls.default.http[0]],
+                  blockExplorerUrls: vesselChain.blockExplorers
+                    ? [vesselChain.blockExplorers.default.url]
+                    : [],
+                },
+              ],
+            });
+          } catch {
+            /* user rejected add-chain */
+          }
         }
       },
       dismissToast,
@@ -347,6 +440,7 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
     logs.data,
     reads.data,
     reads.isError,
+    reads.isLoading,
     runTx,
     switchChainAsync,
     toasts,

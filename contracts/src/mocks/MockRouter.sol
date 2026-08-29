@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {MockWMON} from "./MockWMON.sol";
+import {Decimals} from "../lib/Decimals.sol";
 
 /// @title MockRouter
 /// @notice 1:1 UniswapV2-compatible router for tests and sim deploys.
@@ -54,9 +55,9 @@ contract MockRouter is IUniswapV2Router02 {
         amounts = new uint256[](2);
         amounts[0] = amountIn;
         if (path[0] == address(dUsd) && path[1] == address(wmon)) {
-            amounts[1] = amountIn * 1e12;
+            amounts[1] = Decimals.dusdToWmon(amountIn);
         } else if (path[0] == address(wmon) && path[1] == address(dUsd)) {
-            amounts[1] = amountIn / 1e12;
+            amounts[1] = Decimals.wmonToDusdDown(amountIn);
         } else {
             revert BadPath();
         }

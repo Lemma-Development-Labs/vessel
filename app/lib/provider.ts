@@ -1,3 +1,5 @@
+export type DeckKind = "hull" | "ballast";
+
 export type DeckStats = {
   hullTvl: bigint;
   balTvl: bigint;
@@ -7,14 +9,25 @@ export type DeckStats = {
   balSupply: bigint;
   lastSettle: bigint;
   thetaBps: bigint;
+  hullRateBps: bigint;
+  balLeveredAprBps: bigint;
+  reserveTargetBps: bigint;
 };
 
 export type EngineView = {
+  spotQty: bigint;
+  spotValue: bigint;
+  shortNotional: bigint;
   netDelta: bigint;
   netDeltaBps: bigint;
-  shortId: bigint;
-  simulated: boolean;
+  fundingAccrued: bigint;
+  lastCrankTs: bigint;
+  lastBlock: number;
   venueName: string;
+  simulated: boolean;
+  shortId: bigint;
+  keeperActive: boolean;
+  lastCrankBy?: `0x${string}`;
 };
 
 export type WaterfallEvent = {
@@ -31,6 +44,7 @@ export type WaterfallEvent = {
   reserve: bigint;
   ts: bigint;
   txHash: string;
+  blockNumber?: bigint;
 };
 
 export type Toast = {
@@ -40,6 +54,14 @@ export type Toast = {
   href?: string;
 };
 
+export type SparkPoint = number;
+
+export type PositionMeta = {
+  boardedAt: number;
+  principal: bigint;
+  spark: SparkPoint[];
+};
+
 export interface VesselDataProvider {
   dusdBalance: bigint;
   hullShares: bigint;
@@ -47,6 +69,7 @@ export interface VesselDataProvider {
   deck: DeckStats;
   engine: EngineView;
   waterfall: WaterfallEvent[];
+  loading: boolean;
   connected: boolean;
   address?: `0x${string}`;
   chainId: number;
@@ -54,8 +77,13 @@ export interface VesselDataProvider {
   reconnecting: boolean;
   paused: boolean;
   impaired: boolean;
+  faucetCooldownSec: number;
+  hullMeta: PositionMeta;
+  balMeta: PositionMeta;
   toasts: Toast[];
   faucet: () => Promise<void>;
+  deposit: (amount: bigint, deck: DeckKind) => Promise<void>;
+  withdraw: (shares: bigint, deck: DeckKind) => Promise<void>;
   joinHull: (assets: bigint) => Promise<void>;
   joinBallast: (assets: bigint) => Promise<void>;
   exitHull: (shares: bigint) => Promise<void>;
@@ -77,21 +105,58 @@ export const EMPTY_DECK: DeckStats = {
   balSupply: 0n,
   lastSettle: 0n,
   thetaBps: 10_000n,
+  hullRateBps: 800n,
+  balLeveredAprBps: 0n,
+  reserveTargetBps: 200n,
 };
 
 export const EMPTY_ENGINE: EngineView = {
+  spotQty: 0n,
+  spotValue: 0n,
+  shortNotional: 0n,
   netDelta: 0n,
   netDeltaBps: 0n,
-  shortId: 0n,
-  simulated: true,
+  fundingAccrued: 0n,
+  lastCrankTs: 0n,
+  lastBlock: 0,
   venueName: "SimVenue",
+  simulated: true,
+  shortId: 0n,
+  keeperActive: false,
+};
+
+export const EMPTY_META: PositionMeta = {
+  boardedAt: 0,
+  principal: 0n,
+  spark: [],
 };
 
 export const COPY = {
-  floor:
-    "Ballast must stay at or above 20% of deck TVL. Join Ballast or exit Hull.",
-  cooldown: (s: number) => `Faucet cooling down — ${s}s left.`,
-  impair:
-    "Hull impairment — v0 halted. Ballast and reserve cannot absorb this loss.",
+  floor: "Ballast must stay at or above 20% of deck TVL. Join Ballast or exit Hull.",
+  hullFull: "Hull is full for now — Ballast capacity must grow first (20% floor)",
+  ballastExit:
+    "Exit queued by the floor — Ballast is what protects Hull. Capacity frees as Hull exits or Ballast grows.",
+  cooldown: (s: number) => {
+    const m = Math.floor(Math.max(0, s) / 60);
+    const r = Math.max(0, s) % 60;
+    return `Faucet cooldown — ${m}:${r.toString().padStart(2, "0")} remaining`;
+  },
+  impair: "HULL IMPAIRMENT — halted",
   slippage: "price moved — try again",
+  banner: "TESTNET — demo assets, unaudited contracts.",
+  legal: "Unaudited testnet. Demo dollars (dUSD) have no value. Not an offer of securities.",
 } as const;
+
+export function thetaWouldHold(hull: bigint, bal: bigint): boolean {
+  const sum = hull + bal;
+  if (sum === 0n) return true;
+  return bal * 10_000n >= 2_000n * sum;
+}
+
+export function wouldBreachFloor(hull: bigint, bal: bigint, exitingBallast: boolean): boolean {
+  if (!exitingBallast) return false;
+  const sum = hull + bal;
+  if (sum === 0n) return false;
+  const newBps = (bal * 10_000n) / sum;
+  return newBps < 2_000n;
+}

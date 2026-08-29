@@ -29,3 +29,8 @@ app/out/
 .claude/
 agent/
 .playwright-mcp/
+contracts/crytic-export/
+contracts/foundry-pp/
+
+# Local screenshots (walkthrough artifacts live outside the repo)
+/*.png

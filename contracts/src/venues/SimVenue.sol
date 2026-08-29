@@ -15,6 +15,7 @@ contract SimVenue is IVenue {
     uint256 public constant BPS = 10_000;
     uint256 public constant YEAR = 365 days;
     int256 public constant DEFAULT_RATE_BPS = 1_200;
+    uint256 public constant MAX_RATE_BPS = 10_000; // tripwire, not economics
 
     address public immutable owner;
     IERC20 public immutable dUsd;
@@ -37,6 +38,7 @@ contract SimVenue is IVenue {
     error ZeroNotional();
     error InsufficientPot();
     error InsufficientMargin();
+    error ImplausibleRate();
 
     event Seeded(address indexed from, uint256 amount);
     event RateSet(int256 rateBps);
@@ -62,6 +64,8 @@ contract SimVenue is IVenue {
 
     /// @notice Set the simulated funding rate. May be negative for the bad-day demo.
     function setFundingRateBps(int256 rateBps) external onlyOwner {
+        if (rateBps == type(int256).min) revert ImplausibleRate();
+        if (_abs(rateBps) > MAX_RATE_BPS) revert ImplausibleRate();
         fundingRateBps = rateBps;
         emit RateSet(rateBps);
     }

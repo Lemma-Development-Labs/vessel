@@ -17,7 +17,7 @@ contract MockWMON is ERC20 {
     }
 
     function setRouter(address router_) external {
-        if (router != address(0)) revert NotRouter();
+        if (router_ == address(0) || router != address(0)) revert NotRouter();
         router = router_;
     }
 

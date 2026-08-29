@@ -41,6 +41,18 @@ contract Fixture is Test {
         tranches.setEngine(address(engine));
         engine.wire(address(vault), address(tranches), address(venue), address(router), address(wmon));
         vm.stopPrank();
+        _seedDeadShares();
+    }
+
+    address internal constant DEAD = address(0x000000000000000000000000000000000000dEaD);
+
+    /// @dev 100 dUSD protocol-owned dead shares. Paired with `_decimalsOffset() = 6`.
+    function _seedDeadShares() internal {
+        _faucet(owner, 1);
+        vm.startPrank(owner);
+        dusd.approve(address(vault), 100e6);
+        vault.deposit(100e6, DEAD);
+        vm.stopPrank();
     }
 
     function _faucet(address user, uint256 times) internal {

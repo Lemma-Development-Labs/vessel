@@ -32,13 +32,13 @@ contract FullCycleTest is Fixture {
 
         assertEq(tranches.hullTvl(), 400e6);
         assertEq(tranches.balTvl(), 400e6);
-        assertEq(vault.totalAssets(), 800e6);
+        assertEq(vault.totalAssets(), 900e6); // 800 user + 100 dead seed
 
         uint256 deployable = vault.deployable();
-        assertEq(deployable, 720e6);
+        assertEq(deployable, 810e6);
 
         engine.deployLiquidity();
-        assertEq(vault.deployed(), 720e6);
+        assertEq(vault.deployed(), 810e6);
         assertEq(engine.shortId(), 1);
         assertEq(engine.netDelta(), 0);
 
@@ -65,6 +65,6 @@ contract FullCycleTest is Fixture {
         // Reserve + treasury stay in the vault; decks are empty.
         assertLe(tranches.hullTvl(), 1);
         assertLe(tranches.balTvl(), 1);
-        assertApproxEqAbs(vault.totalAssets(), tranches.reserve() + tranches.treasuryAccrued(), 10);
+        assertApproxEqAbs(vault.totalAssets(), tranches.reserve() + tranches.treasuryAccrued() + 100e6, 10);
     }
 }

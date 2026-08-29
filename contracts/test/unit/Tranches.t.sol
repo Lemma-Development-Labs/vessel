@@ -185,4 +185,81 @@ contract TranchesTest is Test {
         vm.expectRevert(Tranches.DtZero.selector);
         tranches.settle(1e6);
     }
+
+    function test_wireOnce() public {
+        vm.prank(owner);
+        vm.expectRevert(Tranches.EngineAlreadySet.selector);
+        tranches.setEngine(address(1));
+    }
+
+    function test_onlyEngineSettle() public {
+        vm.warp(block.timestamp + 1);
+        vm.prank(alice);
+        vm.expectRevert(Tranches.NotEngine.selector);
+        tranches.settle(0);
+    }
+
+    function test_int256MinYieldReverts() public {
+        _seedDecks(400e6, 400e6);
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert(Tranches.ImplausibleYield.selector);
+        tranches.settle(type(int256).min);
+    }
+
+    function test_emptyTvlPositiveYieldReverts() public {
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert(Tranches.ImplausibleYield.selector);
+        tranches.settle(1);
+    }
+
+    function test_settleAtYieldCapConserves() public {
+        _seedDecks(400e6, 400e6);
+        vm.warp(block.timestamp + 1);
+        uint256 tvl = tranches.hullTvl() + tranches.balTvl() + tranches.reserve();
+        int256 G = int256(tvl * 5_000 / 10_000);
+        uint256 h0 = tranches.hullTvl();
+        uint256 b0 = tranches.balTvl();
+        uint256 r0 = tranches.reserve();
+        uint256 t0 = tranches.treasuryAccrued();
+        tranches.settle(G);
+        assertEq(
+            int256(tranches.hullTvl()) - int256(h0) + int256(tranches.balTvl()) - int256(b0)
+                + int256(tranches.reserve()) - int256(r0) + int256(tranches.treasuryAccrued()) - int256(t0),
+            G
+        );
+    }
+
+    function test_settleNegativeCapDrainsBallast() public {
+        _seedDecks(400e6, 400e6);
+        vm.warp(block.timestamp + 1);
+        uint256 tvl = tranches.hullTvl() + tranches.balTvl() + tranches.reserve();
+        int256 G = -int256(tvl * 5_000 / 10_000); // -400e6 == entire ballast
+        uint256 h0 = tranches.hullTvl();
+        tranches.settle(G);
+        assertEq(tranches.hullTvl(), h0);
+        assertEq(tranches.balTvl(), 0);
+    }
+
+    function test_spillToKeepFloorOnThinBallast() public {
+        _seedDecks(400e6, 100e6); // exactly 20%
+        vm.warp(block.timestamp + 365 days);
+        uint256 h0 = tranches.hullTvl();
+        uint256 b0 = tranches.balTvl();
+        tranches.settle(10e6);
+        uint256 h1 = tranches.hullTvl();
+        uint256 b1 = tranches.balTvl();
+        assertGe(b1 * 10_000, 2_000 * (h1 + b1), "spill keeps floor");
+        assertEq(int256(h1 + b1 + tranches.reserve() + tranches.treasuryAccrued()) - int256(h0 + b0), 10e6);
+    }
+
+    /// @dev Characterization: settle() books NAV without moving vault cash. Not a silent fix.
+    function test_unfundedSettleDivergesLedgerFromVaultCash() public {
+        _seedDecks(400e6, 400e6);
+        uint256 cash = vault.totalAssets();
+        vm.warp(block.timestamp + 1);
+        tranches.settle(1e6);
+        uint256 ledger = tranches.hullTvl() + tranches.balTvl() + tranches.reserve() + tranches.treasuryAccrued();
+        assertGt(ledger, cash);
+        assertEq(vault.totalAssets(), cash);
+    }
 }

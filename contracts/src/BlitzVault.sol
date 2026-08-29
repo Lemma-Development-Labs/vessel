@@ -11,11 +11,15 @@ import {IGuardian} from "./interfaces/IGuardian.sol";
 /// @title BlitzVault
 /// @notice ERC-4626 vault over dUSD. 90% of assets are deployable to EngineLite;
 ///         10% stays as idle buffer. Engine pull/return is wire-once.
+/// @dev Virtual-share offset is 6 (`_decimalsOffset`) plus a protocol dead-share
+///      seed of 100 dUSD at deploy. Together they make the classic first-depositor
+///      inflation attack unprofitable (see test/unit/Inflation.t.sol).
 contract BlitzVault is ERC4626, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant DEPLOYABLE_BPS = 9_000;
     uint256 public constant BPS = 10_000;
+    uint8 public constant DECIMALS_OFFSET = 6;
 
     address public immutable deployer;
     IGuardian public immutable guardian;
@@ -58,6 +62,11 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
         guardian = IGuardian(guardian_);
     }
 
+    /// @dev OZ virtual-share mitigation. 10^6 virtual shares vs +1 virtual asset.
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return DECIMALS_OFFSET;
+    }
+
     /// @notice Assets currently managed by the vault, including amounts at the engine.
     function totalAssets() public view override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this)) + deployed;
@@ -71,7 +80,7 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
     }
 
     /// @notice Wire EngineLite. Single-use. Cannot be called by Guardian.
-    function setEngine(address engine_) external onlyDeployer {
+    function setEngine(address engine_) external onlyDeployer whenNotPaused nonReentrant {
         if (engine != address(0)) revert EngineAlreadySet();
         if (engine_ == address(0)) revert ZeroAddress();
         engine = engine_;
@@ -88,10 +97,11 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
     }
 
     /// @notice Engine returns `amount` dUSD of previously deployed principal.
+    /// @dev Effects before interaction: `deployed` is reduced, then tokens are pulled.
     function returnFromEngine(uint256 amount) external onlyEngine whenNotPaused nonReentrant {
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         if (amount >= deployed) deployed = 0;
         else deployed -= amount;
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         emit Returned(amount, deployed);
     }
 

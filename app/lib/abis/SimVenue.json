@@ -38,6 +38,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_RATE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "YEAR",
     "inputs": [],
     "outputs": [
@@ -366,6 +379,11 @@
   {
     "type": "error",
     "name": "Closed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ImplausibleRate",
     "inputs": []
   },
   {

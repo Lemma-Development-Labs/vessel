@@ -1,16 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { Providers } from "@/lib/providers";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { AppShell } from "@/components/shell";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const sans = Instrument_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -22,10 +34,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+      <body className="flex min-h-full flex-col">
+        <ErrorBoundary>
+          <Suspense fallback={<div className="skeleton mx-auto mt-24 h-40 w-full max-w-xl" />}>
+            <Providers>
+              <AppShell>{children}</AppShell>
+            </Providers>
+          </Suspense>
+        </ErrorBoundary>
       </body>
     </html>
   );

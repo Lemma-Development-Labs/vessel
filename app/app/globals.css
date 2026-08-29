@@ -1,52 +1,116 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0b0d0c;
-  --panel: #121412;
-  --ink: #e8e6e1;
-  --muted: #8a8880;
-  --line: #242822;
-  --hull: #c4a36a;
-  --ballast: #3d9b8f;
-  --sim: #e3b341;
-  --real: #8fd9b4;
-  --impair: #e25d5d;
+  --bg: #070b10;
+  --bg2: #0b1118;
+  --panel: #0e131b;
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #eaeef3;
+  --text-dim: rgba(234, 238, 243, 0.62);
+  --purple: #836ef9;
+  --purple-hover: #957fff;
+  --brass: #c9964b;
+  --steel: #8fa6bc;
+  --phosphor: #35d699;
+  --amber: #f0b35c;
+  --red: #e5646c;
+  --radius-card: 16px;
+  --radius-chip: 8px;
+  --radius-modal: 16px;
 }
 
 @theme inline {
   --color-bg: var(--bg);
+  --color-bg2: var(--bg2);
   --color-panel: var(--panel);
-  --color-ink: var(--ink);
-  --color-muted: var(--muted);
   --color-line: var(--line);
-  --color-hull: var(--hull);
-  --color-ballast: var(--ballast);
-  --color-sim: var(--sim);
-  --color-real: var(--real);
-  --color-impair: var(--impair);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--text);
+  --color-dim: var(--text-dim);
+  --color-purple: var(--purple);
+  --color-brass: var(--brass);
+  --color-steel: var(--steel);
+  --color-phosphor: var(--phosphor);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 html,
 body {
-  background: var(--bg);
-  color: var(--ink);
   min-height: 100%;
 }
 
 body {
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-.num {
+.num,
+.tabular {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 
-@keyframes fall {
+.display {
+  font-family: var(--font-display), ui-sans-serif, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes bar-in {
   from {
-    transform: translateY(-8px);
+    transform: scaleX(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fee-up {
+  from {
+    transform: translateY(8px);
     opacity: 0;
   }
   to {
@@ -55,16 +119,99 @@ body {
   }
 }
 
-.waterfall-play {
-  animation: fall 0.45s ease-out;
-}
-
-@keyframes pulse-bar {
+@keyframes pour {
   from {
-    width: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
   }
 }
 
-.bar-fill {
-  animation: pulse-bar 0.7s ease-out;
+@keyframes drain {
+  from {
+    width: var(--from, 40%);
+  }
+  to {
+    width: var(--to, 0%);
+  }
+}
+
+.spin {
+  animation: spin 0.7s linear infinite;
+}
+
+.pulse-dot {
+  animation: pulse-dot 2.4s ease-in-out infinite;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+}
+
+.ballast-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.ballast-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(201, 150, 75, 0.12) 50%,
+    transparent 60%
+  );
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ballast-shimmer:hover::after {
+  opacity: 1;
+  animation: shimmer-sweep 1.2s ease;
+}
+
+.waterfall-gross {
+  transform-origin: left center;
+  animation: bar-in 0.45s ease-out both;
+}
+
+.waterfall-fee {
+  animation: fee-up 0.35s ease-out 0.3s both;
+}
+
+.waterfall-hull {
+  transform-origin: left center;
+  animation: bar-in 0.4s ease-out 0.6s both;
+}
+
+.waterfall-ballast {
+  animation: pour 0.55s ease-out 0.9s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .pulse-dot,
+  .skeleton,
+  .ballast-shimmer::after,
+  .waterfall-gross,
+  .waterfall-fee,
+  .waterfall-hull,
+  .waterfall-ballast,
+  .gauge-needle {
+    animation: none !important;
+  }
+
+  .ballast-shimmer:hover::after {
+    opacity: 0;
+  }
 }

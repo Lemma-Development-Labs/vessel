@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: fmt
+        run: forge fmt --check
+      - name: test (25k fuzz)
+        env:
+          FOUNDRY_PROFILE: ci
+        run: forge test --offline --fuzz-runs 25000
+      - name: gas snapshot (±10%)
+        run: forge snapshot --check --tolerance 10 --offline --no-match-test 'testFuzz' --no-match-path 'test/fork/*'
+      - name: contract sizes
+        working-directory: .
+        run: node scripts/check-sizes.mjs
+      - name: coverage
+        run: |
+          mkdir -p coverage
+          forge coverage --offline --ir-minimum --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/' || forge coverage --offline --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/'
+      - name: coverage gate ≥95%
+        working-directory: .
+        run: node scripts/coverage-gate.mjs contracts/coverage/lcov.info
+      - name: slither
+        run: |
+          python3 -m pip install --user slither-analyzer
+          export PATH="$HOME/.local/bin:$PATH"
+          slither . --fail-none
+
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-secrets.mjs
