@@ -5,17 +5,29 @@ import Link from "next/link";
 import { useVessel } from "@/lib/context";
 import { COPY, thetaWouldHold } from "@/lib/provider";
 import { formatDusd, formatDusd4, formatTs } from "@/lib/format";
-import { Button, Card, EmptyState, Modal, Tooltip } from "@/components/ui";
+import { useNowSec } from "@/lib/now";
+import { Button, Card, EmptyState, Modal, Skeleton, Tooltip } from "@/components/ui";
 
 export function PortfolioScreen() {
   const v = useVessel();
+  const nowSec = useNowSec();
   const empty = v.hullShares === 0n && v.balShares === 0n;
   const last = Number(v.deck.lastSettle);
-  const recent = last > 0 && Date.now() / 1000 - last < 60;
+  const recent = last > 0 && nowSec - last < 60;
+
+  if (v.loading) {
+    return (
+      <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="mt-4 h-10 w-48" />
+        <Skeleton className="mt-8 h-48 w-full" />
+      </div>
+    );
+  }
 
   if (!v.connected) {
     return (
-      <div className="mx-auto max-w-[1080px] px-5 py-16">
+      <div className="mx-auto max-w-[1080px] px-4 py-16 sm:px-5">
         <EmptyState
           title="Connect to see your decks"
           action={<Button onClick={() => void v.connect()}>Connect</Button>}
@@ -26,7 +38,7 @@ export function PortfolioScreen() {
 
   if (empty) {
     return (
-      <div className="mx-auto max-w-[1080px] px-5 py-16">
+      <div className="mx-auto max-w-[1080px] px-4 py-16 sm:px-5">
         <EmptyState
           title="No position yet — board a deck"
           action={
@@ -44,9 +56,11 @@ export function PortfolioScreen() {
   const targetPct = Number(v.deck.reserveTargetBps) / 100;
 
   return (
-    <div className="mx-auto max-w-[1080px] px-5 py-10 md:py-14">
+    <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
       <p className="num text-[10.5px] tracking-[0.18em] text-steel">PORTFOLIO</p>
-      <h1 className="display mt-3 text-[40px] font-bold tracking-[-0.02em]">Your decks</h1>
+      <h1 className="display mt-3 text-[32px] font-bold tracking-[-0.02em] sm:text-[40px]">
+        Your decks
+      </h1>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <PositionCard
@@ -96,7 +110,7 @@ export function PortfolioScreen() {
         </div>
         <div className="bg-bg2 px-5 py-4">
           <p className="num text-[10px] tracking-[0.16em] text-steel">LAST CRANK</p>
-          <p className="num mt-1 flex items-center gap-2 text-lg">
+          <p className="num mt-1 flex flex-wrap items-center gap-2 text-lg">
             {formatTs(v.deck.lastSettle)}
             {recent ? <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-phosphor" /> : null}
           </p>
@@ -149,31 +163,43 @@ function PositionCard({
   const [open, setOpen] = useState(false);
   if (shares === 0n) return null;
   const value = supply === 0n ? 0n : (shares * tvl) / supply;
-  const accrued = value > meta.principal ? value - meta.principal : 0n;
+  const knownPrincipal = meta.principal > 0n;
+  const accrued = knownPrincipal && value > meta.principal ? value - meta.principal : 0n;
   return (
-    <Card accent={steel ? "steel" : "brass"} className="p-6">
-      <div className="flex items-baseline justify-between">
+    <Card accent={steel ? "steel" : "brass"} className="p-5 sm:p-6">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <h2 className={`display text-xl tracking-[0.04em] ${steel ? "text-[#C2D2E0]" : "text-brass"}`}>
           {name}
         </h2>
-        <p className="num text-[11px] text-steel">
-          {meta.boardedAt ? `Boarded ${formatTs(meta.boardedAt)}` : "Boarded"}
+        <p className="num text-[11px] leading-snug text-steel">
+          {meta.boardedAt ? `Boarded ${formatTs(meta.boardedAt)}` : "On-chain position"}
         </p>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-4">
-        <div>
-          <p className="num text-[10px] tracking-[0.14em] text-steel">PRINCIPAL</p>
-          <p className="num mt-1 text-lg">{formatDusd(meta.principal)}</p>
+      {knownPrincipal ? (
+        <div className="mt-5 grid grid-cols-2 gap-4">
+          <div>
+            <p className="num text-[10px] tracking-[0.14em] text-steel">PRINCIPAL</p>
+            <p className="num mt-1 text-lg">{formatDusd(meta.principal)}</p>
+          </div>
+          <div>
+            <p className="num text-[10px] tracking-[0.14em] text-steel">ACCRUED</p>
+            <p className="num mt-1 text-lg text-phosphor">{formatDusd4(accrued)}</p>
+          </div>
         </div>
-        <div>
-          <p className="num text-[10px] tracking-[0.14em] text-steel">ACCRUED</p>
-          <p className="num mt-1 text-lg text-phosphor">{formatDusd4(accrued)}</p>
+      ) : (
+        <div className="mt-5">
+          <p className="num text-[10px] tracking-[0.14em] text-steel">VALUE</p>
+          <p className="num mt-1 text-lg">{formatDusd(value)} dUSD</p>
         </div>
-      </div>
-      <p className="num mt-4 text-sm text-dim">value {formatDusd(value)} dUSD</p>
-      <div className={`mt-4 ${steel ? "text-steel" : "text-brass"}`}>
-        <Spark points={meta.spark.length ? meta.spark : [1, 1.01, 1.02, 1.015]} />
-      </div>
+      )}
+      {knownPrincipal ? (
+        <p className="num mt-4 text-sm text-dim">value {formatDusd(value)} dUSD</p>
+      ) : null}
+      {meta.spark.length ? (
+        <div className={`mt-4 ${steel ? "text-steel" : "text-brass"}`}>
+          <Spark points={meta.spark} />
+        </div>
+      ) : null}
       {exitBlocked ? (
         <Tooltip content={COPY.ballastExit}>
           <div className="mt-5">

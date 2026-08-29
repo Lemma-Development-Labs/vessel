@@ -6,7 +6,8 @@ import { useVessel } from "@/lib/context";
 import { COPY, thetaWouldHold, type DeckKind } from "@/lib/provider";
 import { MIN_JOIN } from "@/lib/gas";
 import { formatBps, formatDusd, parseDusd } from "@/lib/format";
-import { Button, Card, EmptyState } from "@/components/ui";
+import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { DeployHedgeCta } from "@/components/hedge-cta";
 
 export function DepositScreen() {
   const v = useVessel();
@@ -22,25 +23,42 @@ export function DepositScreen() {
   const balAfter = deck === "ballast" ? v.deck.balTvl + parsed : v.deck.balTvl;
   const floorOk = thetaWouldHold(hullAfter, balAfter);
   const joinOk =
-    v.connected && validShape && parsed >= MIN_JOIN && !over && floorOk && !v.paused;
+    v.connected &&
+    validShape &&
+    parsed >= MIN_JOIN &&
+    !over &&
+    floorOk &&
+    !v.paused &&
+    !v.wrongNetwork;
+
+  if (v.loading) {
+    return (
+      <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-14">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-4 h-10 w-56" />
+        <Skeleton className="mt-8 h-40 w-full" />
+      </div>
+    );
+  }
 
   if (!v.connected) {
     return (
-      <div className="mx-auto max-w-[720px] px-5 py-16">
+      <div className="mx-auto max-w-[720px] px-4 py-16 sm:px-5">
         <EmptyState
           title="Connect to board"
-          action={
-            <Button onClick={() => void v.connect()}>Connect wallet</Button>
-          }
+          action={<Button onClick={() => void v.connect()}>Connect wallet</Button>}
         />
+        <p className="mt-4 text-center text-sm text-dim">
+          Use a Monad-ready wallet in this browser (Phantom, MetaMask). Demo dollars only.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 py-10 md:py-14">
+    <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-14">
       <p className="num text-[10.5px] tracking-[0.18em] text-steel">DEPOSIT</p>
-      <h1 className="display mt-3 text-[40px] font-bold leading-[1.04] tracking-[-0.02em] md:text-[44px]">
+      <h1 className="display mt-3 text-[32px] font-bold leading-[1.04] tracking-[-0.02em] sm:text-[40px] md:text-[44px]">
         Board a deck
       </h1>
       <p className="mt-3 max-w-xl text-base text-dim">
@@ -70,7 +88,7 @@ export function DepositScreen() {
           <span className="num text-[10.5px] tracking-[0.16em] text-steel">AMOUNT</span>
           <button
             type="button"
-            className="num text-[11px] text-purple"
+            className="num min-h-11 text-[11px] text-purple"
             onClick={() => setAmt(formatDusd(v.dusdBalance).replace(/,/g, ""))}
           >
             MAX
@@ -81,7 +99,7 @@ export function DepositScreen() {
           onChange={(e) => setAmt(e.target.value)}
           inputMode="decimal"
           aria-label="Deposit amount in dUSD"
-          className="num mt-2 w-full bg-transparent text-[40px] tracking-[-0.01em] outline-none"
+          className="num mt-2 w-full bg-transparent text-[clamp(1.75rem,10vw,2.5rem)] tracking-[-0.01em] outline-none"
         />
         <p className="mt-2 text-sm text-dim">
           You&apos;re depositing {validShape ? formatDusd(parsed) : "0.00"} dUSD
@@ -91,11 +109,7 @@ export function DepositScreen() {
         ) : null}
       </div>
 
-      <div
-        role="radiogroup"
-        aria-label="Deck"
-        className="mt-8 grid gap-4 sm:grid-cols-2"
-      >
+      <div role="radiogroup" aria-label="Deck" className="mt-8 grid gap-4 sm:grid-cols-2">
         <DeckPick
           kind="hull"
           selected={deck === "hull"}
@@ -114,13 +128,14 @@ export function DepositScreen() {
       </div>
 
       {done ? (
-        <Card className="mt-8 p-8">
+        <Card className="mt-8 p-6 sm:p-8">
           <p className="num flex items-center gap-2 text-[10.5px] tracking-[0.16em] text-phosphor">
             <span className="h-1.5 w-1.5 rounded-full bg-phosphor" />
             ABOARD
           </p>
           <p className="display mt-4 text-2xl">
-            Aboard. {formatDusd(done.amount)} dUSD on the {done.deck === "hull" ? "Hull" : "Ballast"} deck.
+            Aboard. {formatDusd(done.amount)} dUSD on the {done.deck === "hull" ? "Hull" : "Ballast"}{" "}
+            deck.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button onClick={() => router.push("/portfolio")}>View portfolio</Button>
@@ -163,6 +178,8 @@ export function DepositScreen() {
           </div>
         </Card>
       )}
+
+      <DeployHedgeCta className="mt-8" />
     </div>
   );
 }
@@ -204,7 +221,7 @@ function DeckPick({
           onSelect();
         }
       }}
-      className={`relative text-left ${hull ? "" : "ballast-shimmer"} rounded-[var(--radius-card)] border bg-bg2 p-6 ${
+      className={`relative text-left ${hull ? "" : "ballast-shimmer"} rounded-[var(--radius-card)] border bg-bg2 p-5 sm:p-6 ${
         selected
           ? hull
             ? "border-2 border-steel"
@@ -222,11 +239,11 @@ function DeckPick({
       <p className={`num text-[10px] tracking-[0.18em] ${hull ? "text-steel" : "text-brass"}`}>
         {hull ? "SENIOR" : "JUNIOR"}
       </p>
-      <h2 className={`display mt-2 text-[30px] font-bold tracking-[0.03em] ${hull ? "text-[#C2D2E0]" : "text-brass"}`}>
+      <h2 className={`display mt-2 text-[26px] font-bold tracking-[0.03em] sm:text-[30px] ${hull ? "text-[#C2D2E0]" : "text-brass"}`}>
         {hull ? "HULL" : "BALLAST"}
       </h2>
       <p className="mt-1 text-sm text-dim">{hull ? "Fixed. Protected." : "Levered. First-loss."}</p>
-      <p className="num mt-4 text-[22px]">
+      <p className="num mt-4 text-[20px] sm:text-[22px]">
         {hull ? "8.00% APR — fixed" : "≈ 19.4% APR — variable, levered residual"}
       </p>
       <ul className="mt-4 space-y-1 text-[13.5px] text-steel">
@@ -251,9 +268,7 @@ function DeckPick({
         {hull ? (
           <span className={`num ${cushionTone}`}>{cushion}</span>
         ) : (
-          <span className="num text-brass">
-            leverage {leverage ? formatBps(leverage) : "—"}
-          </span>
+          <span className="num text-brass">leverage {leverage ? formatBps(leverage) : "—"}</span>
         )}
       </div>
     </button>

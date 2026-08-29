@@ -10,11 +10,12 @@ const STATES = [
   { q: "impair", label: "Hull impairment banner" },
   { q: "wrongnet", label: "Wrong network" },
   { q: "boarded", label: "User already boarded" },
+  { q: "undeployed", label: "Hedge not deployed yet" },
 ];
 
 export default function DemoStatesPage() {
   return (
-    <div className="mx-auto max-w-[720px] px-5 py-12">
+    <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-12">
       <h1 className="display text-3xl font-bold">Demo states</h1>
       <p className="mt-2 text-sm text-dim">
         MockProvider variants via <span className="num">?demo=</span>. Use these for screenshots.
@@ -35,6 +36,12 @@ export default function DemoStatesPage() {
         Transparency negative:{" "}
         <Link href="/transparency?demo=negative" className="text-purple">
           /transparency?demo=negative
+        </Link>
+      </p>
+      <p className="mt-2 text-sm text-dim">
+        Transparency undeployed:{" "}
+        <Link href="/transparency?demo=undeployed" className="text-purple">
+          /transparency?demo=undeployed
         </Link>
       </p>
     </div>

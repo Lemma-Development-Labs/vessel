@@ -40,12 +40,27 @@
 html,
 body {
   min-height: 100%;
+  overflow-x: clip;
 }
 
 body {
   background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
   color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+input:not(.num),
+textarea,
+select {
+  font-size: 16px;
+}
+
+a,
+button {
+  touch-action: manipulation;
 }
 
 .num,

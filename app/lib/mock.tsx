@@ -145,6 +145,7 @@ export function MockVesselProvider({
   const [impaired] = useState(impair);
   const [lastFaucet, setLastFaucet] = useState(0);
   const [cooldownTick, setCooldown] = useState(0);
+  const [hedged, setHedged] = useState(demo !== "undeployed");
   const [hullMeta, setHullMeta] = useState<PositionMeta>(() =>
     boarded
       ? { boardedAt: Date.now() / 1000 - 3600, principal: dusd(250), spark: spark(250) }
@@ -401,7 +402,17 @@ export function MockVesselProvider({
       hullShares: emptyUser ? 0n : hullShares,
       balShares: emptyUser ? 0n : balShares,
       deck,
-      engine: { ...engine, lastBlock: engine.lastBlock + Math.floor(now / 4000) % 20 },
+      engine: {
+        ...engine,
+        lastBlock: engine.lastBlock + (Math.floor(now / 4000) % 20),
+        shortId: hedged ? 1n : 0n,
+        spotQty: hedged ? engine.spotQty : 0n,
+        spotValue: hedged ? engine.spotValue : 0n,
+        shortNotional: hedged ? engine.shortNotional : 0n,
+        fundingAccrued: hedged ? engine.fundingAccrued : 0n,
+        netDelta: hedged ? engine.netDelta : 0n,
+        netDeltaBps: hedged ? engine.netDeltaBps : 0n,
+      },
       waterfall,
       loading: false,
       connected,
@@ -423,7 +434,13 @@ export function MockVesselProvider({
       exitHull,
       exitBallast,
       crank,
-      deployLiquidity: () => runMockTx("Deploy hedge", () => undefined),
+      deployLiquidity: async () => {
+        if (hedged) {
+          push({ kind: "error", text: "Hedge already deployed" });
+          return;
+        }
+        await runMockTx("Deploy hedge", () => setHedged(true));
+      },
       connect: async () => setConnected(true),
       disconnect: async () => setConnected(false),
       switchNetwork: async () => {},
@@ -444,6 +461,7 @@ export function MockVesselProvider({
       exitBallast,
       exitHull,
       faucet,
+      hedged,
       hullMeta,
       hullShares,
       impaired,
@@ -451,6 +469,7 @@ export function MockVesselProvider({
       joinDeck,
       joinHull,
       now,
+      push,
       runMockTx,
       toasts,
       waterfall,

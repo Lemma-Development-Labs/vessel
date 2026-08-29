@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { useVessel } from "@/lib/context";
 import { ADDRESSES } from "@/lib/addresses";
 import { formatDusd, formatDusd4, formatTs, formatWmon, shorten } from "@/lib/format";
-import { AddressChip, Badge, Button, Card, Gauge } from "@/components/ui";
+import { useNowSec } from "@/lib/now";
+import { AddressChip, Badge, Button, Card, Gauge, Skeleton } from "@/components/ui";
+import { DeployHedgeCta } from "@/components/hedge-cta";
 import type { WaterfallEvent } from "@/lib/provider";
 
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
 
 export function TransparencyScreen() {
   const v = useVessel();
+  const nowSec = useNowSec();
   const [freeze, setFreeze] = useState(false);
-  const [lastAnimated, setLastAnimated] = useState<string | null>(null);
   const pct = Number(v.engine.netDeltaBps) / 100;
   const [jitter, setJitter] = useState(0);
 
@@ -26,29 +28,37 @@ export function TransparencyScreen() {
     return () => window.clearInterval(id);
   }, [freeze]);
 
-  const latest = v.waterfall[0];
-  useEffect(() => {
-    if (latest && latest.txHash !== lastAnimated) setLastAnimated(latest.txHash);
-  }, [latest, lastAnimated]);
+  const undeployed = v.engine.shortId === 0n;
+  const spotVia = v.engine.simulated ? "MockRouter" : "DEX router";
+
+  if (v.loading) {
+    return (
+      <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="mt-4 h-12 w-full max-w-xl" />
+        <Skeleton className="mt-8 h-56 w-full" />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-[1080px] px-5 py-10 md:py-14">
+    <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
       <p className="num text-[10.5px] tracking-[0.18em] text-steel">TRANSPARENCY</p>
-      <h1 className="display mt-3 text-[36px] font-bold leading-[1.04] tracking-[-0.02em] md:text-[44px]">
+      <h1 className="display mt-3 text-[28px] font-bold leading-[1.04] tracking-[-0.02em] sm:text-[36px] md:text-[44px]">
         The hedge is public, every block.
       </h1>
       <p className="mt-3 max-w-xl text-base text-dim">
         Everything the engine does, visible and live. Demo dollars. Unaudited.
       </p>
 
-      <Card className="mt-10 p-6 md:p-7">
+      <Card className="mt-10 p-5 md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="display text-lg">The hedge, live</h2>
+            <h2 className="display text-lg">{undeployed ? "The hedge, pending" : "The hedge, live"}</h2>
             <p className="num mt-1 text-[11.5px] text-steel">
               last update: block {v.engine.lastBlock.toLocaleString()} ·{" "}
               {v.engine.lastCrankTs
-                ? `${Math.max(0, Math.floor(Date.now() / 1000 - Number(v.engine.lastCrankTs)))}s ago`
+                ? `${Math.max(0, nowSec - Number(v.engine.lastCrankTs))}s ago`
                 : "—"}
             </p>
           </div>
@@ -60,13 +70,17 @@ export function TransparencyScreen() {
             label="SPOT LEG"
             a={`WMON ${formatWmon(v.engine.spotQty)}`}
             b={`value ${formatDusd(v.engine.spotValue)} dUSD`}
-            c="via PuddleSwap"
+            c={spotVia}
           />
           <HedgeRow
             label="SHORT LEG"
             a={`notional ${formatDusd(v.engine.shortNotional)} dUSD`}
             b={v.engine.simulated ? "SimVenue" : v.engine.venueName}
-            c={`margin ${formatDusd(v.engine.shortNotional / 2n)}`}
+            c={
+              v.engine.shortNotional === 0n
+                ? "no position"
+                : `margin ${formatDusd(v.engine.shortNotional / 2n)}`
+            }
             amber={v.engine.simulated}
           />
           <HedgeRow
@@ -82,7 +96,9 @@ export function TransparencyScreen() {
         </div>
       </Card>
 
-      <Card className="mt-6 p-6">
+      <DeployHedgeCta className="mt-6" />
+
+      <Card className="mt-6 p-5 sm:p-6">
         <Button
           className="w-full py-5 text-[15px] tracking-[0.12em]"
           loading={freeze}
@@ -115,7 +131,7 @@ export function TransparencyScreen() {
               <WaterfallPlay
                 key={ev.txHash}
                 ev={ev}
-                animate={i === 0 && lastAnimated === ev.txHash && !freeze}
+                animate={i === 0 && !freeze}
               />
             ))
           )}
@@ -128,20 +144,24 @@ export function TransparencyScreen() {
           {(
             [
               ["DemoUSD", ADDRESSES.DemoUSD],
+              ["Guardian", ADDRESSES.Guardian],
               ["BlitzVault", ADDRESSES.BlitzVault],
               ["Tranches", ADDRESSES.Tranches],
               ["Hull", ADDRESSES.Hull],
               ["Ballast", ADDRESSES.Ballast],
               ["EngineLite", ADDRESSES.EngineLite],
               ["SimVenue", ADDRESSES.SimVenue],
+              ["PerplVenue", ADDRESSES.PerplVenue],
+              ["MockRouter", ADDRESSES.MockRouter],
+              ["MockWMON", ADDRESSES.MockWMON],
             ] as const
           ).map(([name, addr]) => (
             <div
               key={name}
-              className="flex flex-col gap-2 border-b border-white/6 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-white/6 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="num text-[11px] tracking-[0.14em] text-steel">{name}</span>
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <AddressChip address={addr} href={`${EXPLORER}/address/${addr}`} />
                 <a href={`${EXPLORER}/address/${addr}`} className="text-phosphor">
                   <Badge kind="verified" />
@@ -151,7 +171,8 @@ export function TransparencyScreen() {
           ))}
         </div>
         <p className="mt-3 text-sm text-dim">
-          Recompute everything yourself — the exact reads are in the docs →{" "}
+          EngineLite is wired to SimVenue + MockRouter. PerplVenue is deployed but not connected.
+          Recompute the reads yourself →{" "}
           <a href="https://docs.vessel.wtf/proof-of-hedge" className="text-purple">
             docs.vessel.wtf/proof-of-hedge
           </a>
@@ -177,7 +198,7 @@ function HedgeRow({
   amber?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-1 border-b border-white/6 bg-bg px-4 py-3 sm:grid-cols-[7rem_1fr_1fr_1fr] sm:items-center">
+    <div className="grid grid-cols-1 gap-1 border-b border-white/6 bg-bg px-4 py-3 last:border-b-0 sm:grid-cols-[7rem_1fr_1fr_1fr] sm:items-center">
       <span className="num text-[11px] tracking-[0.14em] text-steel">{label}</span>
       <span className={`num text-[12.5px] ${phosphor ? "text-phosphor" : "text-ink"}`}>{a}</span>
       <span className={`num text-[12.5px] ${amber ? "text-amber" : "text-[#B9C6D4]"}`}>{b}</span>
@@ -189,23 +210,17 @@ function HedgeRow({
 function WaterfallPlay({ ev, animate }: { ev: WaterfallEvent; animate: boolean }) {
   const negative = ev.gross < 0n;
   const mag = ev.gross < 0n ? -ev.gross : ev.gross;
-  const hullShare =
-    mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / (mag === 0n ? 1n : mag));
+  const hullShare = mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / (mag === 0n ? 1n : mag));
   const cls = animate ? "" : "";
 
   if (negative) {
     return (
       <Card className="overflow-hidden p-4">
         <div className={`h-8 rounded-md bg-red/20 ${animate ? "waterfall-gross" : ""}`}>
-          <span className="num px-3 text-[12px] leading-8 text-red">
-            GROSS −{formatDusd4(mag)} dUSD
-          </span>
+          <span className="num px-3 text-[12px] leading-8 text-red">GROSS −{formatDusd4(mag)} dUSD</span>
         </div>
         <div className="mt-3 h-6 overflow-hidden rounded-md bg-brass/40">
-          <div
-            className="h-full bg-brass"
-            style={{ width: "62%" }}
-          />
+          <div className="h-full bg-brass" style={{ width: "62%" }} />
         </div>
         <p className="num mt-2 text-[11px] text-brass">absorbed by Ballast</p>
         <Row ev={ev} />
@@ -232,9 +247,7 @@ function WaterfallPlay({ ev, animate }: { ev: WaterfallEvent; animate: boolean }
       <p className="num mt-1 text-[11px] text-steel">
         HULL ACCRUAL +{formatDusd4(ev.hullAccrual)} (8% APR × TVL × dt)
       </p>
-      <div
-        className={`mt-2 h-7 rounded-md bg-brass/80 ${animate ? "waterfall-ballast" : ""}`}
-      >
+      <div className={`mt-2 h-7 rounded-md bg-brass/80 ${animate ? "waterfall-ballast" : ""}`}>
         <span className="num px-3 text-[12px] leading-7 text-[#0A0A14]">
           TO BALLAST +{formatDusd4(ev.toBallast)}
         </span>

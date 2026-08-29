@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { Providers } from "@/lib/providers";
@@ -28,6 +28,18 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Vessel — The dollar leverage pays for.",
   description: "Delta-neutral tranche yield on Monad. Unaudited testnet.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Vessel",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#070B10",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

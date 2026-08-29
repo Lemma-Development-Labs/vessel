@@ -6,9 +6,10 @@ import { foundry } from "viem/chains";
 import { CHAIN_ID } from "./addresses";
 
 function rpcList(): string[] {
+  const chainHint = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? CHAIN_ID);
   const primary =
     process.env.NEXT_PUBLIC_RPC ??
-    (CHAIN_ID === 31337 ? "http://127.0.0.1:8545" : "https://testnet-rpc.monad.xyz");
+    (chainHint === 31337 ? "http://127.0.0.1:8545" : "https://testnet-rpc.monad.xyz");
   const extra = process.env.NEXT_PUBLIC_RPC_FALLBACK ?? "";
   const fromCsv = primary.split(",").map((s) => s.trim()).filter(Boolean);
   const fallbacks = extra.split(",").map((s) => s.trim()).filter(Boolean);
@@ -24,7 +25,6 @@ function rpcList(): string[] {
 }
 
 const rpcs = rpcList();
-const rpc = rpcs[0];
 
 const explorer =
   process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";

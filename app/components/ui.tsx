@@ -33,7 +33,7 @@ export function Button({
       type="button"
       disabled={isDisabled}
       title={tooltip}
-      className={`inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
       {...rest}
     >
       {loading ? (
@@ -50,7 +50,7 @@ export function Button({
     return (
       <span className="group relative inline-flex w-full" title={tooltip}>
         {btn}
-        <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block">
+        <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block">
           {tooltip}
         </span>
       </span>
@@ -103,7 +103,7 @@ export function StatBlock({
             ? "text-steel"
             : "text-ink";
   return (
-    <div className="flex min-w-[150px] flex-col gap-1.5 bg-bg2 px-5 py-4">
+    <div className="flex min-w-[120px] flex-col gap-1.5 bg-bg2 px-5 py-4 sm:min-w-[150px]">
       <span className="num text-[10px] uppercase tracking-[0.16em] text-steel">{label}</span>
       <span className={`num text-lg ${color}`}>{value}</span>
       {delta ? <span className="num text-[11px] text-phosphor">{delta}</span> : null}
@@ -113,8 +113,10 @@ export function StatBlock({
 
 export function Badge({
   kind,
+  compact,
 }: {
   kind: "testnet" | "sim" | "verified" | "hedged";
+  compact?: boolean;
 }) {
   if (kind === "testnet") {
     return (
@@ -126,16 +128,24 @@ export function Badge({
   }
   if (kind === "sim") {
     return (
-      <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-amber/50 px-2.5 py-1 text-[10.5px] tracking-[0.12em] text-amber">
-        SIM VENUE — Perpl next
+      <span className="num inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
+        {compact ? (
+          "SIM"
+        ) : (
+          <>
+            <span className="sm:hidden">SIM</span>
+            <span className="hidden sm:inline">SIM VENUE — Perpl next</span>
+          </>
+        )}
       </span>
     );
   }
   if (kind === "hedged") {
     return (
-      <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-phosphor/40 px-2.5 py-1 text-[10.5px] tracking-[0.12em] text-phosphor">
+      <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-phosphor/40 px-2 py-1 text-[10.5px] tracking-[0.12em] text-phosphor sm:px-2.5">
         <span className="h-1.5 w-1.5 rounded-full bg-phosphor" />
-        HEDGED ON PERPL TESTNET
+        <span className="sm:hidden">HEDGED</span>
+        <span className="hidden sm:inline">HEDGED ON PERPL TESTNET</span>
       </span>
     );
   }
@@ -184,7 +194,7 @@ export function Tooltip({ content, children }: { content: string; children: Reac
   return (
     <span className="group relative inline-flex">
       {children}
-      <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-dim group-hover:block group-focus-within:block">
+      <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-dim group-hover:block group-focus-within:block">
         {content}
       </span>
     </span>
@@ -223,8 +233,8 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal>
-      <div className="w-full max-w-md rounded-[var(--radius-modal)] border border-line bg-panel p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" role="dialog" aria-modal>
+      <div className="mb-[env(safe-area-inset-bottom)] max-h-[min(90dvh,36rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-modal)] border border-line bg-panel p-6 sm:mb-0">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="display text-lg">{title}</h2>
           <button type="button" onClick={onClose} className="text-steel hover:text-ink">
