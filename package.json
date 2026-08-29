@@ -4,6 +4,7 @@
   "scripts": {
     "sync": "node scripts/sync.mjs",
     "sync-abis": "node scripts/sync.mjs",
+    "verify:manifest": "node scripts/verify-manifest.mjs",
     "keeper": "tsx --env-file=.env scripts/keeper.ts",
     "e2e": "tsx --env-file=.env scripts/e2e.ts",
     "test": "forge test --root contracts",
