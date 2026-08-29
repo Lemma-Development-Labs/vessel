@@ -11,6 +11,7 @@ import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { Val } from "@/components/live";
 import { DeployHedgeCta } from "@/components/hedge-cta";
 import { ConnectButton, GasFirstCard } from "@/components/connect";
+import { WC_ENABLED } from "@/lib/wagmi";
 
 export function DepositScreen() {
   const v = useVessel();
@@ -63,7 +64,9 @@ export function DepositScreen() {
       <div className="mx-auto max-w-[720px] px-4 py-16 sm:px-5">
         <EmptyState title="Connect to board" action={<ConnectButton />} />
         <p className="mt-4 text-center text-sm text-dim">
-          Use a Monad-ready wallet. On a phone, use WalletConnect. Demo dollars only.
+          {WC_ENABLED
+            ? "Use a Monad-ready wallet. On a phone, use WalletConnect. Demo dollars only."
+            : "Use a Monad-ready browser wallet. WalletConnect is not configured on this deployment, so phones need an in-wallet browser. Demo dollars only."}
         </p>
       </div>
     );

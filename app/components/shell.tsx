@@ -76,7 +76,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Docs↗
             </a>
             {v.engine.simulated.status === "ok" && !v.engine.simulated.value ? (
-              <Badge kind="hedged" />
+              <Badge
+                kind="hedged"
+                venue={v.engine.venueName.status === "ok" ? v.engine.venueName.value : undefined}
+              />
             ) : (
               <Badge kind="sim" />
             )}

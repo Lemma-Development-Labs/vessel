@@ -63,7 +63,11 @@ export function TransparencyScreen() {
               </Val>
             </p>
           </div>
-          {simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}
+          {simulated ? (
+            <Badge kind="sim" />
+          ) : (
+            <Badge kind="hedged" venue={valueOrForLogic(v.engine.venueName, "")} />
+          )}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-xl border border-white/8">
@@ -227,8 +231,8 @@ export function TransparencyScreen() {
         <p className="mt-3 text-sm text-dim">
           EngineLite is wired to SimVenue + MockRouter. PerplVenue is deployed but not connected.
           Recompute the reads yourself →{" "}
-          <a href="https://docs.vessel.wtf/proof-of-hedge" className="text-purple">
-            docs.vessel.wtf/proof-of-hedge
+          <a href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/proof-of-hedge.md" className="text-purple">
+            the proof-of-hedge runsheet
           </a>
         </p>
       </section>

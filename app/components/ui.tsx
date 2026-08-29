@@ -114,9 +114,18 @@ export function StatBlock({
 export function Badge({
   kind,
   compact,
+  venue,
 }: {
   kind: "testnet" | "sim" | "verified" | "hedged";
   compact?: boolean;
+  /**
+   * Venue name as READ FROM CHAIN. The hedged badge used to hardcode
+   * "HEDGED ON PERPL TESTNET" — a venue this protocol has never been wired to.
+   * It shipped in the bundle and would have rendered the moment any
+   * non-simulated venue was connected. The badge now states the venue it was
+   * told about, or nothing.
+   */
+  venue?: string;
 }) {
   if (kind === "testnet") {
     return (
@@ -145,7 +154,9 @@ export function Badge({
       <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-phosphor/40 px-2 py-1 text-[10.5px] tracking-[0.12em] text-phosphor sm:px-2.5">
         <span className="h-1.5 w-1.5 rounded-full bg-phosphor" />
         <span className="sm:hidden">HEDGED</span>
-        <span className="hidden sm:inline">HEDGED ON PERPL TESTNET</span>
+        <span className="hidden sm:inline">
+          {venue ? `HEDGED ON ${venue.toUpperCase()}` : "HEDGED"}
+        </span>
       </span>
     );
   }
