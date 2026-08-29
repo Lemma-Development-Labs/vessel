@@ -13,9 +13,31 @@
 | --- | --- |
 | Landing | [vessel.wtf](https://vessel.wtf) |
 | Docs | [docs.vessel.wtf](https://docs.vessel.wtf) |
-| Testnet app | [testnet.vessel.wtf](https://testnet.vessel.wtf) |
+| **Testnet app (live)** | **[testnet.vessel.wtf](https://testnet.vessel.wtf)** · mirror [vessel-testnet.vercel.app](https://vessel-testnet.vercel.app) |
+| Public status | [testnet.vessel.wtf/status](https://testnet.vessel.wtf/status) |
+| Stats + keeper service | [vessel-service-production.up.railway.app/health](https://vessel-service-production.up.railway.app/health) |
 | Explorer | [testnet.monadvision.com](https://testnet.monadvision.com) |
 | Source | [github.com/Lemma-Development-Labs/vessel](https://github.com/Lemma-Development-Labs/vessel) |
+
+### Run it yourself
+
+Gas comes first: the dUSD faucet is itself a transaction, so with no MON you
+cannot call it. This is the step that silently blocks newcomers.
+
+1. **[Testnet MON for gas](https://faucet.monad.xyz)** — required for every transaction.
+2. Open [testnet.vessel.wtf](https://testnet.vessel.wtf), connect a wallet, then **Get test dollars** for 100 dUSD.
+3. Board a deck, then watch the hedge on [/transparency](https://testnet.vessel.wtf/transparency).
+
+```bash
+git clone https://github.com/Lemma-Development-Labs/vessel && cd vessel
+forge test --root contracts          # 100 tests
+cd app && pnpm i && pnpm test        # 37 tests
+pnpm dev                             # http://localhost:3000
+```
+
+`app/.env.example` lists every variable. The app defaults to the **mock**
+provider; set `NEXT_PUBLIC_USE_MOCK=0` for live chain reads. Check which one a
+deployment is serving with `curl <url>/health` — it reports `provider`.
 
 The landing site lives in a **separate** repo (`vessel-landing`). This repository is the protocol, the testnet app, and the keeper/stats service.
 
@@ -97,7 +119,7 @@ flowchart LR
 | --- | --- |
 | `DemoUSD` | 6-dec faucet token. 100 dUSD / hour, 1,000 lifetime cap. No admin mint. |
 | `Guardian` | Ownable pause. Pause-only. |
-| `BlitzVault` | ERC-4626 over dUSD. `DEPLOYABLE_BPS = 9000`. Dead shares: 100 dUSD to `dEaD` at deploy. `_decimalsOffset() = 6`. |
+| `BlitzVault` | ERC-4626 over dUSD. `DEPLOYABLE_BPS = 9000`. `deposit`/`mint` restricted to `Tranches`; previews open. Dead shares: 100 dUSD to `dEaD` via one-shot `seedDeadShares()`. `_decimalsOffset() = 6`. |
 | `Tranches` | Join/exit Hull & Ballast. `settle(grossYield)` waterfall. |
 | `TrancheToken` | `HULL` / `BAL` ERC-20s minted by Tranches. |
 | `EngineLite` | Wire-once. `deployLiquidity` / `crank` / `unwind`. Permissionless crank. |
@@ -439,6 +461,6 @@ External security audit (the hard gate) · real venue: PerplVenue against Perpl�
 
 Until every line here is crossed, the banner stays amber and the first word stays **unaudited**.
 
-Known v0 limits (also in SECURITY.md): public ERC-4626 bypasses the 20% Ballast floor; `settle` can book NAV above vault cash until `unwind`; SimVenue not Perpl; single-key owner.
+Known v0 limits (also in SECURITY.md): the dead-share seed strands a share of every yield credit, so a full final exit can revert; `settle` can book NAV above vault cash until `unwind`; SimVenue not Perpl; single-key owner. Share issuance is no longer public — `deposit`/`mint` are restricted to `Tranches`.
 
 License: MIT.

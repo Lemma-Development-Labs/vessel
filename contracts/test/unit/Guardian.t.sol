@@ -22,10 +22,12 @@ contract GuardianTest is Fixture {
         dusd.approve(address(tranches), 100e6);
         vm.expectRevert(Tranches.Paused.selector);
         tranches.joinBallast(100e6);
-        dusd.approve(address(vault), 100e6);
+        vm.stopPrank();
+
+        // Pranked as Tranches so this proves the pause gate, not the NotTranches gate.
+        vm.prank(address(tranches));
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.deposit(100e6, alice);
-        vm.stopPrank();
 
         vm.expectRevert(EngineLite.Paused.selector);
         engine.crank();

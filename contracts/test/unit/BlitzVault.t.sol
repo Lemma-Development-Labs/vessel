@@ -12,10 +12,8 @@ contract BlitzVaultTest is Fixture {
     }
 
     function test_deployableIs90Percent() public {
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 500e6);
-        vault.deposit(500e6, alice);
-        vm.stopPrank();
+        _joinBallast(alice, 500e6);
+        // 500 user + 100 dead-share seed = 600 total assets; 90% of that is deployable.
         assertEq(vault.deployable(), 540e6);
         assertEq(vault.deployed(), 0);
     }
@@ -27,10 +25,7 @@ contract BlitzVaultTest is Fixture {
     }
 
     function test_onlyEnginePulls() public {
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 100e6);
-        vault.deposit(100e6, alice);
-        vm.stopPrank();
+        _joinBallast(alice, 100e6);
         vm.prank(alice);
         vm.expectRevert(BlitzVault.NotEngine.selector);
         vault.pullForEngine(10e6);
@@ -39,11 +34,10 @@ contract BlitzVaultTest is Fixture {
     function test_pauseBlocksDeposit() public {
         vm.prank(owner);
         guardian.pause();
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 100e6);
+        // Pranked as Tranches so this proves the pause gate, not the NotTranches gate.
+        vm.prank(address(tranches));
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.deposit(100e6, alice);
-        vm.stopPrank();
     }
 
     function test_guardianCannotSetEngine() public {

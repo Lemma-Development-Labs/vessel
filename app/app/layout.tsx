@@ -25,9 +25,33 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const SITE =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://testnet.vessel.wtf";
+
+const TITLE = "Vessel — the hedge is public, every block.";
+const DESCRIPTION =
+  "Delta-neutral tranche yield on Monad testnet. HULL takes a fixed coupon, BALLAST absorbs first loss. Demo dollars, simulated venue, unaudited.";
+
 export const metadata: Metadata = {
-  title: "Vessel — The dollar leverage pays for.",
-  description: "Delta-neutral tranche yield on Monad. Unaudited testnet.",
+  metadataBase: new URL(SITE),
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: "Vessel",
+  // The link preview carries the testnet/unaudited chrome with it. Wherever this
+  // gets pasted, it must not read as a live mainnet product.
+  openGraph: {
+    type: "website",
+    siteName: "Vessel (testnet)",
+    url: SITE,
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

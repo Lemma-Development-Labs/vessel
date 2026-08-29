@@ -9,6 +9,8 @@ export type StatsRow = {
   subordinationPct?: number;
   reserve?: string;
   netDeltaPct?: number;
+  /** null when the service has no snapshots — never 0, which would read as a real APR. */
+  fundingApr7dBps?: number | null;
   lastCrankTs?: number;
   venue?: "sim" | "perpl";
 };
@@ -24,28 +26,71 @@ export async function fetchStats(): Promise<StatsRow | null> {
   }
 }
 
+/** Strict bigint parse. A missing or unparseable field invalidates the row. */
+function big(v: unknown): bigint | null {
+  if (typeof v === "bigint") return v;
+  if (typeof v === "number" && Number.isInteger(v)) return BigInt(v);
+  if (typeof v === "string" && /^-?\d+$/.test(v.trim())) return BigInt(v.trim());
+  return null;
+}
+
+function pick(r: Record<string, unknown>, ...keys: string[]): bigint | null {
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null) return big(r[k]);
+  }
+  return null;
+}
+
+/**
+ * RULE 0: a waterfall row with a missing field is malformed data, not a datum
+ * worth zero. Zero-filling it would publish a fabricated settle on the
+ * transparency log, so we drop the row and let the count speak for itself.
+ *
+ * Returns null when the service is unreachable (caller falls back to chain),
+ * and [] when the service answered with nothing.
+ */
 export async function fetchWaterfall(limit = 50): Promise<WaterfallEvent[] | null> {
   if (!STATS) return null;
   try {
     const res = await fetch(`${STATS}/waterfall?limit=${limit}`, { cache: "no-store" });
     if (!res.ok) return null;
-    const rows = (await res.json()) as Array<Record<string, string | number>>;
-    return rows.map((r) => ({
-      gross: BigInt(r.gross ?? 0),
-      fee: BigInt(r.fee ?? 0),
-      toReserve: BigInt(r.to_reserve ?? r.toReserve ?? 0),
-      toTreasury: BigInt(r.to_treasury ?? r.toTreasury ?? 0),
-      hullAccrual: BigInt(r.hull_accrual ?? r.hullAccrual ?? 0),
-      toBallast: BigInt(r.to_ballast ?? r.toBallast ?? 0),
-      fromBallast: BigInt(r.from_ballast ?? r.fromBallast ?? 0),
-      fromReserve: BigInt(r.from_reserve ?? r.fromReserve ?? 0),
-      hullTvl: BigInt(r.hull_tvl ?? r.hullTvl ?? 0),
-      balTvl: BigInt(r.bal_tvl ?? r.balTvl ?? 0),
-      reserve: BigInt(r.reserve ?? 0),
-      ts: BigInt(r.ts ?? 0),
-      txHash: String(r.tx_hash ?? r.txHash ?? ""),
-      blockNumber: r.block != null ? BigInt(r.block) : undefined,
-    }));
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(rows)) return null;
+
+    const out: WaterfallEvent[] = [];
+    for (const r of rows) {
+      const gross = pick(r, "gross");
+      const fee = pick(r, "fee");
+      const toReserve = pick(r, "to_reserve", "toReserve");
+      const toTreasury = pick(r, "to_treasury", "toTreasury");
+      const hullAccrual = pick(r, "hull_accrual", "hullAccrual");
+      const toBallast = pick(r, "to_ballast", "toBallast");
+      const fromBallast = pick(r, "from_ballast", "fromBallast");
+      const fromReserve = pick(r, "from_reserve", "fromReserve");
+      const hullTvl = pick(r, "hull_tvl", "hullTvl");
+      const balTvl = pick(r, "bal_tvl", "balTvl");
+      const reserve = pick(r, "reserve");
+      const ts = pick(r, "ts");
+      const txHash = r.tx_hash ?? r.txHash;
+
+      if (
+        gross === null || fee === null || toReserve === null || toTreasury === null ||
+        hullAccrual === null || toBallast === null || fromBallast === null ||
+        fromReserve === null || hullTvl === null || balTvl === null ||
+        reserve === null || ts === null || typeof txHash !== "string" || txHash === ""
+      ) {
+        continue; // malformed — drop rather than fabricate
+      }
+
+      const block = pick(r, "block");
+      out.push({
+        gross, fee, toReserve, toTreasury, hullAccrual, toBallast,
+        fromBallast, fromReserve, hullTvl, balTvl, reserve, ts,
+        txHash,
+        blockNumber: block === null ? undefined : block,
+      });
+    }
+    return out;
   } catch {
     return null;
   }

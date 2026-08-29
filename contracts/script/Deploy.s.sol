@@ -46,9 +46,12 @@ contract Deploy is Script {
         tranches.setEngine(address(engine));
         engine.wire(address(vault), address(tranches), address(venue), address(router), address(wmon));
 
+        // Inflation-attack mitigation: 100 dUSD of protocol dead shares, seeded before
+        // Tranches is wired. After setTranches, Tranches is the only minter of vBLITZ.
         dusd.faucet();
         dusd.approve(address(vault), 100e6);
-        vault.deposit(100e6, address(0x000000000000000000000000000000000000dEaD));
+        vault.seedDeadShares(100e6);
+        vault.setTranches(address(tranches));
 
         vm.stopBroadcast();
 

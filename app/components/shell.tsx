@@ -9,6 +9,8 @@ import { USE_MOCK } from "@/lib/providers";
 import { formatBlock, shorten } from "@/lib/format";
 import { ADDRESSES } from "@/lib/addresses";
 import { AddressChip, Badge } from "@/components/ui";
+import { Val } from "@/components/live";
+import { ConnectButton } from "@/components/connect";
 
 function Wordmark() {
   return (
@@ -73,7 +75,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               Docs↗
             </a>
-            {v.engine.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}
+            {v.engine.simulated.status === "ok" && !v.engine.simulated.value ? (
+              <Badge
+                kind="hedged"
+                venue={v.engine.venueName.status === "ok" ? v.engine.venueName.value : undefined}
+              />
+            ) : (
+              <Badge kind="sim" />
+            )}
             <NetworkPill />
             {v.connected ? (
               <button
@@ -84,13 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {v.address ? shorten(v.address) : "connected"}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void v.connect()}
-                className="min-h-11 rounded-[10px] bg-purple px-3 py-1.5 text-sm font-semibold text-[#0A0A14] hover:bg-[#957FFF]"
-              >
-                Connect
-              </button>
+              <ConnectButton className="min-h-11 px-3 py-1.5 text-sm" />
             )}
           </div>
         </div>
@@ -99,14 +102,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="border-b border-amber/25 bg-amber/10 px-4 py-2 text-center text-xs leading-snug text-amber sm:px-5 md:px-7">
         {COPY.banner}
         <span className="hidden sm:inline">
-          {v.engine.simulated ? " Sim badge visible when SimVenue is active." : ""}
+          {v.engine.simulated.status === "ok" && v.engine.simulated.value
+            ? " Sim badge visible when SimVenue is active."
+            : ""}
         </span>
         {v.reconnecting ? (
           <span className="ml-2 text-steel">reconnecting…</span>
         ) : (
           <span className="num ml-2 hidden text-steel sm:inline">
-            block {formatBlock(v.engine.lastBlock || 0)}
-            {USE_MOCK ? " · mock" : ""}
+            block{" "}
+            <Val of={v.engine.lastBlock}>{(b) => formatBlock(b)}</Val>
+            {v.isMock ? " · mock" : ""}
           </span>
         )}
       </div>

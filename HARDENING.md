@@ -139,7 +139,9 @@ Identity that **does not** hold after an unfunded settle or a positive **spot ma
 
 Characterization: `test_unfundedSettleDivergesLedgerFromVaultCash`. Engine path credits **funding** cash via `creditYield` before settle; **spot PnL is marked**. Full Hull exit after `deployLiquidity` needs `unwind()` so idle ≥ payout (10% buffer otherwise). e2e step 6a2 documents this.
 
-Public ERC-4626: anyone can `vault.deposit` and skip the 20% floor. Engine deploys 90% of **all** vault assets. Spec kept standard 4626.
+Share issuance is closed: `deposit`/`mint` are `onlyTranches`, so vBLITZ is only ever held by Tranches and the dead-share seed. Not a floor fix — a raw deposit never touched `hullTvl`/`balTvl` — but a solvency one: an outside shareholder would have captured a pro-rata slice of every `creditYield` that `settle()` had already booked to Hull and Ballast in full. Engine still deploys 90% of **all** vault assets.
+
+Open, and separate: the dead-share seed itself takes `g × deadShares / totalShares` of every yield credit into an unredeemable position (11.1% at 800 dUSD TVL). Pinned by `test_deadShareSeedDilutesEveryYieldCredit`; see SECURITY.md item 8.
 
 ---
 
@@ -238,7 +240,7 @@ Screenshot: [docs/e2e-pass.html](./docs/e2e-pass.html) (open locally).
 
 1. Unaudited. External audit is the whitepaper gate.
 2. SimVenue, not Perpl. Spot mark is pool mid; ±5% cap is a tripwire.
-3. Public ERC-4626 bypasses Ballast floor.
+3. Dead-share seed strands a share of every yield credit; the last full exit can revert (SECURITY.md item 8).
 4. Ledger NAV can exceed vault cash (unfunded settle / marked spot). Large exits need `unwind`.
 5. Single-key deployer/guardian. No deposit caps.
 6. No testnet/mainnet verify in this environment.

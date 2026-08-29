@@ -40,13 +40,16 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
+  // Indexer first: startKeeper() awaits its first crank, which can block for a
+  // whole receipt timeout (~2 crank intervals). Starting the keeper first would
+  // delay the indexer by that long on every boot that begins with a slow tx.
+  indexer = await startIndexer({ store, publicClient, addrs });
+
   if (getKeeperPk()) {
     keeper = await startKeeper({ publicClient, addrs });
   } else {
     log.warn("KEEPER_PK unset — keeper not started (API + indexer still running)");
   }
-
-  indexer = await startIndexer({ store, publicClient, addrs });
 }
 
 void main().catch((err) => {

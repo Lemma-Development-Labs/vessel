@@ -29,15 +29,25 @@ contract PauseMatrixTest is Fixture {
         vm.startPrank(alice);
         dusd.approve(address(vault), 100e6);
         dusd.approve(address(tranches), 100e6);
-
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.deposit(1e6, alice);
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.mint(1e12, alice);
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.withdraw(1, alice, alice);
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.redeem(1, alice, alice);
+        vm.stopPrank();
+
+        // deposit/mint are Tranches-only, so prank as Tranches to reach the pause gate.
+        vm.startPrank(address(tranches));
+        vm.expectRevert(BlitzVault.Paused.selector);
+        vault.deposit(1e6, alice);
+        vm.expectRevert(BlitzVault.Paused.selector);
+        vault.mint(1e12, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert(BlitzVault.Paused.selector);
+        vault.seedDeadShares(1e6);
+        vm.expectRevert(BlitzVault.Paused.selector);
+        vault.setTranches(address(1));
         vm.stopPrank();
 
         vm.prank(address(engine));
@@ -94,6 +104,10 @@ contract PauseMatrixTest is Fixture {
         vm.prank(address(this));
         vm.expectRevert(BlitzVault.Paused.selector);
         fresh.setEngine(address(engine));
+        vm.expectRevert(BlitzVault.Paused.selector);
+        fresh.seedDeadShares(100e6);
+        vm.expectRevert(BlitzVault.Paused.selector);
+        fresh.setTranches(address(tranches));
     }
 }
 
@@ -101,10 +115,7 @@ contract GuardianFundsTest is Fixture {
     function setUp() public {
         _deploy();
         _faucet(alice, 2);
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 100e6);
-        vault.deposit(100e6, alice);
-        vm.stopPrank();
+        _joinBallast(alice, 100e6);
     }
 
     function test_guardianHasNoTokenMovement() public {
