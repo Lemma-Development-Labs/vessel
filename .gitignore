@@ -28,3 +28,4 @@ app/out/
 *.log
 .claude/
 agent/
+.playwright-mcp/
