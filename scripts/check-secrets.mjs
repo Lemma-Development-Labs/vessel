@@ -31,6 +31,7 @@ const files = execSync("git ls-files", { encoding: "utf8", maxBuffer: 10 * 1024 
       !f.includes("pnpm-lock") &&
       !f.endsWith(".lock") &&
       !f.endsWith(".json") &&
+      !f.endsWith(".md") &&
       !f.endsWith(".gas-snapshot") &&
       !f.endsWith("lcov.info"),
   );

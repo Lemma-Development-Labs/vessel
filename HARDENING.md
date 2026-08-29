@@ -182,7 +182,7 @@ Sizes: max runtime 7328 bytes.
 - `.github/workflows/ci.yml`: `forge fmt --check`, `FOUNDRY_PROFILE=ci` 25k fuzz, coverage gate, snapshot ±10%, slither `--fail-none` (findings triaged here), sizes, app `pnpm build`, secrets scan.
 - Badge in README: `https://github.com/Lemma-Development-Labs/vessel/actions/workflows/ci.yml/badge.svg`
 - [SECURITY.md](./SECURITY.md) unaudited first line.
-- Addresses: README + [docs/ADDRESSES.md](./docs/ADDRESSES.md). **No testnet/mainnet verified links** — not broadcast here.
+- Addresses: README + [docs/ADDRESSES.md](./docs/ADDRESSES.md). Testnet 10143 broadcast 2026-08-29 at block 57874280; Sourcify submitted (`solc 0.8.24` / 200 / via-ir).
 
 ---
 

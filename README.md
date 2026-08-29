@@ -57,18 +57,19 @@ Explorer: testnet [MonadVision](https://testnet.monadvision.com) · mainnet [Mon
 
 | Contract | Testnet (10143) | Mainnet (143) |
 | --- | --- | --- |
-| DemoUSD | *not yet — run Deploy.s.sol* | — |
-| Guardian | — | — |
-| BlitzVault | — | — |
-| Tranches | — | — |
-| Hull | — | — |
-| Ballast | — | — |
-| SimVenue | — | — |
-| PerplVenue (stub) | — | — |
-| EngineLite | — | — |
-| MockWMON / MockRouter | local / testnet until a real dUSD/WMON pool exists | — |
+| DemoUSD | [`0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc`](https://testnet.monadvision.com/address/0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc) | — |
+| Guardian | [`0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E`](https://testnet.monadvision.com/address/0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E) | — |
+| BlitzVault | [`0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823`](https://testnet.monadvision.com/address/0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823) | — |
+| Tranches | [`0x9350A360b01bA4F87Df1164da97Dcc066c37986d`](https://testnet.monadvision.com/address/0x9350A360b01bA4F87Df1164da97Dcc066c37986d) | — |
+| Hull | [`0xb4C08A9F27a0F64e571f57E633073b4D66680D0d`](https://testnet.monadvision.com/address/0xb4C08A9F27a0F64e571f57E633073b4D66680D0d) | — |
+| Ballast | [`0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33`](https://testnet.monadvision.com/address/0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33) | — |
+| SimVenue | [`0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2`](https://testnet.monadvision.com/address/0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2) | — |
+| PerplVenue (stub) | [`0x4b710a0e4E7767bE65a4821f9b4983Ef10B8E26e`](https://testnet.monadvision.com/address/0x4b710a0e4E7767bE65a4821f9b4983Ef10B8E26e) | — |
+| EngineLite | [`0x9FB500D00618C27088c439EdE6EED2c6FeB02455`](https://testnet.monadvision.com/address/0x9FB500D00618C27088c439EdE6EED2c6FeB02455) | — |
+| MockWMON | [`0x4582d715f72221e70A64Af85DF8D9060Be0e1261`](https://testnet.monadvision.com/address/0x4582d715f72221e70A64Af85DF8D9060Be0e1261) | — |
+| MockRouter | [`0x4D06f69257951B4d5FA4F9D2BF43950d373D9e33`](https://testnet.monadvision.com/address/0x4D06f69257951B4d5FA4F9D2BF43950d373D9e33) | — |
 
-The committed `ADDRESSES.json` is the last **local Anvil** deploy (`chainId: 31337`). After testnet broadcast, commit the new file and re-run `pnpm sync`. Verified Sourcify links: `https://testnet.monadvision.com/address/<addr>` (green tick appears once `forge verify-contract` succeeds). **No testnet/mainnet broadcast exists in this repo yet — explorer columns stay "—" until a funded deployer verifies.** See [docs/ADDRESSES.md](./docs/ADDRESSES.md) and [FACTS.md](./FACTS.md).
+Broadcast 2026-08-29, `deployedBlock` **57874280**, deployer `0x4307C72a92063df4fa189c9e9621b741d457be7C`. Sourcify (`solc 0.8.24`, optimizer 200, via-ir) — MonadVision ticks once the verifier job lands. Re-run Deploy locally for Anvil (`chainId: 31337`). See [docs/ADDRESSES.md](./docs/ADDRESSES.md) and [FACTS.md](./FACTS.md).
 
 Canonical refs (never guessed — from [docs.monad.xyz/developer-essentials/network-information](https://docs.monad.xyz/developer-essentials/network-information) and Puddle):
 
@@ -218,7 +219,7 @@ App routes: [testnet.vessel.wtf](https://testnet.vessel.wtf) — Deposit / Portf
 
 `pnpm sync` (alias `pnpm sync-abis`) copies ABIs into `app/lib/abis/` and regenerates `app/lib/addresses.ts`.
 
-Keeper/stats: see [vessel-service/README.md](./vessel-service/README.md). CORS allows vessel.wtf, testnet.vessel.wtf, docs.vessel.wtf. The app prefers `NEXT_PUBLIC_STATS_URL/waterfall` and falls back to `getLogs`.
+Keeper/stats: see [vessel-service/README.md](./vessel-service/README.md). CORS allows vessel.wtf, testnet.vessel.wtf, docs.vessel.wtf, and `*.vercel.app`. The app prefers `NEXT_PUBLIC_STATS_URL/waterfall` and falls back to `getLogs`.
 
 ## The honest gap
 

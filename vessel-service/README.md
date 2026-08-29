@@ -53,7 +53,7 @@ Fund the keeper with **≥ 0.5 MON**. Preflight refuses to start below that.
 
 - **Keeper** — chainId check, `getCode` on EngineLite, MON ≥ 0.5. Each tick logs `netDelta`, estimates gas × 1.3 capped at 1_300_000 (never unbounded). `DtZero` / `Paused` / `NotWired` / `AlreadyDeployed` / `NothingDeployable` log `KEEPER-SKIP` and do not count as failures. RPC errors back off `interval * 2^n` capped at 5 minutes. Three consecutive unexpected failures → exit 1.
 - **Indexer** — backfills `Waterfall` from `deployedBlock`, then watches new blocks. Upserts by `(tx_hash, log_index)`. Crank snapshots store `net_delta`, `funding_accrued`, `spot_value`, `short_notional`.
-- **API** — GET only. CORS: `vessel.wtf` / `testnet.vessel.wtf` / `docs.vessel.wtf` / localhost:3000. Every GET has `Cache-Control: max-age=3`. No secrets in responses.
+- **API** — GET only. CORS: `vessel.wtf` / `testnet.vessel.wtf` / `docs.vessel.wtf` / localhost:3000 / `*.vercel.app`. Every GET has `Cache-Control: max-age=3`. No secrets in responses.
 
 ## Security
 

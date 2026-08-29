@@ -30,6 +30,13 @@ const CORS_ORIGINS = [
   "http://127.0.0.1:3000",
 ];
 
+function allowOrigin(origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) {
+  if (!origin) return cb(null, true);
+  if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+  if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/.test(origin)) return cb(null, true);
+  return cb(null, false);
+}
+
 export type ApiHandle = {
   stop: () => Promise<void>;
 };
@@ -70,7 +77,7 @@ export async function startApi(opts: {
 
   const app = Fastify({ loggerInstance: log });
 
-  await app.register(cors, { origin: CORS_ORIGINS, methods: ["GET", "HEAD"] });
+  await app.register(cors, { origin: allowOrigin, methods: ["GET", "HEAD"] });
 
   app.addHook("onSend", async (req, reply, payload) => {
     if (req.method === "GET") {
