@@ -65,23 +65,21 @@ contract SolvencyFuzz is Fixture {
         assertGe(b * 10_000, tranches.THETA_MIN_BPS() * (h + b), "subordination floor breached");
     }
 
-    /// @dev Property 2: solvency of the vault against the whole book.
+    /// @dev Property 2: SOLVENCY, in its strong form.
     ///
-    ///      The sharp statement is NOT `redeemable(tranches) >= book`. That is false, and
-    ///      not because of anything an outsider does: the protocol's own dead-share seed
-    ///      holds real vBLITZ, so every `creditYield` lifts the share price for the dead
-    ///      position too and a slice of each yield credit lands there instead of in
-    ///      Tranches' shares. See `test_deadShareSeedDilutesEveryYieldCredit` below, which
-    ///      pins that behaviour exactly rather than tolerating it silently.
+    ///      Tranches' asset-denominated book must be redeemable from the vBLITZ it actually
+    ///      holds. This is the statement the protocol is supposed to satisfy, and it now does:
+    ///      dead shares no longer earn, so no slice of a yield credit is diverted into a
+    ///      position nobody can redeem. Only rounding dust separates the two.
     ///
-    ///      What must hold is that the vault is solvent against the book once the dead
-    ///      position is counted: no value has leaked OUT of the system, only into a
-    ///      position nobody can redeem.
+    ///      This assertion was previously weakened to count the dead position as backing,
+    ///      because the protocol could not meet the strong form. The protocol was fixed
+    ///      instead — see BlitzVault._convertToShares / liveAssets / liveSupply.
     function _assertSolvent(uint256 opCount) internal view {
         uint256 book = _book();
-        uint256 backing = _redeemable() + vault.previewRedeem(vault.balanceOf(DEAD));
-        if (backing >= book) return;
-        assertLe(book - backing, DUST_PER_OP * (opCount + 1), "vault cannot back the tranche book");
+        uint256 redeemable = _redeemable();
+        if (redeemable >= book) return;
+        assertLe(book - redeemable, DUST_PER_OP * (opCount + 1), "book exceeds what Tranches' shares can redeem");
     }
 
     /// @dev Property 3: the share-issuance gate. This is the sharp version of what the
@@ -163,31 +161,21 @@ contract SolvencyFuzz is Fixture {
             _assertNoOutsideShares();
         }
 
-        // Can everyone actually get out? Only if the book has not run ahead of what
-        // Tranches' own shares can withdraw. Where it has, the cause must be the dead
-        // seed and nothing else — an unattributable shortfall is a real failure.
-        uint256 book = _book();
-        uint256 redeemable = _redeemable();
-        uint256 shortfall = book > redeemable ? book - redeemable : 0;
-
-        if (shortfall == 0) {
-            uint256 hullShares = tranches.hullToken().balanceOf(alice);
-            if (hullShares > 0) {
-                vm.prank(alice);
-                tranches.exitHull(hullShares);
-            }
-            uint256 balShares = tranches.ballastToken().balanceOf(bob);
-            if (balShares > 0) {
-                vm.prank(bob);
-                tranches.exitBallast(balShares);
-            }
-            _assertFloor();
-        } else {
-            // The stranded value must be sitting in the dead position, in full. If this
-            // ever fails, value has genuinely gone missing rather than been misallocated.
-            uint256 deadAccrual = vault.previewRedeem(vault.balanceOf(DEAD));
-            assertGe(deadAccrual, shortfall, "shortfall is not attributable to the dead seed");
+        // Everyone can actually get out. Before the dead-share fix this reverted with
+        // ERC4626ExceededMaxWithdraw once enough yield had been credited, because the book
+        // had run ahead of what Tranches' shares could withdraw.
+        uint256 hullShares = tranches.hullToken().balanceOf(alice);
+        if (hullShares > 0) {
+            vm.prank(alice);
+            tranches.exitHull(hullShares);
         }
+        uint256 balShares = tranches.ballastToken().balanceOf(bob);
+        if (balShares > 0) {
+            vm.prank(bob);
+            tranches.exitBallast(balShares);
+        }
+        _assertFloor();
+        _assertSolvent(ops + 1);
     }
 
     /// @dev Same shape, but pins the exact worst-case drift rather than a bound, so a
@@ -220,36 +208,31 @@ contract SolvencyFuzz is Fixture {
         }
     }
 
-    /// @dev PINS A KNOWN, UNFIXED ACCOUNTING DIVERGENCE.
+    /// @dev REGRESSION: dead shares must not earn.
     ///
-    ///      `Tranches.settle(g)` credits its book the FULL `g`, but `creditYield(g)`
-    ///      delivers that value through the vault's share price — which lifts every
-    ///      holder, including the protocol's own 100 dUSD dead-share seed. The dead
-    ///      position is unredeemable (nobody holds the 0x…dEaD key), so the slice that
-    ///      lands there is permanently stranded and Tranches' book runs ahead of what
-    ///      its shares can pay.
+    ///      Before the fix, `Tranches.settle(g)` credited its book the full `g` while
+    ///      `creditYield(g)` delivered that value through the vault share price — lifting the
+    ///      protocol's own 100 dUSD dead seed along with everyone else. The slice that landed
+    ///      there was stranded forever (nobody holds the 0x…dEaD key), so the book outran the
+    ///      shares by `g * deadShares / totalShares`: 11.1% of every credit at 800 dUSD of deck
+    ///      TVL, and ~65% against the 54 dUSD that was live on testnet. It compounded per crank
+    ///      and terminated in a final exit that reverted.
     ///
-    ///      The leak is exactly  g * deadShares / totalShares  per credit. With the
-    ///      100 dUSD seed against 800 dUSD of deck TVL that is 100/900 = 11.1% of every
-    ///      yield credit. It is WORST WHEN TVL IS SMALL: against the 54 dUSD currently
-    ///      on testnet the seed would take roughly 65% of each credit.
-    ///
-    ///      This predates the share-issuance gate and is not fixed by it. It is pinned
-    ///      here so it cannot widen unnoticed, and is recorded in OPS.md §6. Closing it
-    ///      is an economic change to a deployed protocol, not a bug fix, so it needs a
-    ///      deliberate decision rather than a silent patch.
-    function test_deadShareSeedDilutesEveryYieldCredit() public {
+    ///      Conversions now run over the live pool only, so the seed's entitlement is pinned at
+    ///      `deadPrincipal` and every credited dollar reaches Tranches.
+    function test_deadShareSeedDoesNotEarn() public {
         vm.prank(bob);
         tranches.joinBallast(400e6);
         vm.prank(alice);
         tranches.joinHull(400e6);
 
         uint256 deadShares = vault.balanceOf(DEAD);
-        uint256 totalShares = vault.totalSupply();
-        assertGt(deadShares, 0, "dead seed must exist");
+        assertGt(deadShares, 0, "dead seed must still exist for inflation protection");
+        assertEq(vault.deadShares(), deadShares, "vault tracks the seed");
+        uint256 principalBefore = vault.deadPrincipal();
 
         uint256 bookBefore = _book();
-        assertEq(_redeemable(), bookBefore, "book and shares start in step");
+        assertApproxEqAbs(_redeemable(), bookBefore, 2, "book and shares start in step");
 
         uint256 g = 100e6;
         vm.warp(block.timestamp + 1 days);
@@ -260,17 +243,51 @@ contract SolvencyFuzz is Fixture {
 
         assertEq(_book(), bookBefore + g, "book takes the full gross");
 
-        uint256 leak = _book() - _redeemable();
-        uint256 expected = (g * deadShares) / totalShares;
-        assertApproxEqAbs(leak, expected, 2, "leak is g * deadShares / totalShares");
+        // The whole credit reaches Tranches. Previously 11,111,111 wei of it did not.
+        assertApproxEqAbs(_redeemable(), bookBefore + g, 2, "the full yield credit reaches Tranches");
+        assertEq(vault.deadPrincipal(), principalBefore, "the seed's entitlement never moves");
+    }
 
-        // Nothing left the system. The dead position holds the stranded slice on top of
-        // its own 100 dUSD principal, so total backing exceeds the book rather than
-        // matching it — the value is misallocated, not missing.
-        assertGe(
-            _redeemable() + vault.previewRedeem(vault.balanceOf(DEAD)),
-            _book(),
-            "vault still backs the book once the dead position is counted"
-        );
+    /// @dev R1.1 exit condition: a full exit of every position must leave nothing stranded and
+    ///      must not revert with ERC4626ExceededMaxWithdraw.
+    function test_fullExitAfterYieldStrandsNothing() public {
+        vm.prank(bob);
+        tranches.joinBallast(400e6);
+        vm.prank(alice);
+        tranches.joinHull(400e6);
+
+        // Several epochs of real, funded yield — the case that used to compound the leak.
+        // Absolute, monotonically increasing timestamps: settle() reverts DtZero when two
+        // settles land in the same second.
+        uint256 t = block.timestamp;
+        for (uint256 i; i < 8; i++) {
+            t += 1 days;
+            vm.warp(t);
+            vm.startPrank(address(engine));
+            vault.creditYield(25e6);
+            tranches.settle(int256(uint256(25e6)));
+            vm.stopPrank();
+        }
+
+        uint256 hullShares = tranches.hullToken().balanceOf(alice);
+        uint256 balShares = tranches.ballastToken().balanceOf(bob);
+
+        vm.prank(alice);
+        uint256 hullOut = tranches.exitHull(hullShares);
+        vm.prank(bob);
+        uint256 balOut = tranches.exitBallast(balShares);
+
+        assertGt(hullOut, 0, "hull exits with value");
+        assertGt(balOut, 0, "ballast exits with value");
+        assertLe(tranches.hullTvl(), 2, "hull deck drained");
+        assertLe(tranches.balTvl(), 2, "ballast deck drained");
+
+        // What remains in Tranches' shares is exactly the protocol's own book — reserve plus
+        // unclaimed treasury — and nothing else is stranded on its side of the vault.
+        uint256 remainingBook = tranches.reserve() + tranches.treasuryAccrued();
+        assertApproxEqAbs(_redeemable(), remainingBook, 4, "nothing stranded beyond reserve + treasury");
+
+        // The seed still holds exactly its principal, never more.
+        assertEq(vault.deadPrincipal(), 100e6, "seed entitlement unchanged");
     }
 }

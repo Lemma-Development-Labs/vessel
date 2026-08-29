@@ -6,6 +6,7 @@ import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.so
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IGuardian} from "./interfaces/IGuardian.sol";
 
 /// @title BlitzVault
@@ -19,8 +20,16 @@ import {IGuardian} from "./interfaces/IGuardian.sol";
 ///      pro-rata slice of yield that Tranches has already credited to Hull/Ballast in
 ///      full, leaving its book unredeemable (see test/unit/Inflation.t.sol).
 ///
-///      Virtual-share offset is 6 (`_decimalsOffset`) plus the 100 dUSD dead-share seed.
-///      Together they make the classic first-depositor inflation attack unprofitable.
+///      Virtual-share offset is 6 (`_decimalsOffset`) plus the dead-share seed. Together they
+///      make the classic first-depositor inflation attack unprofitable.
+///
+///      DEAD SHARES DO NOT EARN. Share conversions are denominated over LIVE shares and LIVE
+///      assets — `totalSupply() - deadShares` and `totalAssets() - deadPrincipal`. Without this
+///      the seed captured `g * deadShares / totalShares` of every `creditYield` (11.1% at 800
+///      dUSD of deck TVL) into a position nobody holds the key to, so Tranches' book outran what
+///      its shares could withdraw and a full final exit reverted with ERC4626ExceededMaxWithdraw.
+///      The seed's job is to exist at t=0 so the first real deposit is never the vault's first
+///      deposit; that defence needs the shares to be present, not to accrue.
 contract BlitzVault is ERC4626, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -38,6 +47,11 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
     address public tranches;
     bool public deadSharesSeeded;
     uint256 public deployed;
+
+    /// @notice vBLITZ minted to `DEAD` by `seedDeadShares`. Fixed after seeding.
+    uint256 public deadShares;
+    /// @notice Assets the dead seed is entitled to, forever. It never grows and never shrinks.
+    uint256 public deadPrincipal;
 
     error NotDeployer();
     error EngineAlreadySet();
@@ -96,6 +110,30 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
         return IERC20(asset()).balanceOf(address(this)) + deployed;
     }
 
+    /// @notice Assets attributable to live (non-dead) shares. Saturating: in a loss deep enough
+    ///         to eat the seed, live holders are already wiped out and this floors at zero.
+    function liveAssets() public view returns (uint256) {
+        uint256 t = totalAssets();
+        return t > deadPrincipal ? t - deadPrincipal : 0;
+    }
+
+    /// @notice Supply excluding the dead seed.
+    function liveSupply() public view returns (uint256) {
+        uint256 s = totalSupply();
+        return s > deadShares ? s - deadShares : 0;
+    }
+
+    /// @dev Conversions run over the live pool, so a yield credit lifts only live shares.
+    ///      `previewRedeem(deadShares)` is therefore NOT the seed's entitlement — that is
+    ///      `deadPrincipal`, which is what the seed can ever be worth.
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256) {
+        return Math.mulDiv(assets, liveSupply() + 10 ** _decimalsOffset(), liveAssets() + 1, rounding);
+    }
+
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
+        return Math.mulDiv(shares, liveAssets() + 1, liveSupply() + 10 ** _decimalsOffset(), rounding);
+    }
+
     /// @notice 90% of totalAssets minus already-deployed. Idle buffer is the remainder.
     function deployable() public view returns (uint256) {
         uint256 maxDeploy = (totalAssets() * DEPLOYABLE_BPS) / BPS;
@@ -119,8 +157,12 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
         if (deadSharesSeeded) revert DeadSharesAlreadySeeded();
         if (amount == 0) revert ZeroAmount();
         deadSharesSeeded = true;
+        // Priced before the seed is recorded, so this mint uses the ordinary (empty-pool)
+        // rate. Afterwards the seed is excluded from every conversion.
         shares = previewDeposit(amount);
         _deposit(msg.sender, DEAD, amount, shares);
+        deadShares = shares;
+        deadPrincipal = amount;
         emit DeadSharesSeeded(amount, shares);
     }
 
