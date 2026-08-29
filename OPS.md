@@ -14,11 +14,111 @@ must be treated as fully compromised.
 
 | Secret | What it controls | Action |
 | --- | --- | --- |
-| Private key `0x67a9…24c5` → `0x4307C72a92063df4fa189c9e9621b741d457be7C` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds ~36.7 MON. | Rotate. See blast radius below. |
+| Deployer private key (`67a9f48c…`) → `0x4307C72a92063df4fa189c9e9621b741d457be7C` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
 | Railway API token `c37ac07b-…` | Full Railway account access, including the ability to read service env vars — which is where `KEEPER_PK` lives. | Revoke in Railway → Account → Tokens. |
 | Vercel token `vcp_…` | Full Vercel account access. | Revoke in Vercel → Account → Tokens. |
 
-**Blast radius of the deployer key on the current testnet deployment.** Holder can:
+### 0.1 Exposure surface — measured, not assumed
+
+A secret shown to **one party** is a trust problem. A secret on a **public
+surface** is a race against scrapers that is already lost. The two demand
+different postures, so the question was answered with tools rather than memory.
+
+The stakes are not hypothetical: `Lemma-Development-Labs/vessel` **is a public
+repository** — `gh repo view --json visibility` returns `"PUBLIC"`,
+`"private": false` — and all three branches (`main`, `harden/p0-testnet`,
+`cursor/vessel-delta-neutral-vault-1a23`) are pushed and match their remotes.
+Anything committed here is world-readable within seconds.
+
+Every check below was run on 2026-08-29 and is reproducible.
+
+| Surface | How it was checked | Result |
+| --- | --- | --- |
+| Git history, all refs | `git log -p --all -S '67a9f48c'` | empty — no commit adds or removes it |
+| Git history, all revs | `git grep -n '67a9f48c' $(git rev-list --all)` over 18 commits | 0 hits, completed well inside a 120 s cap |
+| **Every git object** | all 749 blobs — reachable *and* unreachable, loose and packed — enumerated with `git cat-file --batch-all-objects` and piped through `git cat-file --batch` | **0 hits.** `git fsck --unreachable --dangling` finds exactly one unreachable blob, `e69de29`, which is the empty blob |
+| gitleaks 8.28.0, full history | custom rule anchored on the key's first and last 8 hex chars, `--log-opts=--all` | 17 commits / 4.24 MB scanned — **0 hits on the key rule** |
+| gitleaks 8.28.0, filesystem | `gitleaks dir` over 858 MB: working tree, untracked files, `node_modules/`, `.next/`, `contracts/out/` | **0 hits on the key rule.** The three files >20 MB it skipped were grepped directly — also 0 |
+| trufflehog 3.90.10 | git history *and* filesystem, `--results=verified,unknown` | 197 findings, **all 197 the same `Infura` demo key vendored upstream in `forge-std`** (`contracts/lib/forge-std/src/StdChains.sol:204`, plus copies compiled into `contracts/out/`). Not ours, already public |
+| Working tree | `grep -rn` for both the 8-char fragment and the full 64-hex key | 0 hits |
+| `.env` files | `find` returns only four `*.env.example` and `app/.env.production` | no `.env` exists anywhere in the tree, so there is nothing to leak. `app/.env.production` is tracked but holds only RPC URLs, chain id and the explorer URL |
+| `.env` in history | `git log --all --diff-filter=A --name-only` filtered to `.env` | only the four `.env.example` files and `app/.env.production` were ever added. No real `.env` has ever been committed |
+| GitHub Actions logs | all **13** workflow runs downloaded with `gh run view --log` and grepped for the fragment, the address, and any `0x`+64-hex string | **0 matches across all 13 runs** |
+| GitHub Actions secrets | `gh api repos/…/actions/secrets` → `{"total_count":0,"secrets":[]}`; `ci.yml` has no RPC, deploy or signing step | CI holds no key and touches no chain, so it cannot print one |
+| PR / issues / gists | PR #1 body, comments and reviews; `gh issue list`; `gh api /gists` | 0 hits; no issues; no gists |
+| Deployed app | live Vercel HTML fetched (HTTP 200, 340 KB) and grepped; app source searched for `process.env.*PK` / `PRIVATE_KEY` / `SECRET` | 0 hits — **the frontend never reads a private key at all** |
+| Local shell history | `~/.bash_history` (no zsh/fish history present) | 0 hits |
+
+**What *is* public is the address, never the key.** `0x4307C72a…` appears in 7
+places across 4 commits — `README.md`, `FACTS.md`, `docs/ADDRESSES.md`,
+`docs/security/powers.md` and this file. That is intended: deployment addresses
+are meant to be published, and an address discloses nothing the chain does not
+already show.
+
+**Conclusion, stated precisely.** We checked; we did not assume. The deployer
+key was disclosed to **one chat transcript and to nothing else we can observe**.
+It is not in the repository, not in any git object reachable or otherwise, not
+in a CI log, not in the deployed bundle, not in any file on disk, not in shell
+history. **It never reached a public surface.** This is a single-party
+disclosure, not a public leak — so the rotation is deliberate hygiene on a
+deadline we control, not a race we have already lost.
+
+Two caveats keep that honest:
+
+- **The transcript is outside our instrumentation.** This covers the surfaces we
+  control and can scan; it says nothing about how the chat provider stores,
+  retains or processes that transcript. The key stays classified as compromised
+  regardless. The scan establishes *scope*, not absolution.
+- **Our own scanner would have missed it in Markdown.** `scripts/check-secrets.mjs`
+  flags any `0x`+64-hex in tracked files that is not one of ten allowlisted Anvil
+  keys, and also scans the last 50 commit messages — but it excludes `.json`,
+  `.md`, `.gas-snapshot`, `lcov.info`, `contracts/lib/` and `.agents/`. Probed
+  with a synthetic key: a `.ts` file is caught (`possible key material in …:
+  0xdeadbeef…`, exit 1); the identical key in a `.md` file is **silently
+  ignored**. In a repo whose addresses, runbooks and this very file live in
+  Markdown, that gap is real. It also reads only tracked files, so it can say
+  nothing about chat transcripts, CI logs, platform env vars, or `.gitignore`d
+  files — none of those are code-review surfaces. Nor is GitHub a backstop here:
+  `security_and_analysis` reports secret scanning, non-provider patterns,
+  validity checks **and push protection all `disabled`** on this repo, and stock
+  gitleaks reports "no leaks found" because a bare EVM private key matches none
+  of its default rules. **A leaked key would have to be caught by a human.**
+
+### 0.2 Has anyone else used the key?
+
+No. Measured against `https://testnet-rpc.monad.xyz` (`eth_chainId` → `0x279f` =
+10143) at head block 57,906,203:
+
+| Reading | Value |
+| --- | --- |
+| `eth_getTransactionCount` (`latest`) | `0x14` = **20** |
+| `eth_getTransactionCount` (`pending`) | `0x14` = **20** — identical, so nothing is queued |
+| `eth_getBalance` | `0x1fd020b932ce45400` = **36.677891042 MON** |
+| `eth_getCode` | `0x` — a plain EOA, no EIP-7702 delegation |
+
+Latest and pending nonces agree, so no transaction is in flight. Binary search
+over historical `eth_getTransactionCount` (the public RPC serves archive reads
+for this) pins the last nonce increment, 19 → 20, to block **57,875,449**,
+timestamp `0x6a929611` = **2026-08-29 08:19:29 UTC** — transaction
+`0x81ff7f98…dce81fb1`, sent to `SimVenue` (`0x7E305794…f7D1bf2`), inside the
+deployment window that opens at `deployedBlock` 57,874,280. The key has signed
+nothing in the 2 h 37 min since, which covers every minute after the exposure
+was recorded in commit `39ce4ed` at 10:21:14 UTC. The balance is unchanged: the
+36.67 MON noted earlier is this same 36.677891042, truncated. **No third party
+has touched this account.**
+
+Re-check before and after the redeploy. The watermark to compare against is
+**nonce 20 / 36.677891042 MON**; any movement means the key is being used by
+someone else and the redeploy becomes urgent rather than scheduled.
+
+```
+curl -s -X POST https://testnet-rpc.monad.xyz -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x4307C72a92063df4fa189c9e9621b741d457be7C","latest"]}'
+```
+
+### 0.3 Blast radius on the current deployment
+
+Whoever holds the key can:
 
 - `Guardian.pause()` — halt every mutative path in vault, tranches and engine,
   indefinitely. Two-step ownership means they can also transfer the Guardian away.
