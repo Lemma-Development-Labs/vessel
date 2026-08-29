@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vessel e2e PASS — Anvil 31337</title>
+    <style>
+      body { font: 14px/1.4 ui-monospace, monospace; background: #0e100e; color: #e8e6df; margin: 24px; }
+      h1 { color: #c4a36a; font-size: 18px; }
+      p { color: #8a8880; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #242822; padding: 6px 8px; text-align: left; font-size: 12px; }
+      th { color: #3d9b8f; }
+      .ok { color: #3d9b8f; }
+      td.tx { font-size: 11px; color: #8a8880; }
+    </style>
+  </head>
+  <body>
+    <h1>Vessel e2e PASS table</h1>
+    <p>chainId 31337 · burner 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC · unaudited · Anvil (not live testnet)</p>
+    <table>
+      <tr><th>step</th><th>expected</th><th>actual</th><th>tx</th></tr>
+      <tr><td class="ok">PASS preflight getCode</td><td>non-empty</td><td>11 contracts</td><td class="tx">—</td></tr>
+      <tr><td class="ok">PASS 1 faucet +100 dUSD</td><td>100000000</td><td>100000000</td><td class="tx">0x53cb841f…8c28d3</td></tr>
+      <tr><td class="ok">PASS 2a joinBallast 60</td><td>&gt;0</td><td>6e19 shares</td><td class="tx">0x8457512d…92af06</td></tr>
+      <tr><td class="ok">PASS 2b joinHull 40</td><td>&gt;0</td><td>4e19 shares</td><td class="tx">0x3620527f…420e22</td></tr>
+      <tr><td class="ok">PASS 2c subordination</td><td>&gt;= 2000 bps</td><td>6000</td><td class="tx">0x3620527f…420e22</td></tr>
+      <tr><td class="ok">PASS 3a spot WMON &gt; 0</td><td>&gt;0</td><td>9e19</td><td class="tx">0xde7c150a…bb05a1</td></tr>
+      <tr><td class="ok">PASS 3b shortNotional &gt; 0</td><td>&gt;0</td><td>90000000</td><td class="tx">0xde7c150a…bb05a1</td></tr>
+      <tr><td class="ok">PASS 3c |netDeltaBps| ≤ 100</td><td>&lt;= 100</td><td>0</td><td class="tx">0xde7c150a…bb05a1</td></tr>
+      <tr><td class="ok">PASS 4 conservation wei</td><td>21</td><td>21</td><td class="tx">0x4d1c457d…55e99a</td></tr>
+      <tr><td class="ok">PASS 5a hull unchanged</td><td>40000008</td><td>40000008</td><td class="tx">0x2f4f22c9…ee05a7</td></tr>
+      <tr><td class="ok">PASS 5b ballast − shortfall</td><td>59999964</td><td>59999964</td><td class="tx">0x2f4f22c9…ee05a7</td></tr>
+      <tr><td class="ok">PASS 6a floor after partial exit</td><td>&gt;= 2000</td><td>5744</td><td class="tx">0xad151512…57825e</td></tr>
+      <tr><td class="ok">PASS 6a2 unwind for idle</td><td>success</td><td>success</td><td class="tx">0xdf5f4b5a…985e36</td></tr>
+      <tr><td class="ok">PASS 6b exitHull payout</td><td>40000008</td><td>40000008</td><td class="tx">0x24528983…a8ac01</td></tr>
+    </table>
+  </body>
+</html>

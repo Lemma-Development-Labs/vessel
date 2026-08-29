@@ -1,0 +1,27 @@
+{
+  "chainId": 10143,
+  "contracts": {
+    "Ballast": "0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33",
+    "BlitzVault": "0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823",
+    "DemoUSD": "0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc",
+    "EngineLite": "0x9FB500D00618C27088c439EdE6EED2c6FeB02455",
+    "Guardian": "0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E",
+    "Hull": "0xb4C08A9F27a0F64e571f57E633073b4D66680D0d",
+    "MockRouter": "0x4D06f69257951B4d5FA4F9D2BF43950d373D9e33",
+    "MockWMON": "0x4582d715f72221e70A64Af85DF8D9060Be0e1261",
+    "PerplVenue": "0x4b710a0e4E7767bE65a4821f9b4983Ef10B8E26e",
+    "SimVenue": "0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2",
+    "Tranches": "0x9350A360b01bA4F87Df1164da97Dcc066c37986d"
+  },
+  "deployedBlock": 57874280,
+  "refs": {
+    "explorerMainnet": "https://monadvision.com",
+    "explorerTestnet": "https://testnet.monadvision.com",
+    "puddleRouter": "0x430c23895c8D44883526e3E0B09327dAD8766660",
+    "rpcMainnet": "https://rpc.monad.xyz",
+    "rpcTestnet": "https://testnet-rpc.monad.xyz",
+    "wmonMainnet": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+    "wmonTestnet": "0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541"
+  },
+  "venue": "sim"
+}

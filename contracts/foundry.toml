@@ -1,0 +1,50 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+ffi = true
+fs_permissions = [
+  { access = "read-write", path = "./" },
+  { access = "read-write", path = "../" }
+]
+use_literal_content = true
+
+[profile.testnet]
+eth-rpc-url = "https://testnet-rpc.monad.xyz"
+chain_id = 10143
+
+[profile.mainnet]
+eth-rpc-url = "https://rpc.monad.xyz"
+chain_id = 143
+
+[rpc_endpoints]
+monad = "https://rpc.monad.xyz"
+monad_testnet = "https://testnet-rpc.monad.xyz"
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+
+[fuzz]
+runs = 10000
+
+[profile.ci]
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+fuzz = { runs = 25000 }
+
+[profile.coverage]
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+
+[lint]
+exclude_lints = []
