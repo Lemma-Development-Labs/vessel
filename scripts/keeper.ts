@@ -9,7 +9,7 @@ import { foundry } from "viem/chains";
 import { defineChain } from "viem";
 import { ADDRESSES, CHAIN_ID } from "../app/lib/addresses.ts";
 import { decodeVesselError } from "../app/lib/errors.ts";
-import engineAbi from "../app/lib/abis/EngineLite.json";
+import engineAbi from "../app/lib/abis/EngineLite.json" with { type: "json" };
 
 const RPC_URL = process.env.RPC_URL;
 const KEEPER_PK = process.env.KEEPER_PK as `0x${string}` | undefined;
@@ -76,16 +76,20 @@ async function tick() {
   }
 }
 
-const bal = await publicClient.getBalance({ address: account.address });
-if (bal < MIN_BAL) {
-  console.error(
-    `keeper ${account.address} balance ${formatEther(bal)} < 0.5 — refuse to start (key is gas-only; fund it)`,
-  );
-  process.exit(1);
+async function main() {
+  const bal = await publicClient.getBalance({ address: account.address });
+  if (bal < MIN_BAL) {
+    console.error(
+      `keeper ${account.address} balance ${formatEther(bal)} < 0.5 — refuse to start (key is gas-only; fund it)`,
+    );
+    process.exit(1);
+  }
+
+  console.log("keeper", account.address, "chain", CHAIN_ID, "every", INTERVAL, "s");
+  await tick();
+  setInterval(() => {
+    void tick();
+  }, INTERVAL * 1000);
 }
 
-console.log("keeper", account.address, "chain", CHAIN_ID, "every", INTERVAL, "s");
-await tick();
-setInterval(() => {
-  void tick();
-}, INTERVAL * 1000);
+void main();

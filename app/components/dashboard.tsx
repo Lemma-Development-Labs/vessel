@@ -5,7 +5,7 @@ import { COPY } from "@/lib/provider";
 import { formatBps, formatDelta, formatDusd, formatShares, formatTs, parseDusd, shorten } from "@/lib/format";
 import { USE_MOCK } from "@/lib/providers";
 import { CHAIN_ID } from "@/lib/addresses";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Dashboard() {
   const v = useVessel();
@@ -389,6 +389,14 @@ function Waterfall() {
 
 function Toasts() {
   const { toasts, dismissToast } = useVessel();
+  useEffect(() => {
+    const timers = toasts
+      .filter((t) => t.kind !== "pending")
+      .map((t) => setTimeout(() => dismissToast(t.id), 5_000));
+    return () => {
+      for (const id of timers) clearTimeout(id);
+    };
+  }, [toasts, dismissToast]);
   if (!toasts.length) return null;
   return (
     <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 flex-col gap-2">
