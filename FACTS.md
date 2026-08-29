@@ -24,7 +24,7 @@ Re-run `script/Deploy.s.sol` against Anvil. Do not overwrite the committed testn
 | Keeper (gas) | `0x19B269D761F34E3BE60E49Db6812E55d353008dc` |
 | e2e burner | `0xfD49f731679FC9959A3F73dDE3d6444ed619030A` |
 | Verify | Sourcify via `https://sourcify-api-monad.blockvision.org/` (`solc 0.8.24`, optimizer 200, via-ir). DemoUSD confirmed `already verified`. |
-| e2e live | see [HARDENING.md](./HARDENING.md) / [docs/e2e-last-run.md](./docs/e2e-last-run.md) |
+| e2e live | **PASS** 2026-08-29, burner `0xfD49f731679FC9959A3F73dDE3d6444ed619030A`, 60s wall clock. See HARDENING.md. |
 
 ## Monad Mainnet (143)
 

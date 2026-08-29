@@ -207,7 +207,30 @@ Sizes: max runtime 7328 bytes.
 | PASS 6a2 unwind for idle cash | success | success | `0xdf5f4b5a8024d2f3d221897f4fe2af7c19d5aa61921d9683d9df691837985e36` |
 | PASS 6b exitHull payout = principal + accrued | 40000008 | 40000008 | `0x245289833a0f43ed361d94ac58ed0306d6e317c06d281b8bf9067d7719a8ac01` |
 
-Screenshot: [docs/e2e-pass.html](./docs/e2e-pass.html) (open locally). Live testnet + explorer VERIFIED marks: **not done here**.
+Screenshot: [docs/e2e-pass.html](./docs/e2e-pass.html) (open locally).
+
+---
+
+## e2e PASS table (Monad testnet 10143)
+
+`pnpm e2e` 2026-08-29 against live `ADDRESSES.json`. Burner `0xfD49f731679FC9959A3F73dDE3d6444ed619030A`. Wait: **60s wall clock**. Negative epoch via `setFundingRateBps(-2400)` then crank. Conservation identity **21 wei**. Hull NAV unchanged on the shortfall epoch (`40000018`); Ballast NAV decreased. Full Hull exit after `unwind` paid **40000018**. Explorer: [MonadVision](https://testnet.monadvision.com).
+
+| step | expected | actual | tx |
+| --- | --- | --- | --- |
+| PASS preflight getCode all ADDRESSES | non-empty | 11 contracts | — |
+| PASS 1 faucet +100 dUSD | 100000000 | 100000000 | [`0x7883…2509`](https://testnet.monadvision.com/tx/0x7883f4b42e733b2c90718f2de7366fa3ff5a4c5c8a4165aef39b937f3b112509) |
+| PASS 2a joinBallast 60 shares > 0 | >0 | 60000000000000000000 | [`0x5c95…976e`](https://testnet.monadvision.com/tx/0x5c952f950187c80f36d2f6f3d2cc34081be77a2e2024b13625a980e045fa976e) |
+| PASS 2b joinHull 40 shares > 0 | >0 | 40000000000000000000 | [`0x5ef3…a6e2`](https://testnet.monadvision.com/tx/0x5ef384f02bd5bbcbd169937ccfeeed6b013261d46ea46f6a1642c81cc9b6a6e2) |
+| PASS 2c subordination ≥ 20% | >= 2000 bps | 6000 | [`0x5ef3…a6e2`](https://testnet.monadvision.com/tx/0x5ef384f02bd5bbcbd169937ccfeeed6b013261d46ea46f6a1642c81cc9b6a6e2) |
+| PASS 3a spot WMON > 0 | >0 | 90000000000000000000 | [`0x22ac…f2ae`](https://testnet.monadvision.com/tx/0x22acec226698d8dfa21654898dd460e4a7a9ac7541620f09348af3256f06f2ae) |
+| PASS 3b shortNotional > 0 | >0 | 90000000 | [`0x22ac…f2ae`](https://testnet.monadvision.com/tx/0x22acec226698d8dfa21654898dd460e4a7a9ac7541620f09348af3256f06f2ae) |
+| PASS 3c \|netDeltaBps\| ≤ 100 | <= 100 | 0 | [`0x22ac…f2ae`](https://testnet.monadvision.com/tx/0x22acec226698d8dfa21654898dd460e4a7a9ac7541620f09348af3256f06f2ae) |
+| PASS 4 conservation identity (wei) | 21 | 21 | [`0x2d35…bc13`](https://testnet.monadvision.com/tx/0x2d358ecff432ba4354558b0cd7f7a08f32d66bf751d469b1ebb50766e218bc13) |
+| PASS 5a hull NAV unchanged | 40000018 | 40000018 | [`0x48c8…1f5e`](https://testnet.monadvision.com/tx/0x48c8d28ec4a0af99416c22db6f3c94d45fd5fff5cbc63d39ecefdb2caad01f5e) |
+| PASS 5b ballast NAV − shortfall | 59999959 | 59999959 | [`0x48c8…1f5e`](https://testnet.monadvision.com/tx/0x48c8d28ec4a0af99416c22db6f3c94d45fd5fff5cbc63d39ecefdb2caad01f5e) |
+| PASS 6a floor after partial ballast exit | >= 2000 bps | 5744 | [`0xfc47…32c3`](https://testnet.monadvision.com/tx/0xfc4791b1c0a6e640acbeebc696a27a86d2ec0343a7ed573a62351074c03532c3) |
+| PASS 6a2 unwind for idle cash | success | success | [`0xc2c6…8443`](https://testnet.monadvision.com/tx/0xc2c6be632e3f80daaaa51ab98614cf670a5c3da64229132748e9ce9560258443) |
+| PASS 6b exitHull payout = principal + accrued | 40000018 | 40000018 | [`0xe7f2…d736`](https://testnet.monadvision.com/tx/0xe7f25289d4e41ece892c8ad6b2185755c620dd4b41decfa51467f2024d15d736) |
 
 ---
 
