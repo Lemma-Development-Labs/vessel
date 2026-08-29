@@ -14,21 +14,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
+      # foundry.toml pins solc 0.8.24. On a cold runner svm must fetch it, so
+      # --offline cannot be used; cache the download instead so runs stay fast.
+      - name: cache solc (svm)
+        uses: actions/cache@v4
+        with:
+          path: ~/.svm
+          key: svm-${{ runner.os }}-solc-0.8.24
       - name: fmt
         run: forge fmt --check
       - name: test (25k fuzz)
         env:
           FOUNDRY_PROFILE: ci
-        run: forge test --offline --fuzz-runs 25000
+        run: forge test --fuzz-runs 25000
       - name: gas snapshot (±10%)
-        run: forge snapshot --check --tolerance 10 --offline --no-match-test 'testFuzz' --no-match-path 'test/fork/*'
+        run: forge snapshot --check --tolerance 10 --no-match-test 'testFuzz' --no-match-path 'test/fork/*'
       - name: contract sizes
         working-directory: .
         run: node scripts/check-sizes.mjs
       - name: coverage
         run: |
           mkdir -p coverage
-          forge coverage --offline --ir-minimum --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/' || forge coverage --offline --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/'
+          forge coverage --ir-minimum --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/' || forge coverage --report lcov --report-file coverage/lcov.info --no-match-coverage 'PerplVenue|script/'
       - name: coverage gate ≥95%
         working-directory: .
         run: node scripts/coverage-gate.mjs contracts/coverage/lcov.info
@@ -54,6 +61,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: unit tests (Rule 0 + exit flow)
+        run: pnpm test
+      - run: pnpm lint
       - run: pnpm build
 
   secrets:
