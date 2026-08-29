@@ -7,17 +7,34 @@ against the source on 2026-08-29, not recalled.
 > describes the current on-chain reality, not a target state — where the target
 > differs, it says so.
 
-Roles today are all held by a **single EOA**, `0x4307C72a92063df4fa189c9e9621b741d457be7C`.
-That key was exposed on 2026-08-29 (see `OPS.md` §0) and moving to a 2-of-3 Safe
-is Phase 5. Read the "who holds it" column as a description of a known weakness.
+Every role that **retains power** after deployment is held by a 2-of-3 Safe at
+`0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738` (Safe v1.4.1, threshold 2) — `Guardian.owner`, `Tranches.treasury` and
+`SimVenue.owner`, all verified on chain.
+
+**Read this honestly:** all three Safe signer keys were generated on the same
+machine, so today it is a 1-of-1 wearing a multisig's clothes. It is *not* yet
+the security property "2-of-3" normally implies, and nothing should claim it is.
+What it does buy is real and was the reason to do it now: Safe owners are
+swappable, so replacing two signers with independently-held keys later needs one
+Safe transaction — whereas `Tranches.treasury` and `SimVenue.owner` are
+`immutable` and could otherwise only be changed by redeploying the protocol
+again. The address is fixed; the humans behind it are not.
+
+The deploying EOA `0x830C52EAda6fcE4D72Ca24F25D84d163aDCf581e` holds the `deployer` role on
+`BlitzVault`, `Tranches` and `EngineLite`. Every power that role has —
+`setEngine`, `setTranches`, `seedDeadShares`, `wire` — is single-use and was
+consumed during deployment, so it now holds nothing. It is a throwaway.
+
+The previous deployment's roles were held by a single EOA whose key was exposed;
+those contracts are deprecated and listed in the README.
 
 ---
 
 ## Powers that exist
 
-### Guardian — `0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E`
+### Guardian — `0x150e153D5aB4683EC576bC1F68b7839D86751208`
 
-`Ownable2Step`. Owner verified on chain as the deployer address.
+`Ownable2Step`. Owner verified on chain as the Safe `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`.
 
 | Function | Who | Delay | What it does |
 | --- | --- | --- | --- |
@@ -34,9 +51,10 @@ Note the blast radius of pause: it halts joins, exits, `crank`, `settle`,
 `deployLiquidity` **and `unwind`**. A paused protocol is a frozen protocol, not a
 draining one, but users cannot exit while paused.
 
-### BlitzVault — `0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823`
+### BlitzVault — `0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5`
 
-`deployer` is `immutable` — it cannot be rotated without redeploying.
+`deployer` is `immutable`, but every power it has is single-use and already
+spent — so the role is inert. It is not the Safe, and it does not need to be.
 
 | Function | Who | Delay | What it does |
 | --- | --- | --- | --- |
@@ -57,9 +75,9 @@ would capture a pro-rata slice of yield that `Tranches` has already credited to
 Hull and Ballast in full, leaving its book larger than what its shares can
 redeem — the last exiters could not be paid.
 
-### Tranches — `0x9350A360b01bA4F87Df1164da97Dcc066c37986d`
+### Tranches — `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842`
 
-`deployer` and `treasury` are both `immutable`.
+`deployer` and `treasury` are both `immutable`. `treasury` is the Safe; `deployer` is the spent throwaway.
 
 | Function | Who | Delay | What it does |
 | --- | --- | --- | --- |
@@ -67,7 +85,7 @@ redeem — the last exiters could not be paid.
 | `settle(int256)` | engine only | none | Runs the waterfall. Magnitude capped at `MAX_YIELD_BPS` (50% of TVL). |
 | `claimTreasury()` | **anyone** | none | Pays accrued fees. The destination is the `immutable` `treasury` address — the caller cannot redirect it. |
 
-### EngineLite — `0x9FB500D00618C27088c439EdE6EED2c6FeB02455`
+### EngineLite — `0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85`
 
 | Function | Who | Delay | What it does |
 | --- | --- | --- | --- |
@@ -85,10 +103,11 @@ It is also why the app exposes `unwind` directly to users rather than hiding it
 behind an owner they would have to petition — if your exit needs the hedge
 unwound, you can do it yourself.
 
-### SimVenue — `0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2`
+### SimVenue — `0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7`
 
-`owner` is `immutable`. **This is the simulated venue and the most powerful
-non-pause role in the system.**
+`owner` is `immutable` and is the Safe. **This is the simulated venue and the
+most powerful non-pause role in the system**, which is exactly why it is not an
+EOA.
 
 | Function | Who | Delay | What it does |
 | --- | --- | --- | --- |
@@ -102,7 +121,7 @@ because SimVenue is a **simulation** whose whole purpose is to demonstrate good
 and bad days on demand. It is a reason SimVenue must never be treated as a real
 venue, and it disappears when Phase 6.2 replaces it with Perpl.
 
-### DemoUSD — `0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc`
+### DemoUSD — `0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05`
 
 **No privileged functions at all.** No owner, no admin, no roles.
 
@@ -142,17 +161,16 @@ otherwise.
 
 ---
 
-## Target state (Phase 5, not yet done)
+## Key management — done, and what is still missing
 
-| Item | Today | Target |
-| --- | --- | --- |
-| Guardian owner | single EOA (exposed) | 2-of-3 Safe |
-| Deployer role | single EOA, `immutable` | 2-of-3 Safe — **requires redeploy** |
-| Parameter changes | impossible (all `constant`) | unchanged; nothing to timelock |
-| Pause | immediate | stays immediate |
+| Item | Status |
+| --- | --- |
+| `Guardian.owner` | 2-of-3 Safe ✅ |
+| `Tranches.treasury` | 2-of-3 Safe ✅ (immutable — set correctly at deploy) |
+| `SimVenue.owner` | 2-of-3 Safe ✅ (immutable — set correctly at deploy) |
+| `deployer` role | throwaway EOA, all powers spent ✅ |
+| Safe signers independently held | ❌ all three generated on one machine |
+| Timelock on parameter changes | not applicable — every economic parameter is `constant`, so there is no parameter change to delay |
 
-Because every economic parameter is `constant`, there is no parameter change for
-a timelock to delay. A timelock would only be meaningful over the single-use
-wiring setters, and those are already spent on a live deployment. The honest
-Phase 5 scope is therefore **multisig ownership**, not a timelock — and moving
-the `immutable` deployer role at all means redeploying.
+The one outstanding item is the signers. Replacing two of the three with keys
+held elsewhere is a single Safe transaction and needs no redeploy.

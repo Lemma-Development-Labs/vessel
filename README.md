@@ -153,7 +153,7 @@ Rounding always favors protocol + senior: mint/burn floor, Hull accrual floor, f
 
 ## Live testnet (10143)
 
-Broadcast **2026-08-29**, `deployedBlock` **57874280**. Deployer `0x4307C72a92063df4fa189c9e9621b741d457be7C`. Sourcify (`solc 0.8.24`, optimizer 200, via-ir).
+Broadcast **2026-08-29**, `deployedBlock` **57874280**. Deployer `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`. Sourcify (`solc 0.8.24`, optimizer 200, via-ir).
 
 Explorer: [MonadVision testnet](https://testnet.monadvision.com). RPC: `https://testnet-rpc.monad.xyz`.
 
@@ -161,21 +161,65 @@ Explorer: [MonadVision testnet](https://testnet.monadvision.com). RPC: `https://
 
 | Contract | Address | Explorer |
 | --- | --- | --- |
-| DemoUSD | `0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc` | [link](https://testnet.monadvision.com/address/0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc) |
-| Guardian | `0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E` | [link](https://testnet.monadvision.com/address/0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E) |
-| BlitzVault | `0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823` | [link](https://testnet.monadvision.com/address/0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823) |
-| Tranches | `0x9350A360b01bA4F87Df1164da97Dcc066c37986d` | [link](https://testnet.monadvision.com/address/0x9350A360b01bA4F87Df1164da97Dcc066c37986d) |
-| Hull | `0xb4C08A9F27a0F64e571f57E633073b4D66680D0d` | [link](https://testnet.monadvision.com/address/0xb4C08A9F27a0F64e571f57E633073b4D66680D0d) |
-| Ballast | `0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33` | [link](https://testnet.monadvision.com/address/0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33) |
-| SimVenue | `0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2` | [link](https://testnet.monadvision.com/address/0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2) |
-| PerplVenue (stub) | `0x4b710a0e4E7767bE65a4821f9b4983Ef10B8E26e` | [link](https://testnet.monadvision.com/address/0x4b710a0e4E7767bE65a4821f9b4983Ef10B8E26e) |
-| EngineLite | `0x9FB500D00618C27088c439EdE6EED2c6FeB02455` | [link](https://testnet.monadvision.com/address/0x9FB500D00618C27088c439EdE6EED2c6FeB02455) |
-| MockWMON | `0x4582d715f72221e70A64Af85DF8D9060Be0e1261` | [link](https://testnet.monadvision.com/address/0x4582d715f72221e70A64Af85DF8D9060Be0e1261) |
-| MockRouter | `0x4D06f69257951B4d5FA4F9D2BF43950d373D9e33` | [link](https://testnet.monadvision.com/address/0x4D06f69257951B4d5FA4F9D2BF43950d373D9e33) |
+| DemoUSD | `0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05` | [link](https://testnet.monadvision.com/address/0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05) |
+| Guardian | `0x150e153D5aB4683EC576bC1F68b7839D86751208` | [link](https://testnet.monadvision.com/address/0x150e153D5aB4683EC576bC1F68b7839D86751208) |
+| BlitzVault | `0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5` | [link](https://testnet.monadvision.com/address/0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5) |
+| Tranches | `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842` | [link](https://testnet.monadvision.com/address/0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842) |
+| Hull | `0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12` | [link](https://testnet.monadvision.com/address/0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12) |
+| Ballast | `0x074207acEf2f60a6B1B86a885D2fF893927109A1` | [link](https://testnet.monadvision.com/address/0x074207acEf2f60a6B1B86a885D2fF893927109A1) |
+| SimVenue | `0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7` | [link](https://testnet.monadvision.com/address/0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7) |
+| PerplVenue (stub) | `0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21` | [link](https://testnet.monadvision.com/address/0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21) |
+| EngineLite | `0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85` | [link](https://testnet.monadvision.com/address/0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85) |
+| MockWMON | `0x17141F36c4401C6184143250827713b26c3E964F` | [link](https://testnet.monadvision.com/address/0x17141F36c4401C6184143250827713b26c3E964F) |
+| MockRouter | `0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C` | [link](https://testnet.monadvision.com/address/0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C) |
 
-CREATE txs (headline three): Vault [`0x9f99…fae3`](https://testnet.monadvision.com/tx/0x9f99b84a638cb0d120b69744008bb8b052862fc55bec4272395ff8e3880efae3) · Tranches [`0x885f…88b9`](https://testnet.monadvision.com/tx/0x885f636250ac33989df4ffee10790d7bc76440c995c11e2ca2b26bb5e95c88b9) · Engine [`0x9916…93f6`](https://testnet.monadvision.com/tx/0x99164889cf720428db883ff81befe38460ab76a51499d0e65aff9b855a4f93f6).
+All eleven are **Sourcify-verified `exact_match`** on chain 10143, checked
+2026-08-29 — the app reads that state per contract from a generated manifest
+(`app/lib/verification.ts`) rather than asserting it.
 
-Roles (addresses, not keys): seeder `0x25dd6Bd48fD0F6254Cc15D43a86d801ec83f4235` · keeper gas `0x19B269D761F34E3BE60E49Db6812E55d353008dc`.
+Deployed at block **57918591**.
+
+### Roles (addresses, never keys)
+
+| Role | Address | Notes |
+| --- | --- | --- |
+| Protocol owner | [`0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`](https://testnet.monadvision.com/address/0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738) | **2-of-3 Safe** (v1.4.1). Holds `Guardian.owner`, `Tranches.treasury`, `SimVenue.owner`. See the honesty note below. |
+| Deployer | `0x830C52EAda6fcE4D72Ca24F25D84d163aDCf581e` | Throwaway. Every power it had (`setEngine`, `setTranches`, `seedDeadShares`, `wire`) is single-use and already spent. |
+| Seeder | `0x94555bff001A4Eea5B488f3591df039Be5373e46` | Seeded the SimVenue funding pot. |
+| Keeper (gas only) | `0x60A7cF428BD62B127F5f2BA84301e6251C92964C` | Calls `crank()`, which is permissionless. Holds no dUSD and no approvals. |
+
+> **On the Safe, honestly.** All three signer keys were generated on one machine,
+> so today it gives you a 1-of-1 with a multisig's shape — not the security
+> property "2-of-3" usually implies. It was still worth setting at deploy time:
+> `Tranches.treasury` and `SimVenue.owner` are `immutable`, so pointing them at a
+> Safe means the signers can be replaced later with one Safe transaction, while
+> pointing them at an EOA would have meant redeploying the whole protocol again.
+
+### Deprecated — compromised deployer key
+
+The deployment below is **superseded and must not be used**. Its `deployer` key
+was exposed on 2026-08-29, and that key held `Guardian.owner`, `SimVenue.owner`
+and the `Tranches` treasury. Whoever holds it can pause those contracts
+indefinitely and drive `setFundingRateBps` to −100%. `deployer` is `immutable`
+there, so the contracts cannot be secured — only abandoned.
+
+It also predates the dead-share yield fix, so it leaks a share of every yield
+credit into an unredeemable position.
+
+| Contract | Deprecated address |
+| --- | --- |
+| DemoUSD | `0x7e1Eca4BD693Ca17ADEC1C21cb8a8Cc3edAF6Acc` |
+| Guardian | `0x9f47CA6E0A5B4786362cdBfcCED3710Ea518aa4E` |
+| BlitzVault | `0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823` |
+| Tranches | `0x9350A360b01bA4F87Df1164da97Dcc066c37986d` |
+| Hull / Ballast | `0xb4C08A9F27a0F64e571f57E633073b4D66680D0d` / `0x4b37a2c7EeA338832e5F41F75A3F90DC3DffFB33` |
+| SimVenue | `0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2` |
+| EngineLite | `0x9FB500D00618C27088c439EdE6EED2c6FeB02455` |
+| Compromised deployer EOA | `0x4307C72a92063df4fa189c9e9621b741d457be7C` |
+
+A forensic sweep found the key was never committed, never in a CI log and never
+in the deployed bundle — it reached one chat transcript and nothing else. The
+evidence is in [`OPS.md`](OPS.md) §0. It is still treated as compromised.
 
 Monad **mainnet (143)** is **not** deployed.
 
@@ -320,9 +364,9 @@ Stage UI without a wallet: `NEXT_PUBLIC_USE_MOCK=1` (default in `.env.example`).
 
 ```bash
 export RPC=https://testnet-rpc.monad.xyz
-export TRANCHES=0x9350A360b01bA4F87Df1164da97Dcc066c37986d
-export VAULT=0x4E3C935c69FE55D2A21F1CaB00A95c75F4F85823
-export ENGINE=0x9FB500D00618C27088c439EdE6EED2c6FeB02455
+export TRANCHES=0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842
+export VAULT=0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5
+export ENGINE=0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85
 cast call $TRANCHES "deckStats()" --rpc-url $RPC
 cast call $VAULT "totalAssets()(uint256)" --rpc-url $RPC
 cast call $ENGINE "netDeltaBps()(int256)" --rpc-url $RPC
@@ -442,7 +486,7 @@ Bad-day (Ballast takes the hit):
 
 ```bash
 cd contracts
-SIM_VENUE=0x7E305794712DB9AdBfbe4be5E6CD43C94f7D1bf2 RATE_BPS=-1200 \
+SIM_VENUE=0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7 RATE_BPS=-1200 \
   forge script script/SetRate.s.sol --rpc-url https://testnet-rpc.monad.xyz --broadcast --private-key $DEPLOYER_PK
 # then one crank
 ```

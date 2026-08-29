@@ -32,7 +32,7 @@ contract Fixture is Test {
         guardian = new Guardian(owner);
         vault = new BlitzVault(dusd, address(guardian));
         tranches = new Tranches(address(vault), address(guardian), treasury);
-        venue = new SimVenue(address(dusd));
+        venue = new SimVenue(address(dusd), owner);
         wmon = new MockWMON();
         router = new MockRouter(address(dusd), address(wmon));
         wmon.setRouter(address(router));

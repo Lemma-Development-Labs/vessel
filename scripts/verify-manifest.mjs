@@ -59,13 +59,14 @@ if (resultsPath) {
 for (const [name, state] of Object.entries(cli)) results[name] = state;
 
 const now = new Date().toISOString();
-const unknown = { state: "unknown", checkedAt: null };
+const unknownFor = (address) => ({ state: "unknown", checkedAt: null, address });
 
 const entries = {};
 for (const name of names) {
+  const address = addresses.contracts[name];
   const raw = results[name];
   if (raw === undefined) {
-    entries[name] = unknown;
+    entries[name] = unknownFor(address);
     continue;
   }
   const r = typeof raw === "string" ? { state: raw } : raw;
@@ -76,7 +77,12 @@ for (const name of names) {
   // "verified" without a timestamp is exactly the unfalsifiable claim this
   // manifest exists to stop, so it never lands in the file.
   const checkedAt = r.state === "unknown" ? null : (r.checkedAt ?? now);
-  entries[name] = r.url ? { state: r.state, checkedAt, url: r.url } : { state: r.state, checkedAt };
+  // The address is stamped in so a redeploy cannot inherit the previous
+  // deployment's badge: the manifest entry names the exact contract it checked,
+  // and the parity test fails the moment ADDRESSES.json moves past it.
+  entries[name] = r.url
+    ? { state: r.state, checkedAt, address, url: r.url }
+    : { state: r.state, checkedAt, address };
 }
 
 for (const name of Object.keys(results)) {
@@ -112,6 +118,9 @@ export type VerificationEntry = {
   state: VerificationState;
   /** ISO-8601 instant the state was established, or null if never checked. */
   checkedAt: string | null;
+  /** The exact address this state was checked against. A redeploy moves this,
+   *  and the parity test then fails rather than letting a stale badge ride. */
+  address: string;
   /** Link to the verification evidence, when the run produced one. */
   url?: string;
 };
@@ -122,7 +131,7 @@ ${body}
 
 /** Unknown is the safe default: a name with no entry is never shown as verified. */
 export function verificationOf(name: string): VerificationEntry {
-  return VERIFICATION[name] ?? { state: "unknown", checkedAt: null };
+  return VERIFICATION[name] ?? { state: "unknown", checkedAt: null, address: "" };
 }
 `;
 

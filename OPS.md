@@ -14,7 +14,7 @@ must be treated as fully compromised.
 
 | Secret | What it controls | Action |
 | --- | --- | --- |
-| Deployer private key (`67a9f48c…`) → `0x4307C72a92063df4fa189c9e9621b741d457be7C` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
+| Deployer private key (`67a9f48c…`) → `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
 | Railway API token `c37ac07b-…` | Full Railway account access, including the ability to read service env vars — which is where `KEEPER_PK` lives. | Revoke in Railway → Account → Tokens. |
 | Vercel token `vcp_…` | Full Vercel account access. | Revoke in Vercel → Account → Tokens. |
 
@@ -113,7 +113,7 @@ someone else and the redeploy becomes urgent rather than scheduled.
 
 ```
 curl -s -X POST https://testnet-rpc.monad.xyz -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x4307C72a92063df4fa189c9e9621b741d457be7C","latest"]}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738","latest"]}'
 ```
 
 ### 0.3 Blast radius on the current deployment
