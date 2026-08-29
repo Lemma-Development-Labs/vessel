@@ -135,6 +135,21 @@ export async function startApi(opts: {
     return payload;
   });
 
+  /**
+   * LIVENESS, for the platform. Distinct from /health on purpose.
+   *
+   * /health is a readiness-and-honesty signal: it returns 503 with an explicit
+   * `degraded` list whenever the system is not actually working — including
+   * states like "keeper not configured" that will never clear by themselves.
+   * Pointing a platform healthcheck at that conflates two different questions
+   * and leaves a perfectly serving process permanently un-routed, which is
+   * exactly what happened on the first deploy.
+   *
+   * This endpoint answers only "is this process able to serve HTTP". The
+   * restart policy uses it; humans and /status use /health.
+   */
+  app.get("/live", async () => ({ ok: true, uptimeSec: Math.floor(process.uptime()) }));
+
   app.get("/health", async (_req, reply) => {
     const now = Math.floor(Date.now() / 1000);
     const errors: Record<string, string> = {};
