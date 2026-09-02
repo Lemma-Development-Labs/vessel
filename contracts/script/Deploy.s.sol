@@ -29,13 +29,18 @@ contract Deploy is Script {
             vm.envOr("DEPLOYER_PK", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
         address deployer = vm.addr(pk);
 
+        // Every role that RETAINS power after deployment. The deploying EOA keeps only the
+        // single-use wiring calls (setEngine / setTranches / seedDeadShares / wire), which are
+        // all spent below — so after this script it holds nothing.
+        address owner = vm.envOr("PROTOCOL_OWNER", deployer);
+
         vm.startBroadcast(pk);
 
         dusd = new DemoUSD();
-        guardian = new Guardian(deployer);
+        guardian = new Guardian(owner);
         vault = new BlitzVault(dusd, address(guardian));
-        tranches = new Tranches(address(vault), address(guardian), deployer);
-        venue = new SimVenue(address(dusd));
+        tranches = new Tranches(address(vault), address(guardian), owner);
+        venue = new SimVenue(address(dusd), owner);
         perpl = new PerplVenue();
         wmon = new MockWMON();
         router = new MockRouter(address(dusd), address(wmon));

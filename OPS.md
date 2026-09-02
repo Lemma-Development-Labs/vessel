@@ -14,7 +14,7 @@ must be treated as fully compromised.
 
 | Secret | What it controls | Action |
 | --- | --- | --- |
-| Deployer private key (`67a9f48c…`) → `0x4307C72a92063df4fa189c9e9621b741d457be7C` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
+| Deployer private key (`67a9f48c…`) → `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
 | Railway API token `c37ac07b-…` | Full Railway account access, including the ability to read service env vars — which is where `KEEPER_PK` lives. | Revoke in Railway → Account → Tokens. |
 | Vercel token `vcp_…` | Full Vercel account access. | Revoke in Vercel → Account → Tokens. |
 
@@ -113,7 +113,7 @@ someone else and the redeploy becomes urgent rather than scheduled.
 
 ```
 curl -s -X POST https://testnet-rpc.monad.xyz -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x4307C72a92063df4fa189c9e9621b741d457be7C","latest"]}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738","latest"]}'
 ```
 
 ### 0.3 Blast radius on the current deployment
@@ -223,15 +223,18 @@ calls `multicall`/`readContract` at a historical `blockNumber`. On a non-archive
 endpoint those reads fail. Confirm archive support with the provider before
 choosing one.
 
-### Explorer URL — unresolved discrepancy
+### Explorer URL — RESOLVED 2026-08-29
 
-`.agents/skills/addresses/SKILL.md` gives the Monad testnet explorer as
-**`testnet.monadscan.com`**. This repo hardcodes **`testnet.monadvision.com`** in
-`ADDRESSES.json`, `app/lib/wagmi.ts`, `app/.env.example` and the transparency
-screen. Both return HTTP 403 to `curl` (bot protection), so neither could be
-confirmed or ruled out from the CLI. **Verify in a browser and make the repo
-consistent with whichever is canonical** — every "verify it yourself" link on the
-transparency screen depends on it.
+Both are official. `docs.monad.xyz/developer-essentials/network-information`
+lists **MonadVision** (`monadvision.com`) and **Monadscan** (`monadscan.com`)
+side by side as block explorers, and the Monad docs use `monadvision.com` in
+their own address links. `testnet.monadexplorer.com` 308-redirects and is a
+third-party mirror.
+
+This repo standardises on `testnet.monadvision.com`, which is correct and needs
+no change. The earlier 403s from `curl` were bot protection on both hosts, not
+absence — a plain HEAD request cannot distinguish "blocked" from "does not
+exist", which is why this stayed open until the canonical list settled it.
 
 ---
 

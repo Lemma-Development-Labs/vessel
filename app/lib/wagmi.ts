@@ -3,8 +3,21 @@
 import { createConfig, http, injected } from "wagmi";
 import { walletConnect } from "wagmi/connectors/walletConnect";
 import { defineChain, fallback, type Chain } from "viem";
+
 import { foundry } from "viem/chains";
 import { CHAIN_ID } from "./addresses";
+
+/**
+ * Multicall3 at its canonical cross-chain address. Verified deployed on Monad
+ * testnet (eth_getCode returns 7,618 chars).
+ *
+ * viem's publicClient.multicall REFUSES to run unless the chain declares this —
+ * it throws `Chain "Monad Testnet" does not support contract "multicall3"`.
+ * Without it every batched read in lib/chain.tsx threw, `reads.data` stayed
+ * undefined forever, and the app sat on a loading skeleton with every value
+ * rendering unavailable. It was invisible while the app was serving mock data.
+ */
+const MULTICALL3 = { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" as const } };
 
 function rpcList(): string[] {
   const chainHint = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? CHAIN_ID);
@@ -37,6 +50,7 @@ export const monadTestnet = defineChain({
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
   rpcUrls: { default: { http: rpcs } },
   blockExplorers: { default: { name: "Monad Testnet Explorer", url: explorer } },
+  contracts: MULTICALL3,
 });
 
 function makeChain(): Chain {
@@ -45,6 +59,7 @@ function makeChain(): Chain {
       ...foundry,
       rpcUrls: { default: { http: rpcs } },
       blockExplorers: { default: { name: "Explorer", url: explorer } },
+      contracts: { ...foundry.contracts, ...MULTICALL3 },
     };
   }
   if (envChainId === 143) {
@@ -54,6 +69,7 @@ function makeChain(): Chain {
       nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
       rpcUrls: { default: { http: rpcs } },
       blockExplorers: { default: { name: "Monad Explorer", url: "https://monadvision.com" } },
+      contracts: MULTICALL3,
     });
   }
   return monadTestnet;

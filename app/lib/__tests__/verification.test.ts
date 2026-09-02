@@ -156,14 +156,51 @@ describe("the manifest tracks the deployment exactly", () => {
   });
 
   it("an unlisted contract falls back to unknown, never to verified", () => {
-    expect(verificationOf("NotADeployedContract")).toEqual({ state: "unknown", checkedAt: null });
+    expect(verificationOf("NotADeployedContract")).toEqual({
+      state: "unknown",
+      checkedAt: null,
+      address: "",
+    });
   });
 
-  it("the current seed is all-unknown — the redeploy invalidated every prior check", () => {
-    // Documents the state R4.3 shipped with. When a verification run against
-    // the NEW addresses updates the manifest, update this expectation with it.
-    expect(Object.values(VERIFICATION).map((e) => e.state)).toEqual(
-      Object.keys(deployed).map(() => "unknown"),
-    );
+  it("a verified claim always carries the evidence for it", () => {
+    // The invariant that actually matters, and the one the old false badge
+    // violated: you may only claim "verified" if a run established it and left
+    // a timestamp. Anything unchecked must be null, so it cannot masquerade.
+    for (const [name, e] of Object.entries(VERIFICATION)) {
+      if (e.state === "verified" || e.state === "unverified") {
+        expect(e.checkedAt, `${name} claims ${e.state} without a checkedAt`).toBeTruthy();
+        expect(
+          Number.isNaN(Date.parse(e.checkedAt as string)),
+          `${name} has an unparseable checkedAt`,
+        ).toBe(false);
+      } else {
+        expect(e.checkedAt, `${name} is unknown but carries a checkedAt`).toBeNull();
+      }
+    }
   });
+
+  it("a verified entry names the exact address it was checked against", () => {
+    // The gap this closes: the parity test above only catches a changed
+    // contract SET. A redeploy keeps the same names with new addresses, so
+    // without this a stale "verified" badge would ride straight through onto
+    // contracts nobody had checked. Binding state to address makes that fail.
+    const addresses = JSON.parse(
+      readFileSync(resolve(__dirname, "../../../ADDRESSES.json"), "utf8"),
+    ) as { contracts: Record<string, string> };
+
+    const mismatched: string[] = [];
+    for (const [name, entry] of Object.entries(VERIFICATION)) {
+      if (entry.state !== "verified") continue;
+      if (entry.address?.toLowerCase() !== addresses.contracts[name]?.toLowerCase()) {
+        mismatched.push(`${name}: manifest ${entry.address} vs deployed ${addresses.contracts[name]}`);
+      }
+    }
+    expect(
+      mismatched,
+      `Verified badges pointing at a different address than the current deployment.\n` +
+        `Re-run: node scripts/verify-manifest.mjs\n${mismatched.join("\n")}`,
+    ).toEqual([]);
+  });
+
 });

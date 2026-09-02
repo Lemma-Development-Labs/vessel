@@ -15,25 +15,28 @@ export type VerificationEntry = {
   state: VerificationState;
   /** ISO-8601 instant the state was established, or null if never checked. */
   checkedAt: string | null;
+  /** The exact address this state was checked against. A redeploy moves this,
+   *  and the parity test then fails rather than letting a stale badge ride. */
+  address: string;
   /** Link to the verification evidence, when the run produced one. */
   url?: string;
 };
 
 export const VERIFICATION: Record<string, VerificationEntry> = {
-  "Ballast": { state: "unknown", checkedAt: null },
-  "BlitzVault": { state: "unknown", checkedAt: null },
-  "DemoUSD": { state: "unknown", checkedAt: null },
-  "EngineLite": { state: "unknown", checkedAt: null },
-  "Guardian": { state: "unknown", checkedAt: null },
-  "Hull": { state: "unknown", checkedAt: null },
-  "MockRouter": { state: "unknown", checkedAt: null },
-  "MockWMON": { state: "unknown", checkedAt: null },
-  "PerplVenue": { state: "unknown", checkedAt: null },
-  "SimVenue": { state: "unknown", checkedAt: null },
-  "Tranches": { state: "unknown", checkedAt: null },
+  "Ballast": { state: "unknown", checkedAt: null, address: "0x074207acEf2f60a6B1B86a885D2fF893927109A1" },
+  "BlitzVault": { state: "unknown", checkedAt: null, address: "0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5" },
+  "DemoUSD": { state: "unknown", checkedAt: null, address: "0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05" },
+  "EngineLite": { state: "unknown", checkedAt: null, address: "0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85" },
+  "Guardian": { state: "unknown", checkedAt: null, address: "0x150e153D5aB4683EC576bC1F68b7839D86751208" },
+  "Hull": { state: "unknown", checkedAt: null, address: "0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12" },
+  "MockRouter": { state: "unknown", checkedAt: null, address: "0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C" },
+  "MockWMON": { state: "unknown", checkedAt: null, address: "0x17141F36c4401C6184143250827713b26c3E964F" },
+  "PerplVenue": { state: "unknown", checkedAt: null, address: "0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21" },
+  "SimVenue": { state: "unknown", checkedAt: null, address: "0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7" },
+  "Tranches": { state: "unknown", checkedAt: null, address: "0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842" },
 };
 
 /** Unknown is the safe default: a name with no entry is never shown as verified. */
 export function verificationOf(name: string): VerificationEntry {
-  return VERIFICATION[name] ?? { state: "unknown", checkedAt: null };
+  return VERIFICATION[name] ?? { state: "unknown", checkedAt: null, address: "" };
 }

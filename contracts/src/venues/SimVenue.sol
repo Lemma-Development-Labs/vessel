@@ -51,8 +51,12 @@ contract SimVenue is IVenue {
         _;
     }
 
-    constructor(address dUsd_) {
-        owner = msg.sender;
+    /// @param owner_ Holder of `setFundingRateBps`. Immutable, so it is set here rather than
+    ///        inherited from the deploying EOA — on a real deploy this is the protocol Safe,
+    ///        and the deploying key must hold no residual power.
+    constructor(address dUsd_, address owner_) {
+        if (owner_ == address(0)) revert NotOwner();
+        owner = owner_;
         dUsd = IERC20(dUsd_);
     }
 
