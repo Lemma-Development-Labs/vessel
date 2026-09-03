@@ -18,6 +18,12 @@ Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` 57874280
 | MockWMON | re-run Deploy | [`0x17141F36c4401C6184143250827713b26c3E964F`](https://testnet.monadvision.com/address/0x17141F36c4401C6184143250827713b26c3E964F) | — | Sourcify |
 | MockRouter | re-run Deploy | [`0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C`](https://testnet.monadvision.com/address/0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C) | — | Sourcify |
 
+# Shipped hashes
+
+At the time of this scaffold, no proving tx hashes have been appended yet.
+`/status` and `/resources/addresses` therefore render these contracts as **simulated**
+until this section contains entries.
+
 Verified explorer URLs:
 
 - Testnet: `https://testnet.monadvision.com/address/<addr>`
