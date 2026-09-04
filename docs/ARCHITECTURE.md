@@ -56,3 +56,19 @@ Kuru path wires vault asset to Kuru USDC and base to real WMON.
 
 Measured depth lives in [`CAPACITY.md`](./CAPACITY.md). Genesis AUM is capped
 by realised slippage on that book — not by hope.
+
+## Ship checklist (when book has asks + `DEPLOYER_PK`)
+
+```bash
+# 1) deploy adapter
+forge script script/DeployKuruRouter.s.sol:DeployKuruRouter \
+  --rpc-url $MONAD_TESTNET_RPC --broadcast --slow
+
+# 2) one real swap (QUOTE_IN default = 1 USDC)
+KURU_ROUTER=0x… forge script script/SwapViaKuruRouter.s.sol:SwapViaKuruRouter \
+  --rpc-url $MONAD_TESTNET_RPC --broadcast --slow
+
+# 3) verify (scaffold API — see .agents/skills/scaffold)
+# 4) append TX_KURU_SPOT to docs/ADDRESSES.md
+# 5) only then: Kuru logo ON, SIM chip off the spot leg
+```
