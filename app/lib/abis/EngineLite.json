@@ -25,19 +25,6 @@
   },
   {
     "type": "function",
-    "name": "SLIPPAGE_BPS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "SPOT_PNL_CAP_BPS",
     "inputs": [],
     "outputs": [
@@ -85,7 +72,13 @@
   {
     "type": "function",
     "name": "deployLiquidity",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "minBaseOut",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -175,7 +168,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IUniswapV2Router02"
+        "internalType": "contract IRouter"
       }
     ],
     "stateMutability": "view"
@@ -209,7 +202,13 @@
   {
     "type": "function",
     "name": "unwind",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "minQuoteOut",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -446,6 +445,11 @@
   },
   {
     "type": "error",
+    "name": "MinOutZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NoPosition",
     "inputs": []
   },
@@ -484,11 +488,6 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "Slippage",
-    "inputs": []
   },
   {
     "type": "error",

@@ -544,28 +544,113 @@ export function ChainVesselProvider({ children }: { children: ReactNode }) {
           }),
         ),
       deployLiquidity: () =>
-        runTx("Deploy hedge", async () =>
-          writeContractAsync({
+        runTx("Deploy hedge", async () => {
+          if (!publicClient) throw new Error("no client");
+          const routerAbi = [
+            {
+              type: "function",
+              name: "quoteExactQuoteForBase",
+              stateMutability: "view",
+              inputs: [{ name: "quoteIn", type: "uint256" }],
+              outputs: [{ name: "", type: "uint256" }],
+            },
+          ] as const satisfies Abi;
+          const [routerAddr, deployable] = await Promise.all([
+            publicClient.readContract({
+              address: ADDRESSES.EngineLite,
+              abi: engineAbi,
+              functionName: "router",
+            }) as Promise<`0x${string}`>,
+            publicClient.readContract({
+              address: ADDRESSES.BlitzVault,
+              abi: vaultAbi,
+              functionName: "deployable",
+            }) as Promise<bigint>,
+          ]);
+          const toSpot = deployable / 2n;
+          const minBaseOut = (await publicClient.readContract({
+            address: routerAddr,
+            abi: routerAbi,
+            functionName: "quoteExactQuoteForBase",
+            args: [toSpot],
+          })) as bigint;
+          if (minBaseOut === 0n) throw new Error("minBaseOut is 0 — book empty or quote failed");
+          return writeContractAsync({
             address: ADDRESSES.EngineLite,
             abi: engineAbi,
             functionName: "deployLiquidity",
+            args: [minBaseOut],
             gas: await estimate(
               ADDRESSES.EngineLite,
               engineAbi,
               "deployLiquidity",
               GAS_CEILING.deployLiquidity,
+              [minBaseOut],
             ),
-          }),
-        ),
+          });
+        }),
       unwind: () =>
-        runTx("Unwind hedge", async () =>
-          writeContractAsync({
+        runTx("Unwind hedge", async () => {
+          if (!publicClient) throw new Error("no client");
+          const routerAbi = [
+            {
+              type: "function",
+              name: "quoteExactBaseForQuote",
+              stateMutability: "view",
+              inputs: [{ name: "baseIn", type: "uint256" }],
+              outputs: [{ name: "", type: "uint256" }],
+            },
+          ] as const satisfies Abi;
+          const [routerAddr, wmonAddr] = await Promise.all([
+            publicClient.readContract({
+              address: ADDRESSES.EngineLite,
+              abi: engineAbi,
+              functionName: "router",
+            }) as Promise<`0x${string}`>,
+            publicClient.readContract({
+              address: ADDRESSES.EngineLite,
+              abi: engineAbi,
+              functionName: "wmon",
+            }) as Promise<`0x${string}`>,
+          ]);
+          const wmonBal = (await publicClient.readContract({
+            address: wmonAddr,
+            abi: [
+              {
+                type: "function",
+                name: "balanceOf",
+                stateMutability: "view",
+                inputs: [{ name: "account", type: "address" }],
+                outputs: [{ name: "", type: "uint256" }],
+              },
+            ] as const satisfies Abi,
+            functionName: "balanceOf",
+            args: [ADDRESSES.EngineLite],
+          })) as bigint;
+          // No spot left — still need a non-zero floor only when bal>0; engine
+          // skips the swap when bal==0, but reverts if bal>0 and minOut==0.
+          const minQuoteOut =
+            wmonBal === 0n
+              ? 1n
+              : ((await publicClient.readContract({
+                  address: routerAddr,
+                  abi: routerAbi,
+                  functionName: "quoteExactBaseForQuote",
+                  args: [wmonBal],
+                })) as bigint);
+          if (wmonBal > 0n && minQuoteOut === 0n) {
+            throw new Error("minQuoteOut is 0 — book empty or quote failed");
+          }
+          return writeContractAsync({
             address: ADDRESSES.EngineLite,
             abi: engineAbi,
             functionName: "unwind",
-            gas: await estimate(ADDRESSES.EngineLite, engineAbi, "unwind", GAS_CEILING.unwind),
-          }),
-        ),
+            args: [minQuoteOut],
+            gas: await estimate(ADDRESSES.EngineLite, engineAbi, "unwind", GAS_CEILING.unwind, [
+              minQuoteOut,
+            ]),
+          });
+        }),
       connectors: connectors.map((c) => ({ id: c.id, name: c.name, ready: true })),
       connect: async (connectorId?: string) => {
         try {

@@ -19,6 +19,7 @@ const want = new Set([
   "PerplVenue",
   "MockWMON",
   "MockRouter",
+  "KuruRouter",
 ]);
 
 function walk(dir, acc = []) {

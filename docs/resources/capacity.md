@@ -16,5 +16,8 @@ For Perpl, the operational capacity cap is driven by:
 2. Confirm the keeper’s sizing inputs match the exact hedge instruments.
 3. Confirm you can replay the sizing arithmetic from the public inputs the keeper claims.
 
-This page is intentionally conservative: it avoids publishing any “measured depth” numbers until those measurements are written to this repo and can be replayed from public reads.
+This page is intentionally conservative: measured numbers live in
+[`../CAPACITY.md`](../CAPACITY.md). As of the 2026-09-04 probe the official
+Kuru MON-USDC book had **no ask liquidity** (block `59560667`) — genesis AUM
+for a live spot path is therefore zero until makers return.
 

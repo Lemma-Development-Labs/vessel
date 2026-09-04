@@ -12,7 +12,8 @@ It is written so a stranger can replay the hedge **from public reads** without t
 
 ### Contract
 
-- `EngineLite` — reads spot as “pool mid mark” by routing the current `wmon` balance through its `router.getAmountsOut`.
+- `EngineLite` — reads spot as “router mark” by routing the current `wmon`
+  balance through `IRouter.quoteExactBaseForQuote` (MockRouter or KuruRouter).
 
 ### Call (example)
 
@@ -25,15 +26,15 @@ cast call $ENGINE "router()(address)" --rpc-url $RPC || true
 # 2) read engine-held WMON balance (spot input amount)
 cast call <WMON> "balanceOf(address)(uint256)" $ENGINE --rpc-url $RPC
 
-# 3) recompute routed dUSD output (spot mark)
-cast call <ROUTER> "getAmountsOut(uint256,address[])(uint256[])" \
-  <WMON_BAL> "[\"<WMON>\",\"<DUSD>\"]" --rpc-url $RPC
+# 3) recompute routed quote output (spot mark)
+cast call <ROUTER> "quoteExactBaseForQuote(uint256)(uint256)" \
+  <WMON_BAL> --rpc-url $RPC
 ```
 
 ### Expected output shape
 
 - `balanceOf(...)` returns a single `uint256`.
-- `getAmountsOut(...)` returns a `uint256[]` whose element `[1]` is the routed dUSD output.
+- `quoteExactBaseForQuote(...)` returns the marked quote value (6dec).
 
 ---
 

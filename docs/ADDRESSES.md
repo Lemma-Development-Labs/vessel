@@ -24,6 +24,14 @@ At the time of this scaffold, no proving tx hashes have been appended yet.
 `/status` and `/resources/addresses` therefore render these contracts as **simulated**
 until this section contains entries.
 
+```
+# Shipped hashes
+# TX_KURU_SPOT   <pending>   —   2026-09-04   blocked: MON-USDC bestAsk=0 @ block 59560667; no DEPLOYER_PK in this agent env
+```
+
+Kuru logo / “spot on Kuru” copy stays **off** until `TX_KURU_SPOT` is a real
+vault-path fill hash. MockRouter remains the live testnet spot adapter until then.
+
 Verified explorer URLs:
 
 - Testnet: `https://testnet.monadvision.com/address/<addr>`
