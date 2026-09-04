@@ -6,6 +6,8 @@
     "sync-abis": "node scripts/sync.mjs",
     "verify:manifest": "node scripts/verify-manifest.mjs",
     "keeper": "tsx --env-file=.env scripts/keeper.ts",
+    "keeper:perpl": "npm --prefix keeper run keeper",
+    "keeper:perpl:test": "npm --prefix keeper test",
     "e2e": "tsx --env-file=.env scripts/e2e.ts",
     "measure:depth": "tsx script/measureDepth.ts",
     "test": "forge test --root contracts",
