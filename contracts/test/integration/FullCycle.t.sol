@@ -37,7 +37,7 @@ contract FullCycleTest is Fixture {
         uint256 deployable = vault.deployable();
         assertEq(deployable, 810e6);
 
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         assertEq(vault.deployed(), 810e6);
         assertEq(engine.shortId(), 1);
         assertEq(engine.netDelta(), 0);
@@ -51,7 +51,7 @@ contract FullCycleTest is Fixture {
         vm.warp(block.timestamp + 7 days);
         engine.crank();
 
-        engine.unwind();
+        engine.unwind(_minQuoteOut());
         assertEq(engine.shortId(), 0);
         assertEq(IERC20(address(wmon)).balanceOf(address(engine)), 0);
 

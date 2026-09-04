@@ -53,9 +53,10 @@ contract EngineLiteTest is Fixture {
     }
 
     function test_alreadyDeployedReverts() public {
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
+        uint256 minBaseForExpect = _minBaseOut();
         vm.expectRevert(EngineLite.AlreadyDeployed.selector);
-        engine.deployLiquidity();
+        engine.deployLiquidity(minBaseForExpect);
     }
 
     function test_crankWithoutPositionIsZeroGross() public {
@@ -67,7 +68,7 @@ contract EngineLiteTest is Fixture {
     }
 
     function test_negativeSpotPnlIsCapped() public {
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         uint256 bal = wmon.balanceOf(address(engine));
         vm.prank(address(router));
         wmon.burn(address(engine), bal / 2);
@@ -89,9 +90,9 @@ contract EngineLiteTest is Fixture {
     }
 
     function test_unwindAfterDeployClearsBook() public {
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         assertGt(engine.shortId(), 0);
-        engine.unwind();
+        engine.unwind(_minQuoteOut());
         assertEq(engine.shortId(), 0);
         assertEq(wmon.balanceOf(address(engine)), 0);
         assertEq(vault.totalAssets(), dusd.balanceOf(address(vault)) + vault.deployed());

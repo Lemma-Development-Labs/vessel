@@ -205,10 +205,28 @@ async function main() {
   })) as bigint;
   let deployTx = "—";
   if (shortId === 0n) {
+    const routerAddr = (await publicClient.readContract({
+      address: C.EngineLite,
+      abi: engineAbi,
+      functionName: "router",
+    })) as Address;
+    const deployable = (await publicClient.readContract({
+      address: C.BlitzVault,
+      abi: parseAbi(["function deployable() view returns (uint256)"]),
+      functionName: "deployable",
+    })) as bigint;
+    const minBaseOut = (await publicClient.readContract({
+      address: routerAddr,
+      abi: parseAbi(["function quoteExactQuoteForBase(uint256) view returns (uint256)"]),
+      functionName: "quoteExactQuoteForBase",
+      args: [deployable / 2n],
+    })) as bigint;
+    if (minBaseOut === 0n) throw new Error("minBaseOut is 0");
     deployTx = await wallet.writeContract({
       address: C.EngineLite,
       abi: engineAbi,
       functionName: "deployLiquidity",
+      args: [minBaseOut],
       gas: GAS.deployLiquidity,
     });
     await publicClient.waitForTransactionReceipt({ hash: deployTx as Hex });
@@ -331,10 +349,37 @@ async function main() {
 
   // Full Hull exit needs vault idle. After deployLiquidity 90% is away — unwind first
   // so cash is in the vault (documented idle-buffer / unwind path).
+  const routerAddr2 = (await publicClient.readContract({
+    address: C.EngineLite,
+    abi: engineAbi,
+    functionName: "router",
+  })) as Address;
+  const wmonAddr = (await publicClient.readContract({
+    address: C.EngineLite,
+    abi: engineAbi,
+    functionName: "wmon",
+  })) as Address;
+  const wmonBal = (await publicClient.readContract({
+    address: wmonAddr,
+    abi: erc20,
+    functionName: "balanceOf",
+    args: [C.EngineLite],
+  })) as bigint;
+  const minQuoteOut =
+    wmonBal === 0n
+      ? 1n
+      : ((await publicClient.readContract({
+          address: routerAddr2,
+          abi: parseAbi(["function quoteExactBaseForQuote(uint256) view returns (uint256)"]),
+          functionName: "quoteExactBaseForQuote",
+          args: [wmonBal],
+        })) as bigint);
+  if (wmonBal > 0n && minQuoteOut === 0n) throw new Error("minQuoteOut is 0");
   const unwindTx = await wallet.writeContract({
     address: C.EngineLite,
     abi: engineAbi,
     functionName: "unwind",
+    args: [minQuoteOut],
     gas: GAS.deployLiquidity,
   });
   const recUnw = await publicClient.waitForTransactionReceipt({ hash: unwindTx });

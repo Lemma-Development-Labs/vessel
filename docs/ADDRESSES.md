@@ -18,6 +18,31 @@ Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` 57874280
 | MockWMON | re-run Deploy | [`0x17141F36c4401C6184143250827713b26c3E964F`](https://testnet.monadvision.com/address/0x17141F36c4401C6184143250827713b26c3E964F) | — | Sourcify |
 | MockRouter | re-run Deploy | [`0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C`](https://testnet.monadvision.com/address/0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C) | — | Sourcify |
 
+# Shipped hashes
+
+At the time of this scaffold, no proving tx hashes have been appended yet.
+`/status` and `/resources/addresses` therefore render these contracts as **simulated**
+until this section contains entries.
+
+```
+# Shipped hashes
+# TX_KURU_SPOT   <pending>   —   2026-09-04   blocked: MON-USDC bestAsk=0 @ block 59560667; no DEPLOYER_PK in this agent env
+# PERPL_KEEPER_ORDER  <pending>  —  2026-09-04  blocked: no PERPL_API_KEY in agent env; see keeper/README.md
+```
+
+Perpl testnet references (api-docs 2026-09-04):
+
+| Ref | Address / value |
+| --- | --- |
+| Exchange | `0x1964c32f0be608e7d29302aff5e61268e72080cc` |
+| Collateral (docs README) | `0xdf5b718d8fcc173335185a2a1513ee8151e3c027` (USD) |
+| Collateral (live `/v1/pub/context`) | `0xa9012a055bd4e0edff8ce09f960291c09d5322dc` (AUSD) — **GATE-0 drift** |
+| MON market id | `64` |
+
+Kuru logo / “spot on Kuru” copy stays **off** until `TX_KURU_SPOT` is a real
+vault-path fill hash. MockRouter remains the live testnet spot adapter until then.
+Perpl logo / “integrated with Perpl” stays **off** until `PERPL_KEEPER_ORDER` is real.
+
 Verified explorer URLs:
 
 - Testnet: `https://testnet.monadvision.com/address/<addr>`

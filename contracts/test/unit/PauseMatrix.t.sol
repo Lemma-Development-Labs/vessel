@@ -82,10 +82,12 @@ contract PauseMatrixTest is Fixture {
 
         vm.expectRevert(EngineLite.Paused.selector);
         engine.crank();
+        uint256 minBaseForExpect = _minBaseOut();
         vm.expectRevert(EngineLite.Paused.selector);
-        engine.deployLiquidity();
+        engine.deployLiquidity(minBaseForExpect);
+        uint256 minQuoteForExpect = _minQuoteOut();
         vm.expectRevert(EngineLite.Paused.selector);
-        engine.unwind();
+        engine.unwind(minQuoteForExpect);
         vm.prank(owner);
         vm.expectRevert(EngineLite.Paused.selector);
         engine.wire(address(1), address(1), address(1), address(1), address(1));
