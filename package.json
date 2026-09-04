@@ -7,7 +7,9 @@
     "verify:manifest": "node scripts/verify-manifest.mjs",
     "keeper": "tsx --env-file=.env scripts/keeper.ts",
     "e2e": "tsx --env-file=.env scripts/e2e.ts",
+    "measure:depth": "tsx script/measureDepth.ts",
     "test": "forge test --root contracts",
+    "test:fork": "forge test --root contracts --fork-url ${MONAD_TESTNET_RPC:-https://testnet-rpc.monad.xyz} --match-path 'test/fork/*'",
     "test:fuzz": "forge test --root contracts --fuzz-runs 10000",
     "test:ci": "FOUNDRY_PROFILE=ci forge test --root contracts --fuzz-runs 25000",
     "secrets": "node scripts/check-secrets.mjs"

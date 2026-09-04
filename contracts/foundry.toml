@@ -17,6 +17,8 @@ use_literal_content = true
 [profile.testnet]
 eth-rpc-url = "https://testnet-rpc.monad.xyz"
 chain_id = 10143
+# Fork tests that touch Monad: `forge test --fork-url $MONAD_TESTNET_RPC --match-path 'test/fork/*'`
+# (createSelectFork alone fails when the default EVM is ethereum against a monad RPC.)
 
 [profile.mainnet]
 eth-rpc-url = "https://rpc.monad.xyz"

@@ -31,8 +31,9 @@ contract GuardianTest is Fixture {
 
         vm.expectRevert(EngineLite.Paused.selector);
         engine.crank();
+        uint256 minBaseForExpect = _minBaseOut();
         vm.expectRevert(EngineLite.Paused.selector);
-        engine.deployLiquidity();
+        engine.deployLiquidity(minBaseForExpect);
     }
 
     function test_viewsWorkWhilePaused() public {
