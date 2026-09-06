@@ -24,6 +24,19 @@ At the time of this scaffold, no proving tx hashes have been appended yet.
 `/status` and `/resources/addresses` therefore render these contracts as **simulated**
 until this section contains entries.
 
+```
+# Perpl (prompt 02) — 2026-09-06
+# EXCHANGE (proxy)     0x1964C32f0bE608E7D29302AFF5E61268E72080cc   EIP-1967 → impl 0x5dce9e6a404b1971aec34a30212337717a7232d1
+# MARKET               64 (MON)   priceDecimals=5 lotDecimals=0
+# PERPL_POSITION_READER  <pending deploy>   —   blocked: no DEPLOYER_PK in this agent env
+# PERPL_VENUE            <pending deploy>   —   blocked: no DEPLOYER_PK in this agent env
+# TX_PERPL_SHORT         <pending>          —   blocked: keeper account + off-chain short not posted this session
+# PERPL_ACCOUNT_ID       <pending>          —   keeper EOA owns the Perpl account (Vessel does not custody margin)
+```
+
+Perpl logo / “short on Perpl” copy stays **off** until `TX_PERPL_SHORT` is a real
+hash. `SimVenue` remains the live engine venue until EngineLite is re-wired.
+
 Verified explorer URLs:
 
 - Testnet: `https://testnet.monadvision.com/address/<addr>`

@@ -7,7 +7,9 @@ import {Guardian} from "../src/guards/Guardian.sol";
 import {BlitzVault} from "../src/BlitzVault.sol";
 import {Tranches} from "../src/Tranches.sol";
 import {SimVenue} from "../src/venues/SimVenue.sol";
-import {PerplVenue} from "../src/venues/PerplVenue.stub.sol";
+import {PerplPositionReader} from "../src/venues/PerplPositionReader.sol";
+import {PerplVenue} from "../src/venues/PerplVenue.sol";
+import {MockPerplExchange} from "../test/mocks/MockPerplExchange.sol";
 import {EngineLite} from "../src/EngineLite.sol";
 import {MockWMON} from "../src/mocks/MockWMON.sol";
 import {MockRouter} from "../src/mocks/MockRouter.sol";
@@ -19,6 +21,7 @@ contract Deploy is Script {
     BlitzVault internal vault;
     Tranches internal tranches;
     SimVenue internal venue;
+    PerplPositionReader internal perplReader;
     PerplVenue internal perpl;
     MockWMON internal wmon;
     MockRouter internal router;
@@ -41,7 +44,10 @@ contract Deploy is Script {
         vault = new BlitzVault(dusd, address(guardian));
         tranches = new Tranches(address(vault), address(guardian), owner);
         venue = new SimVenue(address(dusd), owner);
-        perpl = new PerplVenue();
+        // Local/anvil: mock exchange. Live testnet deploy uses Exchange proxy via env.
+        MockPerplExchange perplEx = new MockPerplExchange();
+        perplReader = new PerplPositionReader(address(perplEx), 64, 5, 0);
+        perpl = new PerplVenue(address(perplReader), owner, 100);
         wmon = new MockWMON();
         router = new MockRouter(address(dusd), address(wmon));
         wmon.setRouter(address(router));
@@ -81,6 +87,7 @@ contract Deploy is Script {
         vm.serializeAddress(c, "Hull", address(tranches.hullToken()));
         vm.serializeAddress(c, "Ballast", address(tranches.ballastToken()));
         vm.serializeAddress(c, "SimVenue", address(venue));
+        vm.serializeAddress(c, "PerplPositionReader", address(perplReader));
         vm.serializeAddress(c, "PerplVenue", address(perpl));
         vm.serializeAddress(c, "EngineLite", address(engine));
         vm.serializeAddress(c, "MockWMON", address(wmon));

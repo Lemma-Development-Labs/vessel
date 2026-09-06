@@ -16,13 +16,21 @@ There are **three different dollar tokens** on Monad testnet (chainId `10143`). 
 
 - **Circle USDC** (exists; **no Kuru market**): `0x534b2f3A21130d7a60830c2Df862319e593943A3`
 - **Kuru testnet USDC** (the **vault asset** / quote token of the official MON-USDC market): `0x3bA3d39AFcf8bb994f7964B3e0171Ea2Ba361570`
-- **Perpl testnet collateral ("USD")** (Perpl margin only; sourced from Perpl’s faucet, **not** swapped from the vault): `0xdf5b718d8fcc173335185a2a1513ee8151e3c027`
+- **Perpl testnet collateral** (Perpl margin only; sourced from Perpl’s faucet / testnet path, **not** swapped from the vault):
+  - Product board (historical USD): `0xdf5b718d8fcc173335185a2a1513ee8151e3c027` (symbol `USD`, 6dec — still on-chain)
+  - **Live Perpl `/v1/pub/context` + docs.perpl.xyz Networks (2026-09-06):** aUSD `0xa9012a055bd4e0edff8ce09f960291c09d5322dc` (instance collateral_token_id=1)
+  - **[GATE-0]** These disagree. Do not assume they are the same token. Confirm faucet + `createAccount` against the live context token before posting `TX_PERPL_SHORT`.
 
 Mainnet AUSD at `0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a` does **not** exist on testnet. If you reuse mainnet addresses in a testnet path, you have failed the session.
 
 ## Keeper custody + key loss
 
-This system is permissionlessly crankable, but keeper operations do require custody of the right keys and reliable transaction submission. If the keeper key is lost or never funded, the hedge can stop being maintained and your waterfall can become stale.
+**The keeper EOA owns the Perpl account. Vessel does not custody venue margin
+on-chain this cycle.** Orders are signed off-chain; `PerplVenue` only records
+intent and reads Exchange truth. If the keeper key is lost, drained, or never
+funded, the short leg can diverge from intent and the waterfall can go stale.
+Permissionless crank still needs a funded EOA for gas. See
+[`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## Oracle / price risk on a thin CLOB
 

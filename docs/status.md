@@ -14,6 +14,7 @@ This page is generated from `docs/ADDRESSES.md` to keep “live vs simulated” 
 | Hull | Deployed at `0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12` on Monad testnet. | simulated | — |
 | MockRouter | Deployed at `0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C` on Monad testnet. | simulated | — |
 | MockWMON | Deployed at `0x17141F36c4401C6184143250827713b26c3E964F` on Monad testnet. | simulated | — |
-| PerplVenue | Deployed at `0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21` on Monad testnet. | simulated | — |
+| PerplPositionReader | Code complete; testnet deploy pending (no DEPLOYER_PK this session). | simulated | — |
+| PerplVenue | Live reader+intent venue on branch (stub replaced). On-chain address still prior stub until redeploy: Deployed at `0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21` on Monad testnet. | simulated | — |
 | SimVenue | Deployed at `0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7` on Monad testnet. | simulated | — |
 | Tranches | Deployed at `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842` on Monad testnet. | simulated | — |
