@@ -20,8 +20,9 @@ import { UnwindCard } from "@/components/exit-flow";
 import type { WaterfallEvent } from "@/lib/provider";
 
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
-
-/** One crank interval. Older reads render dim with an age label. */
+/** Perpl MON market id (testnet). Documented in Perpl api-docs. */
+const PERPL_MON_MARKET_ID = 64;
+/** One crank interval — older reads render amber with age. */
 const STALE_AFTER_SEC = 300;
 
 export function TransparencyScreen() {
@@ -40,8 +41,8 @@ export function TransparencyScreen() {
   const undeployed = shortId === 0n;
   const simulated = valueOrForLogic(v.engine.simulated, true);
 
-  // Perpl public position API is not wired for anonymous account reads yet —
-  // surface that honestly so on-chain vs API can disagree when it is.
+  // Public Perpl position API is not wired for anonymous account reads yet.
+  // Surface that honestly so on-chain vs API can disagree when it is.
   const apiNotional: Live<bigint> = unavailable(
     accountParam
       ? `Perpl API position for account ${accountParam} — not wired (no verified public position endpoint)`
@@ -56,6 +57,8 @@ export function TransparencyScreen() {
 
   const castBlock = useMemo(() => netDeltaCastBlock(), []);
   const envioTape = useMemo(() => crankTapeLive(), []);
+  // Cumulative funding from Envio stays GATE-0 until HyperIndex schema is verified.
+  // On-chain accrued (below) is the live read; indexer cumulative renders Unavailable.
 
   useEffect(() => {
     let cancelled = false;
@@ -106,25 +109,34 @@ export function TransparencyScreen() {
         The hedge is public, every block.
       </h1>
       <p className="mt-3 max-w-xl text-base text-dim">
-        Everything the engine does, visible and live. Demo dollars. Unaudited.
+        If you can&apos;t verify the hedge, you don&apos;t own the yield. Demo dollars. Unaudited.
         {accountParam ? (
           <>
             {" "}
             Viewing Perpl account <span className="num text-ink">{accountParam}</span>.
           </>
-        ) : null}
+        ) : (
+          <>
+            {" "}
+            Pass <span className="num">?account=</span> for a standalone Perpl account view.
+          </>
+        )}
       </p>
       <p className="mt-3 text-sm text-dim">
-        Every number on this page is a chain read. Anything we could not read shows as{" "}
+        Every number on this page is a <span className="num">Live&lt;T&gt;</span> chain or indexer
+        read. Anything we could not read shows as{" "}
         <span className="num text-steel/60">—</span>, never as a zero.
       </p>
 
+      {/* 1. Position */}
       <Card className="mt-10 p-5 md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="display text-lg">{undeployed ? "The hedge, pending" : "The hedge, live"}</h2>
+            <h2 className="display text-lg">
+              {undeployed ? "Position — pending" : "Position — live"}
+            </h2>
             <p className="num mt-1 text-[11.5px] text-steel">
-              last update: block{" "}
+              market MON · id {PERPL_MON_MARKET_ID} · block{" "}
               <Val of={v.engine.lastBlock}>{(b) => b.toLocaleString()}</Val> ·{" "}
               <Val of={v.engine.lastCrankTs}>
                 {(t) => (t > 0n ? `${Math.max(0, nowSec - Number(t))}s ago` : "no crank yet")}
@@ -140,7 +152,7 @@ export function TransparencyScreen() {
 
         <div className="mt-6 overflow-hidden rounded-xl border border-white/8">
           <HedgeRow
-            label="SPOT LEG"
+            label="SPOT"
             a={
               <Val of={v.engine.spotQty} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
                 {(q) => `WMON ${formatWmon(q)}`}
@@ -148,13 +160,17 @@ export function TransparencyScreen() {
             }
             b={
               <Val of={v.engine.spotValue} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(x) => `value ${formatDusd(x)} dUSD`}
+                {(x) => `mark ${formatDusd(x)} dUSD`}
               </Val>
             }
-            c={simulated ? "MockRouter" : "DEX router"}
+            c={
+              <span className="text-steel/70">
+                source: EngineLite @ {ADDRESSES.EngineLite.slice(0, 8)}…
+              </span>
+            }
           />
           <HedgeRow
-            label="SHORT LEG"
+            label="SHORT"
             a={
               <Val of={v.engine.shortNotional} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
                 {(n) => `notional ${formatDusd(n)} dUSD`}
@@ -162,8 +178,9 @@ export function TransparencyScreen() {
             }
             b={<Val of={v.engine.venueName}>{(n) => n}</Val>}
             c={
-              <span className="text-steel/60" title="SimVenue does not expose a margin balance.">
-                margin not exposed by venue
+              <span className="text-steel/60" title="SimVenue does not expose margin.">
+                margin not exposed by venue · shortId{" "}
+                <Val of={v.engine.shortId}>{(id) => id.toString()}</Val>
               </span>
             }
             amber={simulated}
@@ -172,13 +189,19 @@ export function TransparencyScreen() {
             label="FUNDING"
             a={
               <Val of={v.engine.fundingAccrued} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(f) => `accrued ${f >= 0n ? "+" : ""}${formatDusd4(f)} dUSD`}
+                {(f) => `on-chain ${f >= 0n ? "+" : ""}${formatDusd4(f)} dUSD`}
               </Val>
             }
             b={
               <Val of={v.engine.fundingRateBps}>
                 {(r) => `rate ${(Number(r) / 100).toFixed(2)}% APR`}
               </Val>
+            }
+            c={
+              <span className="text-steel/60">
+                indexer cumulative:{" "}
+                <Unavailable reason="Cumulative funding from Envio — GATE-0: HyperIndex schema unverified" />
+              </span>
             }
             phosphor
           />
@@ -196,7 +219,9 @@ export function TransparencyScreen() {
           <p className="mt-4 text-sm text-phosphor">On-chain and API notional agree.</p>
         )}
 
+        {/* 2. Net delta */}
         <div className="mt-6">
+          <p className="num mb-2 text-[10.5px] tracking-[0.14em] text-steel">NET DELTA</p>
           {v.engine.netDeltaBps.status === "ok" ? (
             <Gauge pct={Number(v.engine.netDeltaBps.value) / 100} freeze={freeze} />
           ) : (
@@ -205,6 +230,14 @@ export function TransparencyScreen() {
               reason={`net delta unavailable — ${v.engine.netDeltaBps.reason}`}
             />
           )}
+          <p className="num mt-2 text-[11px] text-steel">
+            absolute:{" "}
+            <Val of={v.engine.netDelta} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
+              {(d) => `${formatDusd(d)} dUSD`}
+            </Val>
+            {" · "}
+            published band ±1.00%
+          </p>
         </div>
 
         <p className="mt-4 text-sm text-dim">
@@ -239,12 +272,17 @@ export function TransparencyScreen() {
         </pre>
       </Card>
 
+      {/* 6. Capacity */}
       <Card className="mt-6 p-5 sm:p-6">
         <h2 className="display text-lg">Capacity</h2>
         <p className="mt-2 text-sm text-dim">
           Kuru MON-USDC depth probes (2026-09-04) found an empty ask book — genesis AUM for a live
-          spot path is zero until makers return. See{" "}
-          <a href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/CAPACITY.md" className="text-purple">
+          spot path is zero until makers return. Utilisation vs the ≤10–20% rule is undefined while
+          depth is zero. See{" "}
+          <a
+            href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/CAPACITY.md"
+            className="text-purple"
+          >
             docs/CAPACITY.md
           </a>
           .
@@ -267,12 +305,22 @@ export function TransparencyScreen() {
             <p className="text-ink">0</p>
           </div>
         </div>
+        <p className="num mt-3 text-[11px] text-steel">
+          our short notional:{" "}
+          <Val of={v.engine.shortNotional}>{(n) => `${formatDusd(n)} dUSD`}</Val>
+          {" · "}
+          utilisation:{" "}
+          <Unavailable reason="utilisation undefined while Kuru ask book is empty" />
+        </p>
       </Card>
 
+      {/* 7. Forced-negative sandbox */}
       <Card className="mt-6 border-amber/40 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="num text-[10.5px] tracking-[0.16em] text-amber">SANDBOX — simulated venue, not the live book</p>
+            <p className="num text-[10.5px] tracking-[0.16em] text-amber">
+              SANDBOX — simulated venue, not the live book
+            </p>
             <h2 className="display mt-2 text-lg">Forced-negative funding</h2>
             <p className="mt-2 max-w-xl text-sm text-dim">
               Project a negative funding settle against SimVenue maths. Hull principal stays flat;
@@ -341,11 +389,12 @@ export function TransparencyScreen() {
         </p>
       </Card>
 
+      {/* 5. Keeper health */}
       <Card className="mt-6 p-5 sm:p-6">
         <h2 className="display text-lg">Keeper health</h2>
         <p className="mt-2 text-sm text-dim">
-          Polled from <span className="num">NEXT_PUBLIC_KEEPER_URL</span> /health — never inferred
-          from silence.
+          Polled from <span className="num">NEXT_PUBLIC_KEEPER_URL</span>
+          /health — never inferred from silence. A visible halt is trust.
         </p>
         {!keeper ? (
           <p className="num mt-4 text-sm text-steel">Reading keeper…</p>
@@ -366,7 +415,7 @@ export function TransparencyScreen() {
               <p className="truncate text-ink">{keeper.value.source}</p>
             </div>
             <div>
-              <p className="text-steel">last decision</p>
+              <p className="text-steel">last decision (policy)</p>
               {keeper.value.lastDecision ? (
                 <p className="text-ink">
                   {keeper.value.lastDecision.kind}: {keeper.value.lastDecision.reason}
@@ -377,7 +426,7 @@ export function TransparencyScreen() {
               )}
             </div>
             <div>
-              <p className="text-steel">uptime</p>
+              <p className="text-steel">uptime / heartbeat</p>
               <p className="text-ink">
                 {keeper.value.uptimeMs != null
                   ? `${Math.floor(keeper.value.uptimeMs / 1000)}s`
@@ -396,6 +445,7 @@ export function TransparencyScreen() {
         </p>
       </Card>
 
+      {/* 4. Envio crank tape — GraphQL only, never keeper JSON */}
       <div className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="display text-lg">Envio crank tape</h2>
@@ -475,6 +525,7 @@ export function TransparencyScreen() {
         </p>
         <p className="mt-3 text-sm text-dim">
           EngineLite is wired to SimVenue + MockRouter. PerplVenue is deployed but not connected.
+          Explorer: {EXPLORER}
         </p>
       </section>
     </div>
