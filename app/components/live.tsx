@@ -52,7 +52,7 @@ export function Val<T>({
 
   if (!stale) {
     return (
-      <span className={className} data-live="ok" data-source={of.source}>
+      <span className={`text-phosphor ${className}`} data-live="ok" data-source={of.source}>
         {children(of.value)}
       </span>
     );
@@ -61,13 +61,13 @@ export function Val<T>({
   const age = nowSec !== undefined ? ageSec(of, nowSec) : null;
   return (
     <span
-      className={`text-steel/70 ${className}`}
+      className={`text-amber ${className}`}
       data-live="stale"
       data-source={of.source}
       title={`Last read ${age ?? "?"}s ago — older than one crank interval.`}
     >
       {children(of.value)}
-      <span className="num ml-1.5 text-[10px] text-steel/60">{age !== null ? `${fmtAge(age)} old` : "stale"}</span>
+      <span className="num ml-1.5 text-[10px] text-amber/80">{age !== null ? `${fmtAge(age)} old` : "stale"}</span>
     </span>
   );
 }

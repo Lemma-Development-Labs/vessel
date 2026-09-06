@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { useVessel } from "@/lib/context";
 import { COPY } from "@/lib/provider";
@@ -35,6 +35,8 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const v = useVessel();
   const path = usePathname();
+  const search = useSearchParams();
+  const embed = search.get("embed") === "1";
   const { toasts, dismissToast } = v;
 
   useEffect(() => {
@@ -45,6 +47,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       for (const id of timers) clearTimeout(id);
     };
   }, [toasts, dismissToast]);
+
+  if (embed) {
+    // Standalone tool surface for /transparency?embed=1 (Perpl analytics bounty).
+    return <div className="flex min-h-dvh flex-col bg-bg">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">

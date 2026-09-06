@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useVessel } from "@/lib/context";
 import { ADDRESSES } from "@/lib/addresses";
 import { formatDusd, formatDusd4, formatTs, formatWmon } from "@/lib/format";
 import { useNowSec } from "@/lib/now";
-import { map2, mapLive, valueOrForLogic } from "@/lib/live";
+import { unavailable, valueOrForLogic, type Live } from "@/lib/live";
 import { verificationOf } from "@/lib/verification";
+import { netDeltaCastBlock } from "@/lib/cast-verify";
+import { bigintEq, compareLive } from "@/lib/disagree";
+import { crankTapeLive } from "@/lib/envio-tape";
+import { fetchKeeperHealth, type KeeperHealth } from "@/lib/keeper-health";
+import { defaultSandboxLoss, projectNegativeFunding } from "@/lib/sandbox";
 import { AddressChip, Badge, Button, Card, Gauge, Skeleton } from "@/components/ui";
 import { ChartUnavailable, SourceChip, Unavailable, Val } from "@/components/live";
 import { DeployHedgeCta } from "@/components/hedge-cta";
@@ -21,11 +27,67 @@ const STALE_AFTER_SEC = 300;
 export function TransparencyScreen() {
   const v = useVessel();
   const nowSec = useNowSec();
+  const search = useSearchParams();
+  const accountParam = search.get("account");
   const [freeze, setFreeze] = useState(false);
+  const [sandboxOn, setSandboxOn] = useState(false);
+  const [copiedCast, setCopiedCast] = useState(false);
+  const [keeper, setKeeper] = useState<
+    { status: "ok"; value: KeeperHealth } | { status: "unavailable"; reason: string } | null
+  >(null);
 
   const shortId = valueOrForLogic(v.engine.shortId, 0n);
   const undeployed = shortId === 0n;
   const simulated = valueOrForLogic(v.engine.simulated, true);
+
+  // Perpl public position API is not wired for anonymous account reads yet —
+  // surface that honestly so on-chain vs API can disagree when it is.
+  const apiNotional: Live<bigint> = unavailable(
+    accountParam
+      ? `Perpl API position for account ${accountParam} — not wired (no verified public position endpoint)`
+      : "Perpl API position — pass ?account= to target a Perpl account; endpoint not verified",
+  );
+  const disagreement = compareLive(
+    v.engine.shortNotional,
+    apiNotional,
+    bigintEq,
+    (n) => formatDusd(n),
+  );
+
+  const castBlock = useMemo(() => netDeltaCastBlock(), []);
+  const envioTape = useMemo(() => crankTapeLive(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pull = () => {
+      void fetchKeeperHealth().then((h) => {
+        if (!cancelled) setKeeper(h);
+      });
+    };
+    pull();
+    const id = setInterval(pull, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const sandbox = useMemo(() => {
+    if (!sandboxOn) return null;
+    // Status guards sit immediately above each .value read (Rule 0).
+    if (v.deck.hullTvl.status !== "ok") return null;
+    const hull = v.deck.hullTvl.value;
+    if (v.deck.balTvl.status !== "ok") return null;
+    const bal = v.deck.balTvl.value;
+    if (v.deck.reserve.status !== "ok") return null;
+    const reserve = v.deck.reserve.value;
+    const loss = defaultSandboxLoss(bal);
+    return {
+      loss,
+      live: { hull, bal, reserve },
+      projected: projectNegativeFunding({ hullTvl: hull, balTvl: bal, reserve, loss }),
+    };
+  }, [sandboxOn, v.deck.hullTvl, v.deck.balTvl, v.deck.reserve]);
 
   if (v.loading) {
     return (
@@ -45,6 +107,12 @@ export function TransparencyScreen() {
       </h1>
       <p className="mt-3 max-w-xl text-base text-dim">
         Everything the engine does, visible and live. Demo dollars. Unaudited.
+        {accountParam ? (
+          <>
+            {" "}
+            Viewing Perpl account <span className="num text-ink">{accountParam}</span>.
+          </>
+        ) : null}
       </p>
       <p className="mt-3 text-sm text-dim">
         Every number on this page is a chain read. Anything we could not read shows as{" "}
@@ -94,9 +162,6 @@ export function TransparencyScreen() {
             }
             b={<Val of={v.engine.venueName}>{(n) => n}</Val>}
             c={
-              // SimVenue models no margin account, so we do not invent one.
-              // The old screen showed "margin = notional / 2", which was a
-              // guess presented in the same style as a reading.
               <span className="text-steel/60" title="SimVenue does not expose a margin balance.">
                 margin not exposed by venue
               </span>
@@ -119,11 +184,19 @@ export function TransparencyScreen() {
           />
         </div>
 
+        {disagreement.kind === "disagree" ? (
+          <p className="mt-4 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">
+            On-chain and API disagree: {disagreement.message}. Neither side is silently preferred.
+          </p>
+        ) : disagreement.kind === "incomplete" ? (
+          <p className="mt-4 text-sm text-dim">
+            Position cross-check incomplete — {disagreement.reason}
+          </p>
+        ) : (
+          <p className="mt-4 text-sm text-phosphor">On-chain and API notional agree.</p>
+        )}
+
         <div className="mt-6">
-          {/* The gauge previously had ±0.03% of random jitter added to make it
-              look alive. On the screen whose argument is "watch the hedge",
-              synthetic movement on the risk metric is the worst possible
-              flourish. It renders the read, or nothing. */}
           {v.engine.netDeltaBps.status === "ok" ? (
             <Gauge pct={Number(v.engine.netDeltaBps.value) / 100} freeze={freeze} />
           ) : (
@@ -133,6 +206,120 @@ export function TransparencyScreen() {
             />
           )}
         </div>
+
+        <p className="mt-4 text-sm text-dim">
+          Liquidation band:{" "}
+          <span className="text-steel/80">
+            not shown — Perpl docs do not publish a liquidation band for this market. Inventing one
+            would be the worst failure on a risk page.
+          </span>
+        </p>
+      </Card>
+
+      <Card className="mt-6 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-lg">Verify net delta</h2>
+          <Button
+            className="px-3 py-2 text-[12px] tracking-[0.08em]"
+            onClick={() => {
+              void navigator.clipboard.writeText(castBlock).then(() => {
+                setCopiedCast(true);
+                setTimeout(() => setCopiedCast(false), 2000);
+              });
+            }}
+          >
+            {copiedCast ? "COPIED" : "COPY CAST"}
+          </Button>
+        </div>
+        <p className="mt-2 text-sm text-dim">
+          A stranger reproducing the number from two terminal commands is the product.
+        </p>
+        <pre className="num mt-4 overflow-x-auto rounded-xl border border-line bg-bg2 p-4 text-[11px] leading-relaxed text-steel whitespace-pre-wrap">
+          {castBlock}
+        </pre>
+      </Card>
+
+      <Card className="mt-6 p-5 sm:p-6">
+        <h2 className="display text-lg">Capacity</h2>
+        <p className="mt-2 text-sm text-dim">
+          Kuru MON-USDC depth probes (2026-09-04) found an empty ask book — genesis AUM for a live
+          spot path is zero until makers return. See{" "}
+          <a href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/CAPACITY.md" className="text-purple">
+            docs/CAPACITY.md
+          </a>
+          .
+        </p>
+        <div className="num mt-4 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+          <div>
+            <p className="text-steel">emptyBook</p>
+            <p className="text-amber">true</p>
+          </div>
+          <div>
+            <p className="text-steel">bestAsk</p>
+            <p className="text-ink">0</p>
+          </div>
+          <div>
+            <p className="text-steel">1k USDC slip</p>
+            <p className="text-steel/60">—</p>
+          </div>
+          <div>
+            <p className="text-steel">genesis AUM</p>
+            <p className="text-ink">0</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mt-6 border-amber/40 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="num text-[10.5px] tracking-[0.16em] text-amber">SANDBOX — simulated venue, not the live book</p>
+            <h2 className="display mt-2 text-lg">Forced-negative funding</h2>
+            <p className="mt-2 max-w-xl text-sm text-dim">
+              Project a negative funding settle against SimVenue maths. Hull principal stays flat;
+              Ballast absorbs. Owner-only on chain — this toggle never writes.
+            </p>
+          </div>
+          <Button
+            className="px-3 py-2 text-[12px] tracking-[0.08em]"
+            onClick={() => setSandboxOn((x) => !x)}
+          >
+            {sandboxOn ? "HIDE SANDBOX" : "RUN SANDBOX"}
+          </Button>
+        </div>
+        {sandboxOn && !sandbox ? (
+          <p className="mt-4 text-sm text-dim">
+            Sandbox needs live Hull / Ballast / reserve reads —{" "}
+            <Unavailable reason="deck TVL unavailable for sandbox projection" />
+          </p>
+        ) : null}
+        {sandbox ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-line p-4">
+              <p className="num text-[10.5px] tracking-[0.14em] text-steel">LIVE</p>
+              <p className="num mt-3 text-[12px]">Hull {formatDusd(sandbox.live.hull)} dUSD</p>
+              <p className="num mt-1 text-[12px]">Ballast {formatDusd(sandbox.live.bal)} dUSD</p>
+              <p className="num mt-1 text-[12px]">Reserve {formatDusd(sandbox.live.reserve)} dUSD</p>
+            </div>
+            <div className="rounded-xl border border-amber/30 bg-amber/5 p-4">
+              <p className="num text-[10.5px] tracking-[0.14em] text-amber">
+                AFTER −{formatDusd(sandbox.loss)} dUSD FUNDING
+              </p>
+              <p className="num mt-3 text-[12px] text-phosphor">
+                Hull {formatDusd(sandbox.projected.hullTvl)} dUSD (unchanged)
+              </p>
+              <p className="num mt-1 text-[12px] text-amber">
+                Ballast {formatDusd(sandbox.projected.balTvl)} dUSD
+              </p>
+              <p className="num mt-1 text-[12px]">
+                Reserve {formatDusd(sandbox.projected.reserve)} dUSD
+              </p>
+              <p className="num mt-2 text-[11px] text-steel">
+                from Ballast {formatDusd4(sandbox.projected.fromBallast)} · from reserve{" "}
+                {formatDusd4(sandbox.projected.fromReserve)}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       <DeployHedgeCta className="mt-6" />
@@ -152,18 +339,76 @@ export function TransparencyScreen() {
         <p className="mt-3 text-center text-sm text-dim">
           Anyone can crank. Settlement is a public function.
         </p>
-        <p className="num mt-2 text-center text-[11px] text-steel">
-          {v.engine.keeperActive.status === "ok" && v.engine.keeperActive.value ? (
-            <>Hosted keeper is configured — see the status page for its last run.</>
+      </Card>
+
+      <Card className="mt-6 p-5 sm:p-6">
+        <h2 className="display text-lg">Keeper health</h2>
+        <p className="mt-2 text-sm text-dim">
+          Polled from <span className="num">NEXT_PUBLIC_KEEPER_URL</span> /health — never inferred
+          from silence.
+        </p>
+        {!keeper ? (
+          <p className="num mt-4 text-sm text-steel">Reading keeper…</p>
+        ) : keeper.status === "unavailable" ? (
+          <p className="mt-4 text-sm">
+            <Unavailable reason={keeper.reason} />
+          </p>
+        ) : (
+          <div className="num mt-4 grid gap-3 text-[12px] sm:grid-cols-2">
+            <div>
+              <p className="text-steel">state</p>
+              <p className={keeper.value.ok ? "text-phosphor" : "text-amber"}>
+                {keeper.value.ok ? "running" : "halted"} — {keeper.value.detail}
+              </p>
+            </div>
+            <div>
+              <p className="text-steel">source</p>
+              <p className="truncate text-ink">{keeper.value.source}</p>
+            </div>
+            <div>
+              <p className="text-steel">last decision</p>
+              {keeper.value.lastDecision ? (
+                <p className="text-ink">
+                  {keeper.value.lastDecision.kind}: {keeper.value.lastDecision.reason}
+                  {keeper.value.lastDecision.dryRun ? " · dry-run" : ""}
+                </p>
+              ) : (
+                <Unavailable reason="no decision recorded yet" />
+              )}
+            </div>
+            <div>
+              <p className="text-steel">uptime</p>
+              <p className="text-ink">
+                {keeper.value.uptimeMs != null
+                  ? `${Math.floor(keeper.value.uptimeMs / 1000)}s`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+        )}
+        <p className="num mt-3 text-[11px] text-steel">
+          Provider keeperActive:{" "}
+          {v.engine.keeperActive.status === "ok" ? (
+            <span className="text-phosphor">{v.engine.keeperActive.value ? "true" : "false"}</span>
           ) : (
-            <Unavailable reason={
-              v.engine.keeperActive.status === "unavailable"
-                ? v.engine.keeperActive.reason
-                : "no hosted keeper"
-            } />
+            <Unavailable reason={v.engine.keeperActive.reason} />
           )}
         </p>
       </Card>
+
+      <div className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-lg">Envio crank tape</h2>
+          <span className="num text-[10px] tracking-[0.1em] text-steel">GRAPHQL · NOT KEEPER JSON</span>
+        </div>
+        <Card className="mt-4 px-4 py-6">
+          {envioTape.status === "ok" ? (
+            <p className="text-sm text-dim">{envioTape.value.length} crank rows</p>
+          ) : (
+            <Unavailable reason={envioTape.reason} />
+          )}
+        </Card>
+      </div>
 
       <div className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -225,31 +470,17 @@ export function TransparencyScreen() {
           ))}
         </div>
         <p className="mt-3 text-sm text-dim">
-          Verification status is per contract, read from a generated manifest — a row shows
-          VERIFIED only where a verification run confirmed it. Anything not checked says so.
+          Verification status is per contract, read from a generated manifest — a row shows VERIFIED
+          only where a verification run confirmed it. Anything not checked says so.
         </p>
         <p className="mt-3 text-sm text-dim">
           EngineLite is wired to SimVenue + MockRouter. PerplVenue is deployed but not connected.
-          Recompute the reads yourself →{" "}
-          <a href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/proof-of-hedge.md" className="text-purple">
-            the proof-of-hedge runsheet
-          </a>
         </p>
       </section>
     </div>
   );
 }
 
-/**
- * Per-contract verification status.
- *
- * Every row used to carry a VERIFIED badge unconditionally, when only DemoUSD's
- * Sourcify verification had ever been confirmed. The badge is now a read of
- * lib/verification.ts (generated by `pnpm verify:manifest`): the `kind` passed
- * to Badge is the manifest's own state, never a literal, so a contract can only
- * be badged verified by a verification run that wrote that state and its
- * timestamp. Everything else renders dim and says which it is.
- */
 function VerificationMark({ name, address }: { name: string; address: string }) {
   const entry = verificationOf(name);
   const explorerHref = `${EXPLORER}/address/${address}`;
@@ -280,11 +511,7 @@ function VerificationMark({ name, address }: { name: string; address: string }) 
       <span className="num text-[11px] text-steel/60" title={why}>
         {label}
       </span>
-      <a
-        href={explorerHref}
-        className="num text-[11px] text-purple"
-        title="Check verification status on the explorer"
-      >
+      <a href={explorerHref} className="num text-[11px] text-purple" title="Check verification on explorer">
         explorer ↗
       </a>
     </span>
@@ -330,7 +557,6 @@ function WaterfallPlay({
   const hullShare = mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / mag);
 
   if (negative) {
-    // Width is the real Ballast share of the loss, not a fixed 62% bar.
     const absorbed = ev.fromBallast + ev.fromReserve;
     const balPct = absorbed === 0n ? 0 : Number((ev.fromBallast * 100n) / absorbed);
     return (
@@ -345,7 +571,7 @@ function WaterfallPlay({
           absorbed by Ballast {formatDusd4(ev.fromBallast)}
           {ev.fromReserve > 0n ? ` · reserve ${formatDusd4(ev.fromReserve)}` : ""}
         </p>
-        <Row ev={ev} />
+        <WaterfallMeta ev={ev} />
       </Card>
     );
   }
@@ -375,12 +601,12 @@ function WaterfallPlay({
           TO BALLAST +{formatDusd4(ev.toBallast)}
         </span>
       </div>
-      <Row ev={ev} />
+      <WaterfallMeta ev={ev} />
     </Card>
   );
 }
 
-function Row({ ev }: { ev: WaterfallEvent }) {
+function WaterfallMeta({ ev }: { ev: WaterfallEvent }) {
   return (
     <div className="num mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-steel">
       <span>{formatTs(ev.ts)}</span>
@@ -396,5 +622,3 @@ function Row({ ev }: { ev: WaterfallEvent }) {
     </div>
   );
 }
-
-export { map2, mapLive };
