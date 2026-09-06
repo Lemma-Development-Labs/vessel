@@ -11,8 +11,9 @@
   --purple-hover: #957fff;
   --brass: #c9964b;
   --steel: #8fa6bc;
-  --phosphor: #35d699;
-  --amber: #f0b35c;
+  /* Prompt 04 Live renderer: live = phosphor, stale = amber */
+  --phosphor: #3FB950;
+  --amber: #E3A008;
   --red: #e5646c;
   --radius-card: 16px;
   --radius-chip: 8px;
