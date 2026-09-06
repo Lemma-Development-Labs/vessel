@@ -105,6 +105,48 @@ contract PerplVenueUnitTest is Test {
         assertFalse(venue.isSimulated());
         assertEq(venue.venueName(), "PerplVenue");
     }
+
+    function test_positionReturnsZeroWhenAccountOrLotsEmpty() public view {
+        (int256 size0,,,,) = reader.position(0);
+        assertEq(size0, 0);
+        // account exists conceptually but no setPosition → lotLNS=0
+        (int256 sizeFlat,,,,) = reader.position(999);
+        assertEq(sizeFlat, 0);
+        (int256 nFlat,) = reader.notionalQuote(999);
+        assertEq(nFlat, 0);
+    }
+
+    function test_constructorRevertsOnBadArgs() public {
+        vm.expectRevert(PerplPositionReader.ZeroAddress.selector);
+        new PerplPositionReader(address(0), MARKET, 5, 0);
+        vm.expectRevert(PerplPositionReader.BadDecimals.selector);
+        new PerplPositionReader(address(exchange), MARKET, 7, 0); // > COLLATERAL_DECIMALS
+    }
+
+    function test_unknownPositionTypeReverts() public {
+        uint256 acc = exchange.setAccount(keeper, 1_000e6);
+        exchange.setPosition(MARKET, acc, 99, 100e6, 200_000, 10, 0); // invalid enum
+        vm.expectRevert(abi.encodeWithSelector(PerplPositionReader.UnknownPositionType.selector, uint8(99)));
+        reader.position(acc);
+    }
+
+    function test_notionalWithNonZeroLotDecimals() public {
+        PerplPositionReader scaled = new PerplPositionReader(address(exchange), MARKET, 5, 2);
+        uint256 acc = exchange.setAccount(makeAddr("scaled"), 1_000e6);
+        // lot=10000 (2dec), price=250000, scale 10 → notional = 10000*250000*10/100 = 250e6
+        exchange.setPosition(MARKET, acc, SHORT, 500e6, 250_000, 10_000, 0);
+        (int256 n,) = scaled.notionalQuote(acc);
+        assertEq(n, -int256(250e6));
+    }
+
+    function test_longPositionIsPositiveSize() public {
+        uint256 acc = exchange.setAccount(makeAddr("long"), 1_000e6);
+        exchange.setPosition(MARKET, acc, 0, 100e6, 200_000, 50, 0); // LONG
+        (int256 size,,,,) = reader.position(acc);
+        assertEq(size, 50);
+        (int256 n,) = reader.notionalQuote(acc);
+        assertEq(n, int256(100e6)); // 50 * 200000 * 10
+    }
 }
 
 /// @notice Same net-delta assertions against SimVenue vs PerplVenue (mock exchange).
