@@ -91,8 +91,8 @@ redeem — the last exiters could not be paid.
 | --- | --- | --- | --- |
 | `wire(...)` | deployer | none, **single-use** | Binds vault, tranches, venue, router, WMON. Reverts once wired. |
 | `crank()` | **anyone** | none | Sweeps funding, marks spot, settles. |
-| `deployLiquidity()` | **anyone** | none | Deploys up to 90% of vault assets into the hedge. |
-| `unwind()` | **anyone** | none | Closes the short, swaps WMON back, returns everything to the vault. |
+| `deployLiquidity(uint256 minBaseOut)` | **anyone** | none | Deploys up to 90% of vault assets into the hedge. `minBaseOut` is caller-supplied from the book. |
+| `unwind(uint256 minQuoteOut)` | **anyone** | none | Closes the short, swaps WMON back, returns everything to the vault. `minQuoteOut` is caller-supplied. |
 
 `crank`, `deployLiquidity` and `unwind` are permissionless by design. This is why
 the hosted keeper key is safe to run: it pays gas to call a function anyone could

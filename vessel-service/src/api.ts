@@ -302,6 +302,31 @@ export async function startApi(opts: {
     return reply.code(ok ? 200 : 503).send(body);
   });
 
+  /**
+   * Perpl short-manager last decision (Transparency). Proxies the standalone
+   * keeper/ health process when PERPL_KEEPER_URL is set; otherwise unavailable.
+   */
+  app.get("/perpl/last-decision", rateLimitConfig, async (_req, reply) => {
+    const base = process.env.PERPL_KEEPER_URL;
+    if (!base) {
+      return reply.code(503).send({
+        status: "unavailable",
+        reason: "PERPL_KEEPER_URL unset — Perpl keeper not wired on this service",
+      });
+    }
+    try {
+      const r = await fetch(`${base.replace(/\/$/, "")}/last-decision`);
+      const text = await r.text();
+      reply.header("Cache-Control", "max-age=3");
+      return reply.code(r.status).type("application/json").send(text);
+    } catch (e) {
+      return reply.code(503).send({
+        status: "unavailable",
+        reason: errMsg(e),
+      });
+    }
+  });
+
   app.get("/stats", rateLimitConfig, async (_req, reply) => {
     try {
       const [deckRes, bpsRes, lastRes, head] = await Promise.all([

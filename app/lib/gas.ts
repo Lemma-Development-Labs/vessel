@@ -42,8 +42,8 @@ export const GAS_CEILING = {
   join: 420_000n,
   exit: 200_000n,
   crank: 550_000n,
-  deployLiquidity: 750_000n,
-  unwind: 460_000n,
+  deployLiquidity: 2_500_000n, // CLOB path is heavier than MockRouter; estimate still preferred
+  unwind: 2_000_000n,
 } as const;
 
 /** Back-compat alias; prefer GAS_CEILING so the semantics are explicit. */

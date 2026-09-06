@@ -122,7 +122,7 @@ contract EdgeCasesTest is Fixture {
         dusd.approve(address(tranches), 400e6);
         tranches.joinHull(400e6);
         vm.stopPrank();
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         vm.warp(block.timestamp + 10 days);
         uint256 bPos = tranches.balTvl();
         vm.prank(owner);
@@ -141,9 +141,9 @@ contract EdgeCasesTest is Fixture {
         dusd.approve(address(tranches), 400e6);
         tranches.joinHull(400e6);
         vm.stopPrank();
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         vm.warp(block.timestamp + 30 days);
-        engine.unwind();
+        engine.unwind(_minQuoteOut());
         assertEq(engine.shortId(), 0);
     }
 
@@ -175,7 +175,7 @@ contract EdgeCasesTest is Fixture {
         dusd.approve(address(tranches), 400e6);
         tranches.joinHull(400e6);
         vm.stopPrank();
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         uint256 extra = wmon.balanceOf(address(engine));
         vm.prank(address(router));
         wmon.mint(address(engine), extra);

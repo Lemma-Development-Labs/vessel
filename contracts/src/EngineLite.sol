@@ -6,19 +6,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IGuardian} from "./interfaces/IGuardian.sol";
 import {IVenue} from "./interfaces/IVenue.sol";
-import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 import {IBlitzVault, ITranches} from "./interfaces/IEngine.sol";
 
 /// @title EngineLite
 /// @notice Deploys vault liquidity 50/50 into WMON spot + a venue short, cranks
 ///         funding + mark PnL into Tranches.settle, and can fully unwind.
-/// @dev Spot mark is pool mid (manipulable). Per-crank spot PnL is capped at
-///      ±SPOT_PNL_CAP_BPS of the last marked spot value. Real fix = TWAP/oracle.
+/// @dev Spot mark is router.quoteExactBaseForQuote (manipulable). Per-crank spot
+///      PnL is capped at ±SPOT_PNL_CAP_BPS of the last marked spot value.
+///      Swap minOut is ALWAYS caller-supplied — never a magic constant.
 contract EngineLite is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS = 10_000;
-    uint256 public constant SLIPPAGE_BPS = 200; // 2%
     uint256 public constant SWAP_DEADLINE = 300;
     uint256 public constant SPOT_PNL_CAP_BPS = 500; // ±5% of last spot mark per crank
 
@@ -28,7 +28,7 @@ contract EngineLite is ReentrancyGuard {
     IBlitzVault public vault;
     ITranches public tranches;
     IVenue public venue;
-    IUniswapV2Router02 public router;
+    IRouter public router;
     address public wmon;
     IERC20 public dUsd;
 
@@ -44,9 +44,9 @@ contract EngineLite is ReentrancyGuard {
     error Paused();
     error NothingDeployable();
     error AlreadyDeployed();
-    error Slippage();
     error NoPosition();
     error IntOverflow();
+    error MinOutZero();
 
     event Wired(address vault, address tranches, address venue, address router, address wmon);
     event LiquidityDeployed(uint256 pulled, uint256 toSpot, uint256 shortId, uint256 wmonOut);
@@ -85,7 +85,7 @@ contract EngineLite is ReentrancyGuard {
         vault = IBlitzVault(vault_);
         tranches = ITranches(tranches_);
         venue = IVenue(venue_);
-        router = IUniswapV2Router02(router_);
+        router = IRouter(router_);
         wmon = wmon_;
         dUsd = IERC20(IBlitzVault(vault_).asset());
         wired = true;
@@ -93,15 +93,17 @@ contract EngineLite is ReentrancyGuard {
         emit Wired(vault_, tranches_, venue_, router_, wmon_);
     }
 
-    /// @notice Pull deployable idle, swap half to WMON, open an equal-notional short, keep half as margin.
-    function deployLiquidity() external whenNotPaused nonReentrant {
+    /// @notice Pull deployable idle, swap half to WMON via IRouter, open equal-notional short.
+    /// @param minBaseOut Caller-supplied floor for the spot buy (from off-chain book).
+    function deployLiquidity(uint256 minBaseOut) external whenNotPaused nonReentrant {
         if (!wired) revert NotWired();
         if (shortId != 0) revert AlreadyDeployed();
+        if (minBaseOut == 0) revert MinOutZero();
         uint256 amount = vault.deployable();
         if (amount < 2) revert NothingDeployable();
         vault.pullForEngine(amount);
         uint256 toSpot = amount / 2;
-        uint256 wmonOut = _swap(address(dUsd), wmon, toSpot);
+        uint256 wmonOut = _swapQuoteForBase(toSpot, minBaseOut);
         shortId = venue.openShort(toSpot);
         lastSpotValue = _spotValue();
         lastCrank = block.timestamp;
@@ -125,7 +127,6 @@ contract EngineLite is ReentrancyGuard {
         lastSpotValue = spotNow;
         lastCrank = block.timestamp;
 
-        // Solidity 0.8 reverts on int256 overflow — tripwire for a sim/router bug.
         int256 grossYield = funding + spotPnl;
         _handoffYield(funding);
         tranches.settle(grossYield);
@@ -133,7 +134,8 @@ contract EngineLite is ReentrancyGuard {
     }
 
     /// @notice Close the short, swap WMON back to dUSD, return all dUSD to the vault.
-    function unwind() external whenNotPaused nonReentrant {
+    /// @param minQuoteOut Caller-supplied floor for the spot sell (from off-chain book).
+    function unwind(uint256 minQuoteOut) external whenNotPaused nonReentrant {
         if (!wired) revert NotWired();
         int256 closePnl;
         if (shortId != 0) {
@@ -144,7 +146,8 @@ contract EngineLite is ReentrancyGuard {
         }
         uint256 wmonBal = IERC20(wmon).balanceOf(address(this));
         if (wmonBal > 0) {
-            _swap(wmon, address(dUsd), wmonBal);
+            if (minQuoteOut == 0) revert MinOutZero();
+            _swapBaseForQuote(wmonBal, minQuoteOut);
         }
         uint256 cash = dUsd.balanceOf(address(this));
         uint256 dep = vault.deployed();
@@ -165,7 +168,7 @@ contract EngineLite is ReentrancyGuard {
         emit Unwound(cash, closePnl);
     }
 
-    /// @notice Signed dUSD difference of (WMON at pool mid) minus short notional.
+    /// @notice Signed dUSD difference of (WMON at router quote) minus short notional.
     function netDelta() public view returns (int256) {
         if (!wired) return 0;
         uint256 spot = _spotValue();
@@ -226,24 +229,18 @@ contract EngineLite is ReentrancyGuard {
     function _spotValue() internal view returns (uint256) {
         uint256 bal = IERC20(wmon).balanceOf(address(this));
         if (bal == 0) return 0;
-        address[] memory path = new address[](2);
-        path[0] = wmon;
-        path[1] = address(dUsd);
-        uint256[] memory amounts = router.getAmountsOut(bal, path);
-        return amounts[1];
+        return router.quoteExactBaseForQuote(bal);
     }
 
-    function _swap(address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {
-        IERC20(tokenIn).forceApprove(address(router), 0);
-        IERC20(tokenIn).forceApprove(address(router), amountIn);
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = tokenOut;
-        uint256[] memory quoted = router.getAmountsOut(amountIn, path);
-        uint256 minOut = (quoted[1] * (BPS - SLIPPAGE_BPS)) / BPS;
-        uint256[] memory amounts =
-            router.swapExactTokensForTokens(amountIn, minOut, path, address(this), block.timestamp + SWAP_DEADLINE);
-        if (amounts[1] < minOut) revert Slippage();
-        amountOut = amounts[1];
+    function _swapQuoteForBase(uint256 quoteIn, uint256 minBaseOut) internal returns (uint256 baseOut) {
+        dUsd.forceApprove(address(router), 0);
+        dUsd.forceApprove(address(router), quoteIn);
+        baseOut = router.swapExactQuoteForBase(quoteIn, minBaseOut, block.timestamp + SWAP_DEADLINE);
+    }
+
+    function _swapBaseForQuote(uint256 baseIn, uint256 minQuoteOut) internal returns (uint256 quoteOut) {
+        IERC20(wmon).forceApprove(address(router), 0);
+        IERC20(wmon).forceApprove(address(router), baseIn);
+        quoteOut = router.swapExactBaseForQuote(baseIn, minQuoteOut, block.timestamp + SWAP_DEADLINE);
     }
 }
