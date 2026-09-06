@@ -81,6 +81,22 @@ notionalCNS = lotLNS * pricePNS * 10^(6 - priceDecimals) / 10^lotDecimals
 netDelta    = spotInventoryCNS - abs(notionalCNS)   # short ⇒ negative lots
 ```
 
+### Deploy reader + venue (testnet, live Exchange)
+
+On-chain `0xaf1C…7C21` is still the **stub** (`openShort` / `position` / `sweepFunding`
+revert `NotImplemented`). Redeploy with a real `DEPLOYER_PK` (Anvil well-known keys
+must not be used on 10143):
+
+```bash
+export RPC=https://testnet-rpc.monad.xyz
+export DEPLOYER_PK=0x…                 # funded testnet key — NOT Anvil account 0
+export PERPL_POSITION_OWNER=0x…        # keeper EOA that owns / will own the Perpl account
+cd contracts
+forge script script/DeployPerpl.s.sol:DeployPerpl --rpc-url $RPC --broadcast -vv
+# then Sourcify-verify both addresses (solc 0.8.24, optimizer 200, via-ir)
+# append PERPL_POSITION_READER / PERPL_VENUE + deploy txs to docs/ADDRESSES.md
+```
+
 Via Vessel reader (after deploy):
 
 ```bash
