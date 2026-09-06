@@ -11,11 +11,10 @@
 import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import WebSocket from "ws";
+import WebSocket, { type WebSocket as WsSocket } from "ws";
 
 import {
   parseSecretHex,
-  signedFetch,
   tradingWsSignInFrame,
   type AuthConfig,
 } from "./auth.ts";
@@ -24,19 +23,17 @@ import { clients, crankOnce, readEngineState, CRANK_GAS_LIMIT } from "./chain.ts
 import { executeDecision } from "./execute.ts";
 import { MarketDataClient } from "./marketdata.ts";
 import { decide } from "./policy.ts";
-import { reconcileAfterReconnect, type Truth } from "./reconcile.ts";
+import {
+  reconcileAfterReconnect,
+  shortNotionalFromPositions,
+  type Truth,
+} from "./reconcile.ts";
 import { healthPayload, recordDecision, setHealth } from "./status.ts";
 import { jitter, recoveryFor } from "./ws.ts";
 import type { Decision, Fill, KeeperState } from "./types.ts";
 
 const dryRun = process.argv.includes("--dry-run");
 const once = process.argv.includes("--once");
-
-function env(name: string, fallback?: string): string {
-  const v = process.env[name] ?? fallback;
-  if (v == null || v === "") throw new Error(`missing env ${name}`);
-  return v;
-}
 
 function envOpt(name: string, fallback: string): string {
   return process.env[name] && process.env[name] !== "" ? process.env[name]! : fallback;
@@ -75,7 +72,7 @@ async function startHealth(host: string, port: number): Promise<void> {
     res.statusCode = 404;
     res.end(JSON.stringify({ error: "not found" }));
   });
-  await new Promise<void>((resolve) => server.listen(port, host, resolve));
+  await new Promise<void>((r) => server.listen(port, host, r));
   console.log(`health on http://${host}:${port}/health`);
 }
 
@@ -83,7 +80,7 @@ async function main(): Promise<void> {
   const chainId = Number(envOpt("PERPL_CHAIN_ID", "10143"));
   const apiUrl = envOpt("PERPL_API_URL", "https://testnet.perpl.xyz/api");
   const wsUrl = envOpt("PERPL_WS_URL", "wss://testnet.perpl.xyz");
-  const marketId = Number(envOpt("PERPL_MARKET_ID", "64")); // testnet MON
+  const marketId = Number(envOpt("PERPL_MARKET_ID", "64"));
   const killPath = envOpt("KILL_SWITCH_PATH", "./KILL");
   const maxNotional = BigInt(envOpt("MAX_NOTIONAL_PER_ACTION", "100000000"));
   const healthHost = envOpt("HEALTH_HOST", "0.0.0.0");
@@ -96,12 +93,7 @@ async function main(): Promise<void> {
   const hasPerpl = Boolean(apiKey && secret);
 
   const auth: AuthConfig | null = hasPerpl
-    ? {
-        chainId,
-        apiKey,
-        privateKey: parseSecretHex(secret),
-        apiUrl,
-      }
+    ? { chainId, apiKey, privateKey: parseSecretHex(secret), apiUrl }
     : null;
 
   if (!hasPerpl) {
@@ -114,7 +106,7 @@ async function main(): Promise<void> {
   const rpc = process.env.MONAD_RPC_URL || process.env.RPC_URL;
   if (!rpc) throw new Error("MONAD_RPC_URL (paid/dedicated) required — do not poll public RPC");
   if (/testnet-rpc\.monad\.xyz/i.test(rpc) && !process.env.ALLOW_PUBLIC_RPC) {
-    throw new Error("refusing public testnet-rpc.monad.xyz loop — set ALLOW_PUBLIC_RPC=1 to override");
+    throw new Error("refusing public testnet-rpc.monad.xyz — set ALLOW_PUBLIC_RPC=1 to override");
   }
 
   const engine = loadEngineAddress();
@@ -130,8 +122,8 @@ async function main(): Promise<void> {
   let accountId = 0;
   let restingOid: number | null = null;
   let headBlock = 0;
-  let orderTtl = 100;
-  let trading: WebSocket | null = null;
+  const orderTtl = 100;
+  let trading: WsSocket | null = null;
 
   const md = new MarketDataClient(wsUrl, marketId, mdBudget);
   if (hasPerpl) {
@@ -148,16 +140,14 @@ async function main(): Promise<void> {
     if (account) {
       gasBudgetWei = await publicClient.getBalance({ address: account.address });
     } else if (dryRun) {
-      // Dry-run without a key still exercises policy; pretend runway is healthy.
       gasBudgetWei = 10n ** 18n;
     }
     const book = md.getBook();
     const age = book.updatedAt ? Date.now() - book.updatedAt : Number.MAX_SAFE_INTEGER;
-    // Rough short notional from positions
-    let perplShort = 0n;
-    for (const p of truth.positions) {
-      if (p.mkt === marketId && p.s < 0) {
-        perplShort += BigInt(Math.abs(p.s));
+    let perplShort = shortNotionalFromPositions(truth.positions, marketId, book.bestAsk ?? 0, 0);
+    if (perplShort === 0n) {
+      for (const p of truth.positions) {
+        if (p.mkt === marketId && p.s < 0) perplShort += BigInt(-p.s);
       }
     }
     return {
@@ -168,13 +158,13 @@ async function main(): Promise<void> {
       prevFundingRateMicros: prevFunding,
       exitDepthQuote: book.exitDepthQuote,
       deviationBandBps: 100,
-      netDeltaBps: eng.netDeltaBps,
+      netDeltaBps: Math.abs(eng.netDeltaBps),
       capUtilisationBps: 0,
       lastCrankBlock: eng.lastCrankBlock,
       headBlock: eng.headBlock,
-      crankIntervalBlocks: 1500n, // ~5 min @ ~400ms — operator-tunable
+      crankIntervalBlocks: 1500n,
       gasBudgetWei,
-      minGasBudgetWei: CRANK_GAS_LIMIT * 100n, // runway for ~100 cranks at ceiling
+      minGasBudgetWei: CRANK_GAS_LIMIT * 100n,
       marketDataAgeMs: hasPerpl ? age : 0,
       maxMarketDataAgeMs: 60_000,
       killSwitch: killSwitchArmed(killPath),
@@ -219,17 +209,25 @@ async function main(): Promise<void> {
         (n) => Number(n > 2n ** 31n ? 2n ** 31n : n),
         md.getBook().bestBid ?? 0,
       );
-      recordDecision(decision, dryRun, result.kind === "dry_run" || result.kind === "sent" ? result.order.rq : undefined, result.kind);
+      recordDecision(
+        decision,
+        dryRun,
+        result.kind === "dry_run" || result.kind === "sent" ? result.order.rq : undefined,
+        result.kind,
+      );
       console.log("DECISION", decision, result);
       return;
     }
     recordDecision(decision, dryRun);
-    console.log("DECISION", decision, { spot: state.spotValueQuote.toString(), short: state.perplShortNotional.toString() });
+    console.log("DECISION", decision, {
+      spot: state.spotValueQuote.toString(),
+      short: state.perplShortNotional.toString(),
+    });
   }
 
   async function connectTrading(): Promise<void> {
     if (!auth) return;
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolveConn, reject) => {
       trading = new WebSocket(`${wsUrl}/ws/v1/trading`);
       const timer = setTimeout(() => {
         reject(new Error("idle timeout before sign-in — must sign within 10s on testnet"));
@@ -241,14 +239,19 @@ async function main(): Promise<void> {
           const frame = await tradingWsSignInFrame(auth);
           trading!.send(JSON.stringify(frame));
           clearTimeout(timer);
-          resolve();
+          resolveConn();
         } catch (e) {
           clearTimeout(timer);
           reject(e);
         }
       });
       trading.on("message", (buf) => {
-        let msg: { mt?: number; as?: Array<{ id: number; lfr: number }>; d?: unknown; h?: number };
+        let msg: {
+          mt?: number;
+          as?: Array<{ id: number; lfr: number }>;
+          d?: unknown;
+          h?: number;
+        };
         try {
           msg = JSON.parse(String(buf));
         } catch {
@@ -272,14 +275,12 @@ async function main(): Promise<void> {
         const rec = recoveryFor(code, reason, retry++);
         console.warn("trading closed", code, reason, rec);
         setHealth(false, `ws close ${code} ${rec.reason}`);
-        // Close carries no per-request status — reconcile before acting.
         try {
-          if (auth) truth = await reconcileAfterReconnect(auth, truth.fills);
+          truth = await reconcileAfterReconnect(auth, truth.fills);
         } catch (e) {
           console.warn("reconcile failed", (e as Error).message);
         }
-        const wait = jitter(rec.backoffMs);
-        await new Promise((r) => setTimeout(r, wait));
+        await new Promise((r) => setTimeout(r, jitter(rec.backoffMs)));
         try {
           await connectTrading();
           setHealth(true, "reconnected");
@@ -292,7 +293,6 @@ async function main(): Promise<void> {
   }
 
   if (auth) {
-    // Pull funding print once (REST) for policy input.
     try {
       const to = Date.now();
       const from = to - 3_600_000;
@@ -321,40 +321,33 @@ async function main(): Promise<void> {
 
   async function tick(): Promise<void> {
     const state = await buildState();
-    const decision = decide(state);
-    await act(decision, state);
+    await act(decide(state), state);
   }
 
   await tick();
   if (once) {
     md.close();
-    trading?.close();
+    // ws.WebSocket typing under NodeNext can collapse; call defensively.
+    (trading as { close?: () => void } | null)?.close?.();
     process.exit(0);
   }
 
-  // Event-driven loop with backoff — NOT setInterval against public RPC.
-  const loop = async () => {
-    for (;;) {
-      try {
-        await tick();
-        setHealth(true, "ok");
-      } catch (e) {
-        const msg = (e as Error).message;
-        console.error("tick error", msg);
-        setHealth(false, msg);
-        // REST 429 → exponential backoff
-        if (msg.includes("429")) {
-          await new Promise((r) => setTimeout(r, 5_000));
-        }
-      }
-      await new Promise((r) => setTimeout(r, 30_000));
+  // Event loop with sleep — NOT setInterval against public RPC.
+  for (;;) {
+    try {
+      await tick();
+      setHealth(true, "ok");
+    } catch (e) {
+      const msg = (e as Error).message;
+      console.error("tick error", msg);
+      setHealth(false, msg);
+      if (msg.includes("429")) await new Promise((r) => setTimeout(r, 5_000));
     }
-  };
-  await loop();
+    await new Promise((r) => setTimeout(r, 30_000));
+  }
 }
 
 main().catch((e) => {
   console.error(e);
-  // Never log secrets
   process.exit(1);
 });

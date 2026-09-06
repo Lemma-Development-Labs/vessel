@@ -75,7 +75,7 @@ describe("policy decide fixtures", () => {
       }),
     );
     expect(d.kind).toBe("reduce");
-    if (d.kind === "reduce") expect(d.targetNotional).toBe(50_000_000n); // capped by max
+    if (d.kind === "reduce") expect(d.targetNotional).toBe(50_000_000n);
   });
 
   it("halt when deviation and insufficient exit depth", () => {

@@ -1,6 +1,8 @@
 /**
- * Request budget for Perpl trading WS — hard ceiling 60/min on testnet.
+ * Request budget for Perpl trading WS — hard ceiling 60/min on testnet
+ * (PerplFoundation/api-docs README § Rate Limits, fetched 2026-09-06).
  * Application pings count. A reserve is held so reconcile cannot starve reduce.
+ * On exhaustion we queue and log — we never silently drop.
  */
 export type BudgetOpts = {
   /** Hard ceiling (testnet trading = 60). */
@@ -32,7 +34,6 @@ export class RequestBudget {
     while (this.stamps.length && this.stamps[0]! < cut) this.stamps.shift();
   }
 
-  /** Current spend in the rolling 60s window. */
   used(now = Date.now()): number {
     this.prune(now);
     return this.stamps.length;
@@ -40,6 +41,10 @@ export class RequestBudget {
 
   remaining(now = Date.now()): number {
     return Math.max(0, this.limitPerMin - this.used(now));
+  }
+
+  queuedCount(): number {
+    return this.queue.length;
   }
 
   /**
@@ -62,9 +67,5 @@ export class RequestBudget {
     const q = this.queue;
     this.queue = [];
     return q;
-  }
-
-  queuedCount(): number {
-    return this.queue.length;
   }
 }

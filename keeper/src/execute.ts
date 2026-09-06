@@ -1,5 +1,6 @@
 /**
- * Decision → Change order (docs: use Change instead of Post + Cancel).
+ * Decision → Change order.
+ * Docs (websocket.md): use Change (`t: 7`) instead of Post + Cancel.
  */
 import type { Decision } from "./types.ts";
 import type { RequestBudget } from "./budget.ts";
@@ -39,10 +40,6 @@ export type ExecuteCtx = {
   send: (frame: object) => void;
 };
 
-/**
- * Map a reduce decision into a Change that shrinks size toward target.
- * Size here is Perpl scaled integer; caller converts notional → size.
- */
 export function buildChange(args: {
   oid: number;
   marketId: number;
@@ -82,7 +79,7 @@ export function executeDecision(
   if (ctx.restingOrderId == null) {
     return {
       kind: "skipped",
-      reason: "no resting order to Change — post a seed order first (GATE-0 if none)",
+      reason: "no resting order to Change — seed via UI or one-shot OpenShort first",
     };
   }
   const spend = ctx.budget.trySpend("change-order", true);

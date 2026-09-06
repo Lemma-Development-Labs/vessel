@@ -1,5 +1,6 @@
 /**
- * Monad chain reads/writes. Gas budgeted on gas_limit (MONSKILLS gas/).
+ * Monad chain reads/writes.
+ * Gas: Monad charges on gas_limit, not gas_used (MONSKILLS gas/).
  * Never setInterval against the public testnet RPC.
  */
 import {
@@ -82,7 +83,10 @@ const routerAbi = [
 /** Ceiling for crank gas_limit — Monad charges the limit, not gas_used. */
 export const CRANK_GAS_LIMIT = 550_000n;
 
-export function clients(rpcUrl: string, pk?: `0x${string}`): {
+export function clients(
+  rpcUrl: string,
+  pk?: `0x${string}`,
+): {
   publicClient: PublicClient;
   wallet?: WalletClient;
   account?: Account;
@@ -104,8 +108,6 @@ export async function readEngineState(
   netDeltaBps: number;
   lastCrankBlock: bigint;
   headBlock: bigint;
-  gasBudgetWei: bigint;
-  keeper?: `0x${string}`;
 }> {
   const [wmon, router, lastCrank, netDelta, head] = await Promise.all([
     publicClient.readContract({ address: engine, abi: engineAbi, functionName: "wmon" }),
@@ -135,7 +137,6 @@ export async function readEngineState(
     netDeltaBps: Number(netDelta),
     lastCrankBlock: lastCrank as bigint,
     headBlock: head,
-    gasBudgetWei: 0n,
   };
 }
 
@@ -145,8 +146,6 @@ export async function crankOnce(
   account: Account,
   engine: `0x${string}`,
 ): Promise<`0x${string}`> {
-  // Prefer estimate then buffer 10%, but always send an explicit gas_limit —
-  // Monad bills the limit (MONSKILLS gas/).
   let gas = CRANK_GAS_LIMIT;
   try {
     const est = await publicClient.estimateContractGas({

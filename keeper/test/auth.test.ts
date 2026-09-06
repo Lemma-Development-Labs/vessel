@@ -33,7 +33,7 @@ describe("auth canonical strings", () => {
     expect(sha256Hex(body)).toBe(bodyHash);
   });
 
-  it("WS sign-in canonical matches doc", () => {
+  it("WS sign-in canonical matches doc (trading-ws-signin)", () => {
     const c = wsSignInCanonical({
       chainId: 10143,
       timestampMs: "1700000000000",

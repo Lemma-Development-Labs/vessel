@@ -7,7 +7,7 @@ describe("reconcile", () => {
     const local: Fill[] = [{ oid: 1, mkt: 64, s: 10, f: "1" }];
     const remote: Fill[] = [
       { oid: 1, mkt: 64, s: 10, f: "1", at: { t: 1 } },
-      { oid: 2, mkt: 64, s: 5, f: "2", at: { t: 2 } }, // arrived while down
+      { oid: 2, mkt: 64, s: 5, f: "2", at: { t: 2 } },
     ];
     const merged = mergeFills(local, remote);
     expect(merged.some((f) => f.oid === 2)).toBe(true);
@@ -24,9 +24,8 @@ describe("reconcile", () => {
     expect(n).toBe(100_000n);
   });
 
-  it("never adds f + bfa (fee reporting gotcha documented)", () => {
+  it("never adds f + bfa (fee reporting gotcha)", () => {
     const fill: Fill = { oid: 9, mkt: 64, s: 1, f: "100", bfa: "10" };
-    // Gross fee is `f` alone — builder portion already included.
     const gross = BigInt(fill.f);
     const wrong = gross + BigInt(fill.bfa!);
     expect(gross).toBe(100n);

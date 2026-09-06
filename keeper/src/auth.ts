@@ -1,14 +1,22 @@
 /**
  * Ed25519 request signing for Perpl API keys.
- * Canonical forms from https://github.com/PerplFoundation/api-docs/blob/main/authentication.md
- * (fetched 2026-09-04).
+ *
+ * Canonical forms from PerplFoundation/api-docs `authentication.md`
+ * (fetched 2026-09-06):
+ *
+ * REST:
+ *   [CHAIN_ID, METHOD, TARGET, TIMESTAMP, NONCE, SHA256(body)].join("\n")
+ * Headers: X-API-Key, X-API-Timestamp, X-API-Nonce, X-API-Signature
+ *
+ * Trading WS sign-in (mt: 29):
+ *   [CHAIN_ID, "trading-ws-signin", TIMESTAMP, NONCE].join("\n")
  */
 import { createHash, randomBytes } from "node:crypto";
 import * as ed from "@noble/ed25519";
 
 const usedNonces = new Set<string>();
 
-/** Max allowed |local - claimed| clock skew for outbound timestamps (ms). */
+/** Max allowed |local − claimed| clock skew for outbound timestamps (ms). */
 export const CLOCK_SKEW_MAX_MS = 5_000;
 
 export function sha256Hex(body: string | Uint8Array): string {
@@ -48,7 +56,6 @@ export function freshNonce(): string {
     const n = randomBytes(16).toString("base64url");
     if (!usedNonces.has(n)) {
       usedNonces.add(n);
-      // Bound memory — drop oldest when large.
       if (usedNonces.size > 10_000) {
         const first = usedNonces.values().next().value;
         if (first) usedNonces.delete(first);

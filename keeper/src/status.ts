@@ -28,6 +28,11 @@ export function healthPayload(): object {
   };
 }
 
-export function recordDecision(decision: Decision, dryRun: boolean, orderId?: string | number, note?: string): void {
+export function recordDecision(
+  decision: Decision,
+  dryRun: boolean,
+  orderId?: string | number,
+  note?: string,
+): void {
   setLastDecision({ at: Date.now(), decision, dryRun, orderId, note });
 }

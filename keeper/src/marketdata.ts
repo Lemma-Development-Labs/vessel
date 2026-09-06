@@ -8,7 +8,7 @@ import type { RequestBudget } from "./budget.ts";
 export type BookTop = {
   bestBid: number | null;
   bestAsk: number | null;
-  /** Rough exit depth in quote units (6dec scale when known). */
+  /** Rough exit depth in quote units. */
   exitDepthQuote: bigint;
   updatedAt: number;
 };
@@ -56,7 +56,11 @@ export class MarketDataClient {
   }
 
   private onMessage(raw: string): void {
-    let msg: { mt?: number; bid?: Array<{ p: number; s: number }>; ask?: Array<{ p: number; s: number }> };
+    let msg: {
+      mt?: number;
+      bid?: Array<{ p: number; s: number }>;
+      ask?: Array<{ p: number; s: number }>;
+    };
     try {
       msg = JSON.parse(raw);
     } catch {
@@ -67,7 +71,6 @@ export class MarketDataClient {
     const asks = msg.ask ?? [];
     const bestBid = bids.length ? Math.max(...bids.map((l) => l.p)) : this.book.bestBid;
     const bestAsk = asks.length ? Math.min(...asks.map((l) => l.p)) : this.book.bestAsk;
-    // Sum ask sizes as a crude depth proxy (scaled size units — treated as quote-ish for policy).
     const depth = asks.reduce((a, l) => a + BigInt(Math.max(0, l.s)), 0n);
     this.book = {
       bestBid,

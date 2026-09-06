@@ -9,7 +9,7 @@ export type Decision =
 export type KeeperState = {
   /** Engine-held WMON (18dec). */
   spotInventoryWei: bigint;
-  /** Marked spot value in quote (6dec) from IRouter.quoteExactBaseForQuote. */
+  /** Marked spot value in quote (6dec). */
   spotValueQuote: bigint;
   /** Absolute Perpl short notional in quote (6dec). 0 = flat. */
   perplShortNotional: bigint;
@@ -19,7 +19,7 @@ export type KeeperState = {
   prevFundingRateMicros: number;
   /** Best ask depth available to exit (quote 6dec). */
   exitDepthQuote: bigint;
-  /** Allowed |spot - short| band in bps of combined book. */
+  /** Allowed |spot − short| band in bps of combined book. */
   deviationBandBps: number;
   /** Current |netDelta| in bps of (spot+short). */
   netDeltaBps: number;

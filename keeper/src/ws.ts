@@ -1,6 +1,13 @@
 /**
  * Map Perpl WS close events → recovery action.
- * Close carries no per-request status — in-flight work is lost silently.
+ *
+ * Close codes from api-docs `websocket.md` + README (fetched 2026-09-06):
+ *   1008 — too many requests / too many connections / ping timeout / idle timeout
+ *   1011 — failed to process
+ *   3401 — auth failure
+ *
+ * A close carries **no per-request status** — anything in flight is lost silently.
+ * Always reconcile before acting after reconnect.
  */
 import type { CloseReason } from "./types.ts";
 

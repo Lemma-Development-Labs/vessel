@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { RequestBudget } from "../src/budget.ts";
 
 describe("RequestBudget", () => {
-  it("never exceeds 60/min including pings", () => {
+  it("never exceeds 60/min including pings; queues instead of dropping", () => {
     const b = new RequestBudget({ limitPerMin: 60, reservePerMin: 10 });
     const t0 = 1_000_000;
     let ok = 0;
     for (let i = 0; i < 70; i++) {
-      // pings count
       const r = b.trySpend(i % 5 === 0 ? "ping" : "order", false, t0 + i);
       if (r.ok) ok++;
     }

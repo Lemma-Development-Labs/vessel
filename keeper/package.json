@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "keeper": "tsx src/main.ts",
-    "dry-run": "tsx src/main.ts --dry-run",
+    "dry-run": "tsx src/main.ts --dry-run --once",
     "once": "tsx src/main.ts --once",
     "test": "vitest run",
     "test:watch": "vitest"

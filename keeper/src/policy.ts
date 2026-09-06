@@ -1,16 +1,18 @@
 /**
- * Pure policy — state → Decision. No I/O. Shared with CRE workflow later.
+ * Pure policy — state → Decision. No I/O.
+ * This is the CRE reuse surface (prompt 07 calls the same function).
  */
 import type { Decision, KeeperState } from "./types.ts";
-
-const BPS = 10_000n;
 
 export function decide(s: KeeperState): Decision {
   if (s.killSwitch) {
     return { kind: "halt", reason: "kill switch file present" };
   }
   if (s.gasBudgetWei < s.minGasBudgetWei) {
-    return { kind: "halt", reason: `gas runway ${s.gasBudgetWei} < min ${s.minGasBudgetWei} (budget on gas_limit)` };
+    return {
+      kind: "halt",
+      reason: `gas runway ${s.gasBudgetWei} < min ${s.minGasBudgetWei} (budget on gas_limit)`,
+    };
   }
   if (s.marketDataAgeMs > s.maxMarketDataAgeMs) {
     return { kind: "halt", reason: `stale market data ageMs=${s.marketDataAgeMs}` };
@@ -21,7 +23,6 @@ export function decide(s: KeeperState): Decision {
 
   const absDelta = s.netDeltaBps < 0 ? -s.netDeltaBps : s.netDeltaBps;
   if (absDelta > s.deviationBandBps) {
-    // Need exit depth at least equal to the overhang we would reduce.
     const overhang =
       s.spotValueQuote > s.perplShortNotional
         ? s.spotValueQuote - s.perplShortNotional
@@ -32,9 +33,7 @@ export function decide(s: KeeperState): Decision {
         reason: `deviation ${absDelta}bps > band ${s.deviationBandBps}; exit depth ${s.exitDepthQuote} < overhang ${overhang}`,
       };
     }
-    const target =
-      overhang > s.maxNotionalPerAction ? s.maxNotionalPerAction : overhang;
-    // Prefer reduce toward matching the smaller of spot/short toward balance.
+    const target = overhang > s.maxNotionalPerAction ? s.maxNotionalPerAction : overhang;
     return {
       kind: "reduce",
       targetNotional: target,
@@ -42,7 +41,7 @@ export function decide(s: KeeperState): Decision {
     };
   }
 
-  // Funding sign flip beyond threshold (micros): 50 bps of interval ≈ 5000 micros.
+  // Funding sign flip beyond threshold (micros): ~50 bps of interval ≈ 5000 micros.
   const flipThresh = 5_000;
   if (
     s.prevFundingRateMicros !== 0 &&
@@ -62,6 +61,5 @@ export function decide(s: KeeperState): Decision {
     };
   }
 
-  void BPS;
   return { kind: "noop", reason: "within band; crank not due" };
 }

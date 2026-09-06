@@ -27,7 +27,8 @@ until this section contains entries.
 ```
 # Shipped hashes
 # TX_KURU_SPOT   <pending>   —   2026-09-04   blocked: MON-USDC bestAsk=0 @ block 59560667; no DEPLOYER_PK in this agent env
-# PERPL_KEEPER_ORDER  <pending>  —  2026-09-04  blocked: no PERPL_API_KEY in agent env; see keeper/README.md
+# PERPL_KEEPER_ORDER  <pending>  —  2026-09-06  blocked: no PERPL_API_KEY in agent env; keeper/ shipped with 24 unit tests green; see keeper/README.md
+# PERPL_POSITION_READER / PERPL_VENUE  <pending deploy> — see cursor/perpl-venue-bf3b; on-chain 0xaf1C… still stub
 ```
 
 Perpl testnet references (api-docs 2026-09-04):

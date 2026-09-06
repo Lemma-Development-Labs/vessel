@@ -1,6 +1,9 @@
 /**
  * After any WS close: reconnect with jitter, re-auth, then re-read fills +
- * positions + on-chain state before acting. Never assume in-flight landed or dropped.
+ * positions before acting. Never assume an in-flight order landed or dropped.
+ *
+ * Fee gotcha (api-docs README): on Order(mt:24)/Fill(mt:25), `f` is **gross**
+ * and already includes builder portion `bfa`. Never add them.
  */
 import type { AuthConfig } from "./auth.ts";
 import { signedFetch } from "./auth.ts";
@@ -15,12 +18,8 @@ export type Truth = {
 export async function fetchFills(cfg: AuthConfig, count = 50): Promise<Fill[]> {
   const target = `/v1/trading/fills?count=${count}`;
   const res = await signedFetch(cfg, "GET", target);
-  if (res.status === 429) {
-    throw new Error("REST 429 on fills — backoff");
-  }
-  if (!res.ok) {
-    throw new Error(`fills HTTP ${res.status}`);
-  }
+  if (res.status === 429) throw new Error("REST 429 on fills — backoff");
+  if (!res.ok) throw new Error(`fills HTTP ${res.status}`);
   const body = (await res.json()) as { d?: Fill[] };
   return body.d ?? [];
 }
@@ -34,10 +33,7 @@ export async function fetchPositionHistory(cfg: AuthConfig, count = 50): Promise
   return body.d ?? [];
 }
 
-/**
- * Merge snapshot fills with any fills that arrived while disconnected.
- * Last-write-wins by oid+timestamp.
- */
+/** Merge local + remote fills. Last-write-wins by oid+timestamp+size. */
 export function mergeFills(local: Fill[], remote: Fill[]): Fill[] {
   const map = new Map<string, Fill>();
   for (const f of [...local, ...remote]) {
@@ -63,20 +59,14 @@ export function shortNotionalFromPositions(
     if (p.s < 0) sizeScaled += BigInt(-p.s);
   }
   if (sizeScaled === 0n) return 0n;
-  if (pHasNotional(positions, marketId)) {
+  const withN = positions.filter((p) => p.mkt === marketId && p.s < 0 && p.n);
+  if (withN.length) {
     let n = 0n;
-    for (const p of positions) {
-      if (p.mkt === marketId && p.s < 0 && p.n) n += BigInt(p.n.replace(/^-/, ""));
-    }
+    for (const p of withN) n += BigInt(p.n!.replace(/^-/, ""));
     if (n > 0n) return n;
   }
-  // sizeScaled / 10^dec * markScaled — keep integer: (size * mark) / 10^dec
   const scale = 10n ** BigInt(sizeDecimals);
   return (sizeScaled * BigInt(markScaled)) / scale;
-}
-
-function pHasNotional(positions: Position[], marketId: number): boolean {
-  return positions.some((p) => p.mkt === marketId && p.n != null);
 }
 
 export async function reconcileAfterReconnect(
