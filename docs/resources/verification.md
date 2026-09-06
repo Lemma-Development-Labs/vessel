@@ -43,22 +43,67 @@ cast call <ROUTER> "getAmountsOut(uint256,address[])(uint256[])" \
 
 - Perpl Exchange: `0x1964c32f0be608e7d29302aff5e61268e72080cc`
 
-### Call 1: `getAccountByAddr`
+### Call 1: `getAccountByAddr` → AccountInfo
 
 Orders are signed off-chain via the Perpl API key. What matters on-chain is the resulting **exchange account** and its positions.
 
-Use the exchange’s `getAccountByAddr`:
+Live ABI (PerplFoundation/dex-sdk `Exchange.json`, verified 2026-09-06) returns
+**AccountInfo**, not a bare `uint256`. The api-docs README cast snippet that
+decodes as `(uint256)` is incomplete.
 
 ```bash
-cast call --from $WALLET_ADDRESS 0x1964c32f0be608e7d29302aff5e61268e72080cc \
-  "getAccountByAddr(address)(uint256)" $WALLET_ADDRESS --rpc-url $RPC
+EX=0x1964C32f0bE608E7D29302AFF5E61268E72080cc
+cast call $EX \
+  "getAccountByAddr(address)((uint256,uint256,uint256,uint8,address,(uint256,uint256,uint256,uint256)))" \
+  $WALLET_ADDRESS --rpc-url $RPC
+# → (accountId, balanceCNS, lockedBalanceCNS, frozen, accountAddr, positionsBitmap)
 ```
 
-### Call 2: position read
+`PerplPositionReader.accountId(owner)` wraps this and returns `0` when absent
+(never reverts).
 
-We need to read the on-chain position that corresponds to the account/market.
+### Call 2: `getPosition(perpId, accountId)` → PositionInfo
 
-[GATE-0] Perpl docs fetched in this session describe `getAccountByAddr`, but we did not find a verified on-chain function signature for reading positions from the exchange contract (the “position read” step). Do not guess—please fetch the missing contract surface and append the verified function signature here.
+```bash
+# MON market id = 64. Args are (perpId, accountId) — order matters.
+cast call $EX \
+  "getPosition(uint256,uint256)((uint256,uint256,uint256,uint8,uint256,uint256,uint256,uint256,int256,int256,int256),uint256,bool)" \
+  64 $ACCOUNT_ID --rpc-url $RPC
+# PositionInfo: accountId, next, prev, positionType (0=Long,1=Short), depositCNS,
+#   pricePNS, lotLNS, entryBlock, pnlCNS, deltaPnlCNS, premiumPnlCNS
+# + markPricePNS, markPriceValid
+```
+
+Quote notional (6dec CNS) for stranger math (MON: priceDecimals=5, lotDecimals=0):
+
+```
+notionalCNS = lotLNS * pricePNS * 10^(6 - priceDecimals) / 10^lotDecimals
+netDelta    = spotInventoryCNS - abs(notionalCNS)   # short ⇒ negative lots
+```
+
+### Deploy reader + venue (testnet, live Exchange)
+
+On-chain `0xaf1C…7C21` is still the **stub** (`openShort` / `position` / `sweepFunding`
+revert `NotImplemented`). Redeploy with a real `DEPLOYER_PK` (Anvil well-known keys
+must not be used on 10143):
+
+```bash
+export RPC=https://testnet-rpc.monad.xyz
+export DEPLOYER_PK=0x…                 # funded testnet key — NOT Anvil account 0
+export PERPL_POSITION_OWNER=0x…        # keeper EOA that owns / will own the Perpl account
+cd contracts
+forge script script/DeployPerpl.s.sol:DeployPerpl --rpc-url $RPC --broadcast -vv
+# then Sourcify-verify both addresses (solc 0.8.24, optimizer 200, via-ir)
+# append PERPL_POSITION_READER / PERPL_VENUE + deploy txs to docs/ADDRESSES.md
+```
+
+Via Vessel reader (after deploy):
+
+```bash
+cast call $PERPL_READER "accountId(address)(uint256,uint256)" $KEEPER --rpc-url $RPC
+cast call $PERPL_READER "position(uint256)(int256,uint256,uint256,int256,uint256)" $ACCOUNT_ID --rpc-url $RPC
+cast call $PERPL_VENUE "netDelta(uint256)(int256,uint256)" $SPOT_INVENTORY_CNS --rpc-url $RPC
+```
 
 ### Why the position is on-chain (not “order placement by contract”)
 
@@ -83,10 +128,10 @@ netDelta = spotMark - shortNotional
 
 Funding accrual for the short leg must come from the exchange position data (or an indexer derived from exchange events), at a specific reference block/timestamp.
 
-[GATE-0] We have not verified the exact Perpl contract field(s) or indexer-derived field names for “accrued funding” in the on-chain position read path. Once the position-read function is verified (Section 2), we should map:
-
-- “funding accrued” → the corresponding on-chain field(s) / indexer output field(s)
-- reference block/timestamp → the block where the funding snapshot applies
+On-chain funding/premium accrual for an open position is `PositionInfo.premiumPnlCNS`
+(perpl-sdk `Position.premium_pnl`). `PerplPositionReader.position` returns it as
+`fundingAccrued` with the read block. Liquidation **price** is **not** on
+PositionInfo — `liquidationPrice` reverts `FieldNotOnChain` (do not invent a band).
 
 ---
 
@@ -113,5 +158,6 @@ Envio endpoints (Monad testnet):
 3. **Quotes from a thin book**
    - Verify the spot mark is computed from the exact pool/router path and at the exact reference time used by the keeper.
 4. **Position-read function surface**
-   - Until Section 2’s “position read” callable surface is verified, we can’t claim this page is fully reproducible end-to-end.
+   - `getPosition` + `premiumPnlCNS` are verified (Section 2). Stranger path uses
+     `PerplPositionReader` / raw `cast call` above — re-check if Exchange upgrades.
 

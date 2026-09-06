@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /// @title IVenue
-/// @notice Hedge venue interface. SimVenue implements this today; PerplVenue.stub is the live-market successor.
+/// @notice Hedge venue interface. SimVenue implements this today; PerplVenue is the live-market successor.
 interface IVenue {
     /// @notice Open a short of `notional` (dUSD, 6 decimals). Returns a position id.
     function openShort(uint256 notional) external returns (uint256 id);

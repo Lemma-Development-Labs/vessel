@@ -124,6 +124,49 @@ contract SimVenue is IVenue {
         return true;
     }
 
+    // --- Prompt-02 delta surface (parity with PerplVenue; one-contract swap) ---
+
+    int256 public targetNotional;
+    uint256 public constant MAX_DEVIATION_BPS = 100;
+
+    event ShortTargetSet(int256 notional, uint256 blockNumber);
+
+    /// @notice Record desired short notional (positive magnitude, quote units).
+    function targetShort(int256 notional) public {
+        if (notional <= 0) revert ZeroNotional();
+        targetNotional = notional;
+        emit ShortTargetSet(notional, block.number);
+    }
+
+    /// @notice Sum of open short notionals for `msg.sender` opener book (sim truth).
+    function currentShort() public view returns (uint256 shortNotional, uint256 blockRead) {
+        blockRead = block.number;
+        uint256 end = nextId;
+        for (uint256 id = 1; id < end; id++) {
+            Pos storage p = positions[id];
+            if (p.open) shortNotional += p.notional;
+        }
+    }
+
+    function netDelta(uint256 spotInventory) public view returns (int256 delta, uint256 blockRead) {
+        (uint256 shortNotional, uint256 b) = currentShort();
+        blockRead = b;
+        delta = int256(spotInventory) - int256(shortNotional);
+    }
+
+    function deviation(uint256 spotInventory) public view returns (int256 deviationBps, uint256 blockRead) {
+        require(spotInventory != 0, "no-spot");
+        (int256 delta, uint256 b) = netDelta(spotInventory);
+        blockRead = b;
+        deviationBps = (delta * int256(BPS)) / int256(spotInventory);
+    }
+
+    function assertWithinBand(uint256 spotInventory) external view {
+        (int256 d,) = deviation(spotInventory);
+        uint256 ad = d >= 0 ? uint256(d) : uint256(-d);
+        require(ad <= MAX_DEVIATION_BPS, "deviation-band");
+    }
+
     function _accrued(Pos storage p) internal view returns (int256) {
         uint256 dt = block.timestamp - p.lastAccrual;
         if (dt == 0 || p.notional == 0 || fundingRateBps == 0) return 0;

@@ -24,6 +24,22 @@ At the time of this scaffold, no proving tx hashes have been appended yet.
 `/status` and `/resources/addresses` therefore render these contracts as **simulated**
 until this section contains entries.
 
+```
+# Perpl (prompt 02) — 2026-09-06
+# EXCHANGE (proxy)     0x1964C32f0bE608E7D29302AFF5E61268E72080cc   EIP-1967 → impl 0x5dce9e6a404b1971aec34a30212337717a7232d1
+# MARKET               64 (MON)   priceDecimals=5 lotDecimals=0
+# COLLATERAL (live)    0xa9012a055bd4e0edff8ce09f960291c09d5322dc   AUSD — see docs/risk.md GATE-0 vs product USD
+# ONCHAIN_TABLE_ROW    0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21   STUB (openShort/position/sweepFunding → NotImplemented)
+# PERPL_POSITION_READER  <pending deploy>   —   forge script script/DeployPerpl.s.sol (needs DEPLOYER_PK)
+# PERPL_VENUE            <pending deploy>   —   same; replaces stub row after verify
+# TX_PERPL_SHORT         <pending>          —   blocked: keeper account + off-chain short not posted this session
+# PERPL_ACCOUNT_ID       <pending>          —   keeper EOA owns the Perpl account (Vessel does not custody margin)
+```
+
+Perpl logo / “short on Perpl” copy stays **off** until `TX_PERPL_SHORT` is a real
+hash. `SimVenue` remains the live engine venue until EngineLite is re-wired.
+Do not treat table row `0xaf1C…7C21` as the prompt-02 reader venue — it is the stub.
+
 Verified explorer URLs:
 
 - Testnet: `https://testnet.monadvision.com/address/<addr>`

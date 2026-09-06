@@ -4,7 +4,9 @@ pragma solidity ^0.8.24;
 import {Fixture} from "../helpers/Fixture.sol";
 import {EngineLite} from "../../src/EngineLite.sol";
 import {SimVenue} from "../../src/venues/SimVenue.sol";
-import {PerplVenue} from "../../src/venues/PerplVenue.stub.sol";
+import {PerplVenue} from "../../src/venues/PerplVenue.sol";
+import {PerplPositionReader} from "../../src/venues/PerplPositionReader.sol";
+import {MockPerplExchange} from "../mocks/MockPerplExchange.sol";
 
 contract EngineLiteTest is Fixture {
     function setUp() public {
@@ -99,16 +101,17 @@ contract EngineLiteTest is Fixture {
 }
 
 contract PerplVenueTest is Fixture {
-    function test_stubRevertsAndViews() public {
-        PerplVenue p = new PerplVenue();
-        vm.expectRevert(PerplVenue.NotImplemented.selector);
-        p.openShort(1);
-        vm.expectRevert(PerplVenue.NotImplemented.selector);
-        p.closeShort(1);
-        vm.expectRevert(PerplVenue.NotImplemented.selector);
-        p.position(1);
-        vm.expectRevert(PerplVenue.NotImplemented.selector);
-        p.sweepFunding(1);
+    function test_perplVenueIntentAndViews() public {
+        MockPerplExchange ex = new MockPerplExchange();
+        PerplPositionReader reader = new PerplPositionReader(address(ex), 64, 5, 0);
+        PerplVenue p = new PerplVenue(address(reader), address(this), 100);
+        uint256 id = p.openShort(1e6);
+        assertEq(id, 1);
+        assertEq(p.targetNotional(), 1e6);
+        vm.expectRevert(abi.encodeWithSelector(PerplVenue.OrdersOffChainOnly.selector, "closeShort"));
+        p.closeShort(id);
+        vm.expectRevert(PerplVenue.FundingSweepOffChainOnly.selector);
+        p.sweepFunding(id);
         assertEq(p.venueName(), "PerplVenue");
         assertFalse(p.isSimulated());
     }
