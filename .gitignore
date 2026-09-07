@@ -6,6 +6,7 @@ vessel-service/node_modules/
 indexer/node_modules/
 indexer/generated/
 indexer/.pnpm-store/
+cre/node_modules/
 
 # Env (never commit keys)
 .env

@@ -12,6 +12,7 @@ export type KeeperDecisionSnapshot = {
   dryRun: boolean;
   orderId?: string | number;
   note?: string;
+  source?: "CRE" | "keeper";
 };
 
 export type KeeperHealth = {
@@ -20,6 +21,7 @@ export type KeeperHealth = {
   uptimeMs?: number;
   lastDecision: KeeperDecisionSnapshot | null;
   source: string;
+  creHaltLatched?: boolean;
 };
 
 export function keeperBaseUrl(): string | undefined {
@@ -36,6 +38,7 @@ function asDecision(raw: unknown): KeeperDecisionSnapshot | null {
   const reason = (decision as { reason?: unknown }).reason;
   if (typeof kind !== "string" || typeof reason !== "string") return null;
   const at = typeof d.at === "number" ? d.at : Date.now();
+  const src = d.source;
   return {
     at,
     kind,
@@ -44,6 +47,7 @@ function asDecision(raw: unknown): KeeperDecisionSnapshot | null {
     orderId:
       typeof d.orderId === "string" || typeof d.orderId === "number" ? d.orderId : undefined,
     note: typeof d.note === "string" ? d.note : undefined,
+    source: src === "CRE" || src === "keeper" ? src : undefined,
   };
 }
 
@@ -74,6 +78,7 @@ export async function fetchKeeperHealth(
         uptimeMs: typeof body.uptimeMs === "number" ? body.uptimeMs : undefined,
         lastDecision: asDecision(body.lastDecision),
         source: `${base}/health`,
+        creHaltLatched: Boolean(body.creHaltLatched),
       },
     };
   } catch (err) {

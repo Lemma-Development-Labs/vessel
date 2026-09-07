@@ -402,12 +402,17 @@ export function TransparencyScreen() {
         </p>
       </Card>
 
-      {/* 5. Keeper health */}
+      {/* 5. Keeper / CRE health */}
       <Card className="mt-6 p-5 sm:p-6">
-        <h2 className="display text-lg">Keeper health</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-lg">Keeper health</h2>
+          <span className="num text-[10px] tracking-[0.1em] text-steel">SOURCE · CRE VS KEEPER</span>
+        </div>
         <p className="mt-2 text-sm text-dim">
           Polled from <span className="num">NEXT_PUBLIC_KEEPER_URL</span>
-          /health — never inferred from silence. A visible halt is trust.
+          /health — never inferred from silence. A visible halt is trust. CRE
+          decisions show source <span className="num">CRE</span>; a CRE halt
+          latches the keeper kill switch end-to-end.
         </p>
         {!keeper ? (
           <p className="num mt-4 text-sm text-steel">Reading keeper…</p>
@@ -424,19 +429,32 @@ export function TransparencyScreen() {
               </p>
             </div>
             <div>
-              <p className="text-steel">source</p>
+              <p className="text-steel">endpoint</p>
               <p className="truncate text-ink">{keeper.value.source}</p>
             </div>
             <div>
               <p className="text-steel">last decision (policy)</p>
               {keeper.value.lastDecision ? (
                 <p className="text-ink">
+                  <span
+                    className={
+                      keeper.value.lastDecision.source === "CRE" ? "text-phosphor" : "text-steel"
+                    }
+                  >
+                    [{keeper.value.lastDecision.source ?? "keeper"}]
+                  </span>{" "}
                   {keeper.value.lastDecision.kind}: {keeper.value.lastDecision.reason}
                   {keeper.value.lastDecision.dryRun ? " · dry-run" : ""}
                 </p>
               ) : (
                 <Unavailable reason="no decision recorded yet" />
               )}
+            </div>
+            <div>
+              <p className="text-steel">CRE halt latch</p>
+              <p className="text-ink">
+                {keeper.value.creHaltLatched ? "armed (killSwitch)" : "clear"}
+              </p>
             </div>
             <div>
               <p className="text-steel">uptime / heartbeat</p>

@@ -1,0 +1,23 @@
+# Local / simulate target — simulation is the shipped artifact until DON deploy EA.
+local-settings:
+  user-workflow:
+    workflow-name: "vessel-keeper-cre-local"
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "./secrets.yaml"
+
+staging-settings:
+  user-workflow:
+    workflow-name: "vessel-keeper-cre-staging"
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "./secrets.yaml"
+    # Deploy is Early Access — do not set deployment-registry until approved.
+    # deployment-registry: "private"
+
+production-settings:
+  user-workflow:
+    workflow-name: "vessel-keeper-cre-production"
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "./secrets.yaml"

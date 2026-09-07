@@ -28,7 +28,8 @@ import {
   shortNotionalFromPositions,
   type Truth,
 } from "./reconcile.ts";
-import { healthPayload, recordDecision, setHealth } from "./status.ts";
+import { healthPayload, recordDecision, setHealth, isCreHaltLatched, latchCreHalt } from "./status.ts";
+import { stateToSnapshot, type SnapshotJson } from "./cre-snapshot.ts";
 import { jitter, recoveryFor } from "./ws.ts";
 import type { Decision, Fill, KeeperState } from "./types.ts";
 
@@ -55,10 +56,68 @@ function killSwitchArmed(path: string): boolean {
   return existsSync(path);
 }
 
-async function startHealth(host: string, port: number): Promise<void> {
+async function startHealth(host: string, port: number, getSnapshot: () => SnapshotJson | null): Promise<void> {
+  const creToken = process.env.CRE_ACT_TOKEN ?? "";
   const server = createServer((req, res) => {
     const url = req.url ?? "/";
     res.setHeader("Content-Type", "application/json");
+
+    if (req.method === "GET" && url.startsWith("/cre/snapshot")) {
+      const snap = getSnapshot();
+      if (!snap) {
+        res.statusCode = 503;
+        res.end(JSON.stringify({ error: "snapshot not ready" }));
+        return;
+      }
+      res.end(JSON.stringify(snap));
+      return;
+    }
+
+    if (req.method === "POST" && url.startsWith("/cre/decision")) {
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        const auth = req.headers.authorization ?? "";
+        const expected = creToken ? `Bearer ${creToken}` : "";
+        if (!creToken || auth !== expected) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: "unauthorized" }));
+          return;
+        }
+        let body: { kind?: string; reason?: string; targetNotional?: string };
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as typeof body;
+        } catch {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "invalid json" }));
+          return;
+        }
+        const kind = body.kind;
+        const reason = typeof body.reason === "string" ? body.reason : "cre decision";
+        if (kind !== "noop" && kind !== "crank" && kind !== "reduce" && kind !== "halt") {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "invalid kind" }));
+          return;
+        }
+        const decision =
+          kind === "reduce"
+            ? {
+                kind: "reduce" as const,
+                targetNotional: BigInt(body.targetNotional ?? "0"),
+                reason,
+              }
+            : { kind, reason };
+
+        if (kind === "halt") {
+          latchCreHalt(reason);
+        }
+        recordDecision(decision, true, undefined, "accepted via CRE HTTP act", "CRE");
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, creHaltLatched: isCreHaltLatched(), decision }));
+      });
+      return;
+    }
+
     if (url.startsWith("/health")) {
       const body = healthPayload() as { ok: boolean };
       res.statusCode = body.ok ? 200 : 503;
@@ -74,6 +133,7 @@ async function startHealth(host: string, port: number): Promise<void> {
   });
   await new Promise<void>((r) => server.listen(port, host, r));
   console.log(`health on http://${host}:${port}/health`);
+  if (creToken) console.log("CRE act endpoint armed at POST /cre/decision");
 }
 
 async function main(): Promise<void> {
@@ -86,7 +146,8 @@ async function main(): Promise<void> {
   const healthHost = envOpt("HEALTH_HOST", "0.0.0.0");
   const healthPort = Number(envOpt("HEALTH_PORT", process.env.PORT ?? "3001"));
 
-  await startHealth(healthHost, healthPort);
+  let lastSnapshot: SnapshotJson | null = null;
+  await startHealth(healthHost, healthPort, () => lastSnapshot);
 
   const apiKey = process.env.PERPL_API_KEY ?? "";
   const secret = process.env.PERPL_API_KEY_SECRET ?? "";
@@ -167,7 +228,7 @@ async function main(): Promise<void> {
       minGasBudgetWei: CRANK_GAS_LIMIT * 100n,
       marketDataAgeMs: hasPerpl ? age : 0,
       maxMarketDataAgeMs: 60_000,
-      killSwitch: killSwitchArmed(killPath),
+      killSwitch: killSwitchArmed(killPath) || isCreHaltLatched(),
       maxNotionalPerAction: maxNotional,
     };
   }
@@ -321,6 +382,7 @@ async function main(): Promise<void> {
 
   async function tick(): Promise<void> {
     const state = await buildState();
+    lastSnapshot = stateToSnapshot(state);
     await act(decide(state), state);
   }
 

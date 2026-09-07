@@ -1,0 +1,22 @@
+# Vessel CRE project — RPCs per simulation/deploy target.
+# Monad testnet is listed on public CRE Supported Networks (CLI ≥1.30, TS SDK ≥1.19).
+# Tenant enablement still requires `cre workflow supported-chains` after login.
+
+local-settings:
+  rpcs:
+    - chain-name: monad-testnet
+      url: ${MONAD_TESTNET_RPC:-https://testnet-rpc.monad.xyz}
+    - chain-name: ethereum-testnet-sepolia
+      url: ${SEPOLIA_RPC:-https://ethereum-sepolia-rpc.publicnode.com}
+
+staging-settings:
+  rpcs:
+    - chain-name: monad-testnet
+      url: ${MONAD_TESTNET_RPC}
+    - chain-name: ethereum-testnet-sepolia
+      url: ${SEPOLIA_RPC}
+
+production-settings:
+  rpcs:
+    - chain-name: monad-testnet
+      url: ${MONAD_TESTNET_RPC}
