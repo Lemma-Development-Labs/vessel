@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useVessel } from "@/lib/context";
 import { COPY, thetaWouldHold, type DeckKind } from "@/lib/provider";
@@ -33,6 +33,12 @@ export function DepositScreen() {
   const hullAfter = deck === "hull" ? hullTvlN + parsed : hullTvlN;
   const balAfter = deck === "ballast" ? balTvlN + parsed : balTvlN;
   const floorOk = thetaWouldHold(hullAfter, balAfter);
+  // Hull card is selectable only if min join would still hold the Ballast floor.
+  const hullFloorAllows = thetaWouldHold(hullTvlN + MIN_JOIN, balTvlN);
+
+  useEffect(() => {
+    if (!hullFloorAllows && deck === "hull") setDeck("ballast");
+  }, [hullFloorAllows, deck]);
 
   const joinOk =
     v.connected &&
@@ -79,7 +85,8 @@ export function DepositScreen() {
         Board a deck
       </h1>
       <p className="mt-3 max-w-xl text-base text-dim">
-        Deposit demo dollars. Choose how you ride the yield.
+        Deposit demo dollars. <span className="text-brass">Ballast fills first</span> — it is the
+        floor that lets Hull mint. Choose how you ride the yield.
       </p>
 
       <GasFirstCard className="mt-8" />
@@ -142,15 +149,6 @@ export function DepositScreen() {
 
       <div role="radiogroup" aria-label="Deck" className="mt-8 grid gap-4 sm:grid-cols-2">
         <DeckPick
-          kind="hull"
-          selected={deck === "hull"}
-          onSelect={() => setDeck("hull")}
-          tvl={v.deck.hullTvl}
-          theta={v.deck.thetaBps}
-          thetaMin={v.deck.thetaMinBps}
-          rate={mapLive(v.deck.hullRateBps, (r) => `${(Number(r) / 100).toFixed(2)}% APR — fixed`)}
-        />
-        <DeckPick
           kind="ballast"
           selected={deck === "ballast"}
           onSelect={() => setDeck("ballast")}
@@ -164,6 +162,17 @@ export function DepositScreen() {
           rate={map2(v.deck.hullRateBps, v.deck.feeBps, (h, f) =>
             `residual after ${(Number(h) / 100).toFixed(2)}% Hull coupon and ${(Number(f) / 100).toFixed(0)}% fee`,
           )}
+        />
+        <DeckPick
+          kind="hull"
+          selected={deck === "hull"}
+          onSelect={() => setDeck("hull")}
+          tvl={v.deck.hullTvl}
+          theta={v.deck.thetaBps}
+          thetaMin={v.deck.thetaMinBps}
+          rate={mapLive(v.deck.hullRateBps, (r) => `${(Number(r) / 100).toFixed(2)}% coupon — fixed`)}
+          floorOk={hullFloorAllows}
+          floorReason={!hullFloorAllows ? COPY.hullFull : undefined}
         />
       </div>
 
@@ -234,6 +243,8 @@ function DeckPick({
   theta,
   thetaMin,
   rate,
+  floorOk = true,
+  floorReason,
 }: {
   kind: DeckKind;
   selected: boolean;
@@ -242,8 +253,11 @@ function DeckPick({
   theta: Live<bigint>;
   thetaMin: Live<bigint>;
   rate: Live<string>;
+  floorOk?: boolean;
+  floorReason?: string;
 }) {
   const hull = kind === "hull";
+  const disabled = hull && !floorOk;
 
   // The floor is read from Tranches.THETA_MIN_BPS, not assumed to be 20%.
   const cushion = map2(theta, thetaMin, (t, min) => {
@@ -251,7 +265,7 @@ function DeckPick({
     const floor = Number(min) / 100;
     const label =
       pct >= floor
-        ? `${pct.toFixed(1)}% — above the ${floor.toFixed(0)}% floor`
+        ? `${pct.toFixed(1)}% Ballast floor remaining — above ${floor.toFixed(0)}%`
         : `${pct.toFixed(1)}% — below the ${floor.toFixed(0)}% floor`;
     const tone = pct >= floor + 1 ? "text-phosphor" : pct >= floor ? "text-amber" : "text-red";
     return { label, tone };
@@ -262,14 +276,21 @@ function DeckPick({
       type="button"
       role="radio"
       aria-checked={selected}
-      onClick={onSelect}
+      aria-disabled={disabled}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onSelect();
+      }}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
           e.preventDefault();
           onSelect();
         }
       }}
       className={`relative text-left ${hull ? "" : "ballast-shimmer"} rounded-[var(--radius-card)] border bg-bg2 p-5 sm:p-6 ${
+        disabled ? "cursor-not-allowed opacity-60" : ""
+      } ${
         selected
           ? hull
             ? "border-2 border-steel"
@@ -279,6 +300,11 @@ function DeckPick({
             : "border-brass/30"
       }`}
     >
+      {!hull ? (
+        <span className="num absolute left-4 top-4 text-[10px] tracking-[0.12em] text-brass">
+          FILLS FIRST
+        </span>
+      ) : null}
       {selected ? (
         <span className={`num absolute right-4 top-4 text-[10px] tracking-[0.14em] ${hull ? "text-steel" : "text-brass"}`}>
           ●
@@ -290,7 +316,9 @@ function DeckPick({
       <h2 className={`display mt-2 text-[26px] font-bold tracking-[0.03em] sm:text-[30px] ${hull ? "text-[#C2D2E0]" : "text-brass"}`}>
         {hull ? "HULL" : "BALLAST"}
       </h2>
-      <p className="mt-1 text-sm text-dim">{hull ? "Fixed. Protected." : "Levered. First-loss."}</p>
+      <p className="mt-1 text-sm text-dim">
+        {hull ? "Fixed coupon. Losses reach you last." : "Levered residual. Wiped first."}
+      </p>
       <p className="num mt-4 text-[17px] sm:text-[19px]">
         <Val of={rate}>{(r) => r}</Val>
       </p>
@@ -304,11 +332,17 @@ function DeckPick({
         ) : (
           <>
             <li>Absorbs shocks first — and gets paid for it</li>
-            <li>Yield = everything above Hull&apos;s rate</li>
-            <li>Exit guarded by the subordination floor</li>
+            <li>Yield = everything above Hull&apos;s coupon</li>
+            <li>
+              Wipe story: in stress, Ballast (then reserve) go to zero before the
+              engine halts. This is the first-loss seat — not a savings account.
+            </li>
           </>
         )}
       </ul>
+      {disabled && floorReason ? (
+        <p className="mt-3 text-sm text-amber">{floorReason}</p>
+      ) : null}
       <div className="mt-5 flex flex-wrap justify-between gap-2 text-[12px]">
         <span className="num text-dim">
           {hull ? "Hull" : "Bal"} TVL <Val of={tvl}>{(t) => formatDusd(t)}</Val>

@@ -231,7 +231,7 @@ export const COPY = {
   },
   impair: "HULL IMPAIRMENT — halted",
   slippage: "price moved — try again",
-  banner: "TESTNET — demo assets, unaudited contracts.",
+  banner: "TESTNET · chain 10143 · unaudited · not Vessel Finance",
   legal: "Unaudited testnet. Demo dollars (dUSD) have no value. Not an offer of securities.",
   unwindWhat:
     "Unwind closes the venue short, swaps WMON back to dUSD, and returns every deployed dollar to the vault. It is permissionless — anyone can call it.",

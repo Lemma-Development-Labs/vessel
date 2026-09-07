@@ -390,6 +390,20 @@ export function TransparencyScreen() {
         <Button
           className="w-full py-5 text-[15px] tracking-[0.12em]"
           loading={freeze}
+          disabled={
+            !v.connected ||
+            v.wrongNetwork ||
+            (v.paused.status === "ok" && v.paused.value)
+          }
+          tooltip={
+            !v.connected
+              ? "Connect to crank"
+              : v.wrongNetwork
+                ? "Switch to Monad testnet first"
+                : v.paused.status === "ok" && v.paused.value
+                  ? "Guardian pause is on"
+                  : undefined
+          }
           onClick={() => {
             setFreeze(true);
             void v.crank().finally(() => setFreeze(false));
@@ -398,7 +412,7 @@ export function TransparencyScreen() {
           CRANK — settle the waterfall
         </Button>
         <p className="mt-3 text-center text-sm text-dim">
-          Anyone can crank. Settlement is a public function.
+          Anyone can crank when unpaused. Settlement is a public function.
         </p>
       </Card>
 

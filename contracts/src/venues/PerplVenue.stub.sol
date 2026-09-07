@@ -10,7 +10,8 @@ import {IVenue} from "../interfaces/IVenue.sol";
 ///      - Read PerplFoundation/api-docs for position open/close + funding
 ///      - Map openShort notional (dUSD 6dec) onto Perpl's perp market size
 ///      - Map closeShort / sweepFunding onto Perpl settle + funding harvest
-///      - isSimulated() MUST return false in the live implementation
+///      - isSimulated() MUST return false ONLY in the live implementation.
+///        This stub returns true so UI / chips never treat NotImplemented as live.
 contract PerplVenue is IVenue {
     error NotImplemented();
 
@@ -40,7 +41,8 @@ contract PerplVenue is IVenue {
     }
 
     /// @inheritdoc IVenue
+    /// @dev Stub is not a live hedge. Returning false here was a honesty bug.
     function isSimulated() external pure returns (bool) {
-        return false;
+        return true;
     }
 }

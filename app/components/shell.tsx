@@ -11,6 +11,9 @@ import { ADDRESSES } from "@/lib/addresses";
 import { AddressChip, Badge } from "@/components/ui";
 import { Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
+import { IntegrationChips } from "@/components/integration-chips";
+import { FirstRunOverlay } from "@/components/first-run-overlay";
+import { ActionBar } from "@/components/action-bar";
 
 function Wordmark() {
   return (
@@ -28,8 +31,9 @@ function Wordmark() {
 
 const NAV = [
   { href: "/deposit", label: "Deposit" },
-  { href: "/portfolio", label: "Portfolio" },
+  { href: "/portfolio", label: "Book" },
   { href: "/transparency", label: "Transparency" },
+  { href: "/series", label: "Series" },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -107,21 +111,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="border-b border-amber/25 bg-amber/10 px-4 py-2 text-center text-xs leading-snug text-amber sm:px-5 md:px-7">
-        {COPY.banner}
-        <span className="hidden sm:inline">
-          {v.engine.simulated.status === "ok" && v.engine.simulated.value
-            ? " Sim badge visible when SimVenue is active."
-            : ""}
-        </span>
-        {v.reconnecting ? (
-          <span className="ml-2 text-steel">reconnecting…</span>
-        ) : (
-          <span className="num ml-2 hidden text-steel sm:inline">
-            block{" "}
-            <Val of={v.engine.lastBlock}>{(b) => formatBlock(b)}</Val>
-            {v.isMock ? " · mock" : ""}
-          </span>
-        )}
+        <p>
+          {COPY.banner}
+          {v.reconnecting ? (
+            <span className="ml-2 text-steel">reconnecting…</span>
+          ) : (
+            <span className="num ml-2 hidden text-steel sm:inline">
+              block{" "}
+              <Val of={v.engine.lastBlock}>{(b) => formatBlock(b)}</Val>
+              {v.isMock ? " · mock" : ""}
+            </span>
+          )}
+        </p>
+        <IntegrationChips className="mt-1.5" />
       </div>
 
       {v.wrongNetwork ? (
@@ -149,11 +151,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           stop. Only assert the pause when we actually read it as true. */}
       {v.paused.status === "ok" && v.paused.value ? (
         <div className="border-b border-amber/30 bg-amber/5 px-4 py-2 text-center text-sm text-amber sm:px-5">
-          Guardian pause is on. Views still work; mutative paths are frozen.
+          Guardian pause is on. Views still work; mutative paths — including unwind — are frozen on-chain.
         </div>
       ) : null}
 
+      <div className="mx-auto w-full max-w-[1280px] px-4 pt-4 sm:px-5 md:px-7">
+        <ActionBar />
+      </div>
+
       <main className="mx-auto w-full flex-1">{children}</main>
+      <FirstRunOverlay />
 
       <footer className="mt-12 border-t border-white/8 px-4 py-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-xs text-steel sm:mt-16 sm:px-5 sm:pb-8 md:px-7">
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -167,6 +174,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <a href="https://docs.vessel.wtf" className="hover:text-purple">
               Docs
             </a>
+            <Link href="/series" className="hover:text-purple">
+              Series
+            </Link>
+            <a
+              href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/risk.md"
+              className="hover:text-purple"
+            >
+              Risk
+            </a>
           </div>
           <AddressChip address={ADDRESSES.EngineLite} href={`https://testnet.monadvision.com/address/${ADDRESSES.EngineLite}`} />
         </div>
@@ -177,7 +193,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] sm:hidden"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {NAV.map((n) => {
             const on = path === n.href || (n.href === "/deposit" && path === "/");
             return (

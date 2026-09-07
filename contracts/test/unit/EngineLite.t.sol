@@ -111,6 +111,7 @@ contract PerplVenueTest is Fixture {
         vm.expectRevert(PerplVenue.NotImplemented.selector);
         p.sweepFunding(1);
         assertEq(p.venueName(), "PerplVenue");
-        assertFalse(p.isSimulated());
+        // Stub must read as simulated until a real Perpl surface ships.
+        assertTrue(p.isSimulated());
     }
 }

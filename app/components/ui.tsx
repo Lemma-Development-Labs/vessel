@@ -143,7 +143,7 @@ export function Badge({
         ) : (
           <>
             <span className="sm:hidden">SIM</span>
-            <span className="hidden sm:inline">SIM VENUE — Perpl next</span>
+            <span className="hidden sm:inline">SIM VENUE — MockRouter + SimVenue</span>
           </>
         )}
       </span>

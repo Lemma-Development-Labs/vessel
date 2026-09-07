@@ -11,7 +11,8 @@ X weights one URL as 23 characters. The single-block version is **~381** (over 2
 ```
 Contracts are live on @monad testnet. Verified, source published, read them yourself.
 
-VESSEL — long spot, short the perp, funding streams through a two-tranche waterfall.
+VESSEL — Engine + Hull + Ballast + vUSD/svUSD (coming up) + Proof-of-Hedge.
+Testnet hedge today: MockRouter spot + SimVenue funding (not Perpl/Kuru live yet).
 
 https://github.com/Lemma-Development-Labs/vessel
 
