@@ -155,7 +155,8 @@ contract ReentrancyTest is Test {
         dusd.faucet();
         dusd.approve(address(tranches), 100e6);
         tranches.joinBallast(100e6);
-        engine.deployLiquidity();
+        uint256 minBase = router.quoteExactQuoteForBase(vault.deployable() / 2);
+        engine.deployLiquidity(minBase);
 
         vm.warp(block.timestamp + 1);
         vm.expectRevert();

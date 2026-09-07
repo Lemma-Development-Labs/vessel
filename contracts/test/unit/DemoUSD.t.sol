@@ -36,7 +36,7 @@ contract DemoUSDTest is Fixture {
         dusd.faucet();
     }
 
-    function test_noPrivilegedMint() public {
+    function test_noPrivilegedMint() public view {
         // DemoUSD has no mint() — only faucet. Fixture seeds 100 dUSD as dead vault shares.
         assertEq(dusd.totalSupply(), 100e6);
         assertGt(vault.balanceOf(address(0x000000000000000000000000000000000000dEaD)), 0);

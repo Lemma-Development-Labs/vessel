@@ -81,17 +81,11 @@ contract CoverageBoostTest is Fixture {
         assertLt(tranches.reserve(), r);
     }
 
-    function test_routerBadPathTwoTokens() public {
-        address[] memory path = new address[](2);
-        path[0] = address(dusd);
-        path[1] = address(dusd);
-        vm.expectRevert(MockRouter.BadPath.selector);
-        router.getAmountsOut(1e6, path);
-        dusd.approve(address(router), 1e6);
+    function test_routerMinOutUnmet() public {
         vm.startPrank(alice);
         dusd.approve(address(router), 1e6);
-        vm.expectRevert(MockRouter.BadPath.selector);
-        router.swapExactTokensForTokens(1e6, 1, path, alice, block.timestamp + 1);
+        vm.expectRevert(MockRouter.InsufficientOutput.selector);
+        router.swapExactQuoteForBase(1e6, type(uint256).max, block.timestamp + 1);
         vm.stopPrank();
     }
 
@@ -110,18 +104,18 @@ contract CoverageBoostTest is Fixture {
         dusd.approve(address(tranches), 400e6);
         tranches.joinHull(400e6);
         vm.stopPrank();
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         uint256 dep = vault.deployed();
         assertGt(dep, 0);
         deal(address(wmon), address(engine), 0);
         deal(address(dusd), address(engine), dep / 2);
-        engine.unwind();
+        engine.unwind(_minQuoteOut());
         assertEq(engine.shortId(), 0);
 
-        engine.deployLiquidity();
+        engine.deployLiquidity(_minBaseOut());
         deal(address(dusd), address(engine), 0);
         deal(address(wmon), address(engine), 0);
-        engine.unwind();
+        engine.unwind(_minQuoteOut());
         assertEq(vault.deployed(), 0);
     }
 }

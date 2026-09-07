@@ -100,4 +100,17 @@ contract Fixture is Test {
         tranches.joinBallast(assets);
         vm.stopPrank();
     }
+
+    /// @dev MockRouter is 1:1 — floor at the exact preview so fills clear minOut.
+    function _minBaseOut() internal view returns (uint256) {
+        uint256 toSpot = vault.deployable() / 2;
+        return router.quoteExactQuoteForBase(toSpot);
+    }
+
+    /// @dev Floor for unwinding the engine's full WMON balance.
+    function _minQuoteOut() internal view returns (uint256) {
+        uint256 bal = wmon.balanceOf(address(engine));
+        if (bal == 0) return 1; // unwind with no spot still requires non-zero when bal>0 only
+        return router.quoteExactBaseForQuote(bal);
+    }
 }
