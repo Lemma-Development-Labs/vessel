@@ -263,6 +263,8 @@ Spot **interface** is UniswapV2 (`IUniswapV2Router02`) so a later `wire` can poi
 contracts/          Foundry protocol (src / test / script)
 app/                Next.js — /deposit · /portfolio · /transparency · /demo
 vessel-service/     Keeper + indexer + stats API (Railway-shaped)
+indexer/            Envio HyperIndex (Monad testnet 10143) — Transparency crank tape
+docs/               Product + risk + ENVIO.md + ADDRESSES.md
 scripts/            sync.mjs · e2e.ts · keeper.ts · check-secrets.mjs
 ADDRESSES.json      Single source of truth after deploy
 HARDENING.md        Security sweep (not an audit)
