@@ -241,10 +241,7 @@ contract KuruRouterForkTest is Test {
         router = new KuruRouter(address(book), MARGIN, KURU_USDC, WMON);
     }
 
-    function _wireEngine()
-        internal
-        returns (EngineLite engine, BlitzVault vault, KuruRouter router, address alice)
-    {
+    function _wireEngine() internal returns (EngineLite engine, BlitzVault vault, KuruRouter router, address alice) {
         alice = makeAddr("alice");
         MockKuruBook book = new MockKuruBook(KURU_USDC, PRICE_PREC, SIZE_PREC);
         vm.deal(address(book), 1_000_000 ether);
