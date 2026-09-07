@@ -28,7 +28,12 @@ until this section contains entries.
 # Shipped hashes
 # TX_KURU_SPOT   <pending>   —   2026-09-04   blocked: MON-USDC bestAsk=0 @ block 59560667; no DEPLOYER_PK in this agent env
 # PERPL_KEEPER_ORDER  <pending>  —  2026-09-06  blocked: no PERPL_API_KEY in agent env; keeper/ shipped with 24 unit tests green; see keeper/README.md
+# TX_PERPL_SHORT  <pending>  —  2026-09-07  alias for the live Perpl short / Change-order hash (same event as PERPL_KEEPER_ORDER once filled)
 # PERPL_POSITION_READER / PERPL_VENUE  <pending deploy> — see cursor/perpl-venue-bf3b; on-chain 0xaf1C… still stub
+#
+# HARD GATE — Hull series-001 Kuru market (docs/SERIES-001.md):
+# Do not deploy HullSeries / create a Kuru market / seed MM quotes until BOTH
+# TX_KURU_SPOT and TX_PERPL_SHORT are real hashes above. SimVenue-backed Hull = market on fiction.
 ```
 
 Perpl testnet references (api-docs 2026-09-04):
