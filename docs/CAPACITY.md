@@ -42,15 +42,31 @@ testnet market `0xa241896A7Dbe8a550D2E5fF7A914bB1989ceD2D9` (quote =
 | 1,000 | — | — | — | — | no ask liquidity at block 59645259 |
 | 5,000 | — | — | — | — | no ask liquidity at block 59645259 |
 
+## Probe — 2026-09-07 (UTC)
+
+| Field | Value |
+| --- | --- |
+| Slot | `2026-09-07T17:30Z` |
+| Block | `60533271` |
+| bestBid | `type(uint256).max` (empty-book sentinel) |
+| bestAsk | `0` |
+| emptyBook | **true** |
+| Method | `cast call … bestBidAsk()` via `https://testnet-rpc.monad.xyz` |
+
+| USDC in | note |
+| --- | --- |
+| 100–5,000 | no ask liquidity at block 60533271 |
+
 ### Reading
 
-There is **no sell-side depth** on the official MON-USDC book across morning and
-afternoon probes. Realised slippage cannot be computed until makers post asks.
-Genesis AUM for a live Kuru spot path remains **zero**. `TX_KURU_SPOT` cannot
-ship honestly. Evening probe still outstanding:
+There is **no sell-side depth** on the official MON-USDC book across 2026-09-04
+probes and the 2026-09-07 recheck (~1M blocks later). Realised slippage cannot
+be computed until makers post asks. Genesis AUM for a live Kuru spot path
+remains **zero**. `TX_KURU_SPOT` cannot ship honestly.
 
 ```bash
-MEASURE_SLOT=evening npx tsx script/measureDepth.ts
+MEASURE_SLOT=recheck npx tsx script/measureDepth.ts
+# or: cast call 0xa241…eD2D9 'bestBidAsk()(uint256,uint256)' --rpc-url $RPC
 ```
 
 Prefer `MONAD_TESTNET_RPC` = paid endpoint when available.

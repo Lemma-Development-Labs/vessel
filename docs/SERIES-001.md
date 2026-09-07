@@ -11,6 +11,17 @@
 
 A Hull token whose short is SimVenue is a market on a fiction. Listing it would be the single most damaging thing we could do to a verifiability brand. **This document exists so the stop is explicit.**
 
+### Recheck — 2026-09-07
+
+| Check | Result |
+|---|---|
+| MON-USDC `bestAsk` @ block `60533271` | `0` (empty; bid = `type(uint256).max`) |
+| `DEPLOYER_PK` / `PERPL_API_KEY` / `PERPL_API_KEY_SECRET` in this agent env | **unset** — cannot land either venue hash from here |
+| Perpl public `GET /api/v1/pub/context` | `200` (exchange live); still no authenticated Change order |
+| Fail-closed helper | `npx tsx script/assertSeries001Gate.ts` exits `1` until both hashes are real |
+
+**Existing vault path (not series-001):** `BlitzVault.deposit`/`mint` are already `onlyTranches`; floor is enforced in `Tranches.joinHull`. The prompt’s `test_ERC4626PublicEntrypointCannotBypassFloor` for **HullSeries** is still future work — do not confuse with the vault lock already on-chain.
+
 Related product page stub (terms only, no market): [`docs/series/001.md`](./series/001.md).
 
 ---
