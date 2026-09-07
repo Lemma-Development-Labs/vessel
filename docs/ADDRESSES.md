@@ -2,7 +2,7 @@
 
 Source of truth: [`ADDRESSES.json`](../ADDRESSES.json).
 
-Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` 57874280). Deployer `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`. Seeder ≠ deployer (venue seed 100 dUSD). Dead shares: 100 dUSD to `0x…dEaD`.
+Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` **57918591** per `ADDRESSES.json`; docs table historically noted 57874280 — indexer `start_block` uses **57918591**). Deployer `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`. Seeder ≠ deployer (venue seed 100 dUSD). Dead shares: 100 dUSD to `0x…dEaD`.
 
 | Contract | Anvil (31337) | Testnet (10143) | Mainnet (143) | Verified |
 | --- | --- | --- | --- | --- |
@@ -17,6 +17,17 @@ Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` 57874280
 | EngineLite | re-run Deploy | [`0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85`](https://testnet.monadvision.com/address/0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85) | — | Sourcify |
 | MockWMON | re-run Deploy | [`0x17141F36c4401C6184143250827713b26c3E964F`](https://testnet.monadvision.com/address/0x17141F36c4401C6184143250827713b26c3E964F) | — | Sourcify |
 | MockRouter | re-run Deploy | [`0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C`](https://testnet.monadvision.com/address/0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C) | — | Sourcify |
+
+# Indexer
+
+```
+# ENVIO_GRAPHQL  <pending hosted>  — HyperIndex GraphQL after Envio Cloud promote
+#   start_block: 57918591
+#   HyperSync: https://monad-testnet.hypersync.xyz
+#   HyperRPC:  https://monad-testnet.rpc.hypersync.xyz
+#   App env:   NEXT_PUBLIC_ENVIO_GRAPHQL=<endpoint>
+#   See docs/ENVIO.md · indexer/README.md
+```
 
 # Shipped hashes
 

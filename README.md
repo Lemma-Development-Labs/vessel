@@ -250,6 +250,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **wagmi + viem** | Wallet + reads/writes when `NEXT_PUBLIC_USE_MOCK=0`. |
 | **TanStack Query** | Polling deck stats, engine, waterfall. |
 | **Fastify + viem** | `vessel-service/` — permissionless crank loop, Waterfall indexer, GET `/stats` `/waterfall` `/health`. |
+| **Envio HyperIndex** | `indexer/` — historical crank / funding / NAV tape for Transparency (GraphQL; required because Monad drops archive state). See `docs/ENVIO.md`. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
 
 Spot **interface** is UniswapV2 (`IUniswapV2Router02`) so a later `wire` can point at Puddle without changing EngineLite. Today the live `router()` is MockRouter.

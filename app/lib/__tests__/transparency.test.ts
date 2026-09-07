@@ -7,7 +7,7 @@ import { ok, unavailable, type Live } from "../live";
 import { Val, Unavailable } from "../../components/live";
 import { defaultSandboxLoss, projectNegativeFunding } from "../sandbox";
 import { bigintEq, compareLive } from "../disagree";
-import { crankTapeLive } from "../envio-tape";
+import { crankTapeLive, fetchCrankTape, CRANK_TAPE_QUERY } from "../envio-tape";
 import { netDeltaCastBlock } from "../cast-verify";
 import { ADDRESSES } from "../addresses";
 
@@ -134,14 +134,32 @@ describe("On-chain vs API disagreement", () => {
   });
 });
 
-describe("Envio crank tape GATE-0", () => {
-  it("is unavailable until schema is verified", () => {
+describe("Envio crank tape", () => {
+  it("sync crankTapeLive is unavailable without inventing keeper JSON", () => {
     const tape = crankTapeLive();
     expect(tape.status).toBe("unavailable");
     if (tape.status === "unavailable") {
-      expect(tape.reason).toMatch(/GATE-0/i);
+      expect(tape.reason).toMatch(/unavailable|NEXT_PUBLIC_ENVIO_GRAPHQL/i);
       expect(tape.reason).not.toMatch(/keeper json/i);
     }
+  });
+
+  it("CRANK_TAPE_QUERY selects gasLimit (not gasUsed)", () => {
+    expect(CRANK_TAPE_QUERY).toMatch(/gasLimit/);
+    expect(CRANK_TAPE_QUERY).not.toMatch(/gasUsed/);
+    expect(CRANK_TAPE_QUERY).toMatch(/Crank\(/);
+  });
+
+  it("fetchCrankTape is unavailable when GraphQL URL unset", async () => {
+    const prev = process.env.NEXT_PUBLIC_ENVIO_GRAPHQL;
+    delete process.env.NEXT_PUBLIC_ENVIO_GRAPHQL;
+    const tape = await fetchCrankTape();
+    expect(tape.status).toBe("unavailable");
+    if (tape.status === "unavailable") {
+      expect(tape.reason).not.toMatch(/keeper json/i);
+      expect(tape.reason).toMatch(/unavailable/i);
+    }
+    if (prev !== undefined) process.env.NEXT_PUBLIC_ENVIO_GRAPHQL = prev;
   });
 });
 

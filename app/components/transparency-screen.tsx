@@ -10,7 +10,7 @@ import { unavailable, valueOrForLogic, type Live } from "@/lib/live";
 import { verificationOf } from "@/lib/verification";
 import { netDeltaCastBlock } from "@/lib/cast-verify";
 import { bigintEq, compareLive } from "@/lib/disagree";
-import { crankTapeLive } from "@/lib/envio-tape";
+import { fetchCrankTape, type CrankTapeRow } from "@/lib/envio-tape";
 import { fetchKeeperHealth, type KeeperHealth } from "@/lib/keeper-health";
 import { defaultSandboxLoss, projectNegativeFunding } from "@/lib/sandbox";
 import { AddressChip, Badge, Button, Card, Gauge, Skeleton } from "@/components/ui";
@@ -36,6 +36,7 @@ export function TransparencyScreen() {
   const [keeper, setKeeper] = useState<
     { status: "ok"; value: KeeperHealth } | { status: "unavailable"; reason: string } | null
   >(null);
+  const [envioTape, setEnvioTape] = useState<Live<CrankTapeRow[]> | null>(null);
 
   const shortId = valueOrForLogic(v.engine.shortId, 0n);
   const undeployed = shortId === 0n;
@@ -56,9 +57,21 @@ export function TransparencyScreen() {
   );
 
   const castBlock = useMemo(() => netDeltaCastBlock(), []);
-  const envioTape = useMemo(() => crankTapeLive(), []);
-  // Cumulative funding from Envio stays GATE-0 until HyperIndex schema is verified.
-  // On-chain accrued (below) is the live read; indexer cumulative renders Unavailable.
+
+  useEffect(() => {
+    let cancelled = false;
+    const pullTape = () => {
+      void fetchCrankTape(32).then((tape) => {
+        if (!cancelled) setEnvioTape(tape);
+      });
+    };
+    pullTape();
+    const id = window.setInterval(pullTape, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,7 +213,7 @@ export function TransparencyScreen() {
             c={
               <span className="text-steel/60">
                 indexer cumulative:{" "}
-                <Unavailable reason="Cumulative funding from Envio — GATE-0: HyperIndex schema unverified" />
+                <Unavailable reason="Cumulative funding from Envio FundingPrint — UI widget not wired yet; crank tape uses GraphQL. See indexer/schema.graphql." />
               </span>
             }
             phosphor
@@ -452,8 +465,50 @@ export function TransparencyScreen() {
           <span className="num text-[10px] tracking-[0.1em] text-steel">GRAPHQL · NOT KEEPER JSON</span>
         </div>
         <Card className="mt-4 px-4 py-6">
-          {envioTape.status === "ok" ? (
-            <p className="text-sm text-dim">{envioTape.value.length} crank rows</p>
+          {envioTape == null ? (
+            <p className="text-sm text-dim">Loading HyperIndex…</p>
+          ) : envioTape.status === "ok" ? (
+            envioTape.value.length === 0 ? (
+              <p className="text-sm text-dim">
+                Indexer reachable — no Crank rows yet (empty tape is honest; not a fabricated zero).
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-left text-sm">
+                  <thead className="num text-[10px] tracking-[0.1em] text-steel">
+                    <tr>
+                      <th className="pb-2 pr-3 font-normal">BLOCK</th>
+                      <th className="pb-2 pr-3 font-normal">DECISION</th>
+                      <th className="pb-2 pr-3 font-normal">GAS LIMIT</th>
+                      <th className="pb-2 pr-3 font-normal">Δ BEFORE</th>
+                      <th className="pb-2 pr-3 font-normal">Δ AFTER</th>
+                      <th className="pb-2 font-normal">TX</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {envioTape.value.map((row) => (
+                      <tr key={`${row.txHash}-${row.block}`} className="border-t border-white/6">
+                        <td className="num py-2 pr-3">{row.block.toString()}</td>
+                        <td className="py-2 pr-3 text-dim">{row.decision}</td>
+                        <td className="num py-2 pr-3">{row.gasLimit.toString()}</td>
+                        <td className="num py-2 pr-3">{row.deltaBefore.toString()}</td>
+                        <td className="num py-2 pr-3">{row.deltaAfter.toString()}</td>
+                        <td className="py-2">
+                          <a
+                            className="num text-phosphor underline-offset-2 hover:underline"
+                            href={`${EXPLORER}/tx/${row.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {row.txHash.slice(0, 10)}…
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           ) : (
             <Unavailable reason={envioTape.reason} />
           )}

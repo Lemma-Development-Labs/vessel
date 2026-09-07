@@ -97,11 +97,13 @@ The tape should come from Envio’s HyperIndex (not an archive RPC call), becaus
 
 Envio endpoints (Monad testnet):
 
-- HyperIndex (GraphQL): [use the Envio HyperIndex endpoint configured for your indexer]
+- HyperIndex (GraphQL): set `NEXT_PUBLIC_ENVIO_GRAPHQL` after Envio Cloud promote — see `docs/ADDRESSES.md` `ENVIO_GRAPHQL` and `docs/ENVIO.md`
 - HyperRPC: `https://monad-testnet.rpc.hypersync.xyz`
 - HyperSync: `https://monad-testnet.hypersync.xyz`
+- Verified crank query: `app/lib/envio-tape.ts` (`CRANK_TAPE_QUERY` → `Crank { block ts actor decision gasLimit deltaBefore deltaAfter txHash }`)
+- Indexer schema: `indexer/schema.graphql` · handlers: `indexer/src/handlers/vessel.ts` · `start_block: 57918591`
 
-[GATE-0] We did not verify the exact HyperIndex schema / event type names for the “hedge verification tape” query (what exact GraphQL fields to select for perps funding + position PnL). Do not guess—append a verified query that returns funding/settle inputs with the expected JSON shape.
+Funding cumulative / perps PnL widgets still pending a dedicated UI fetch of `FundingPrint` (entity is indexed from SimVenue today).
 
 ---
 

@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+# vessel-indexer — Monad testnet (10143)
+#
+# start_block MUST be the vault deploy block from ADDRESSES.json (not 0).
+# HyperSync: https://monad-testnet.hypersync.xyz  (alt: https://10143.hypersync.xyz)
+# HyperRPC:  https://monad-testnet.rpc.hypersync.xyz
+#
+# Pending (no address / no events yet — do not invent):
+#   - KuruRouter — code on branch; not in ADDRESSES.json (MockRouter still live)
+#   - HullSeries001 — hard-gated until TX_KURU_SPOT + TX_PERPL_SHORT (docs/SERIES-001.md)
+#   - PerplVenue live events — on-chain stub at 0xaf1C… has empty ABI; FundingPrint from SimVenue until live
+
+name: vessel-indexer
+description: >
+  Historical crank / funding / NAV / delta tape for Vessel transparency.
+  Required on Monad because full nodes drop arbitrary historical state —
+  archive RPC cannot power the crank tape.
+
+# gas = gas limit (Monad charges the limit, not gasUsed). hash for explorer links.
+field_selection:
+  transaction_fields:
+    - hash
+    - from
+    - gas
+  # block.timestamp / block.number are available by default on events;
+  # do not list them under block_fields (schema rejects `timestamp`).
+
+contracts:
+  - name: EngineLite
+    abi_file_path: ./abis/EngineLite.json
+    events:
+      - event: Cranked
+      - event: LiquidityDeployed
+      - event: Unwound
+      - event: Wired
+      - event: SpotPnlCapped
+  - name: Tranches
+    abi_file_path: ./abis/Tranches.json
+    events:
+      - event: JoinedHull
+      - event: JoinedBallast
+      - event: ExitedHull
+      - event: ExitedBallast
+      - event: Waterfall
+  - name: BlitzVault
+    abi_file_path: ./abis/BlitzVault.json
+    events:
+      - event: Deposit
+      - event: Withdraw
+  - name: SimVenue
+    abi_file_path: ./abis/SimVenue.json
+    events:
+      - event: FundingSwept
+      - event: RateSet
+  - name: Guardian
+    abi_file_path: ./abis/Guardian.json
+    events:
+      - event: Paused
+      - event: Unpaused
+
+chains:
+  - id: 10143
+    # ADDRESSES.json deployedBlock — also recorded in docs/ADDRESSES.md
+    start_block: 57918591
+    contracts:
+      - name: EngineLite
+        address: 0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85
+      - name: Tranches
+        address: 0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842
+      - name: BlitzVault
+        address: 0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5
+      - name: SimVenue
+        address: 0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7
+      - name: Guardian
+        address: 0x150e153D5aB4683EC576bC1F68b7839D86751208
