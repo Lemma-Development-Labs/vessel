@@ -134,8 +134,12 @@ contract EngineLite is ReentrancyGuard {
     }
 
     /// @notice Close the short, swap WMON back to dUSD, return all dUSD to the vault.
+    /// @dev Intentionally callable while Guardian is paused. Pause must freeze *ingress*
+    ///      (deploy / crank / joins), not trap ~90% of capital at the engine. Vault
+    ///      engine callbacks used here (`returnFromEngine` / `creditYield` / `notifyLoss`)
+    ///      are likewise pause-exempt; `pullForEngine` is not.
     /// @param minQuoteOut Caller-supplied floor for the spot sell (from off-chain book).
-    function unwind(uint256 minQuoteOut) external whenNotPaused nonReentrant {
+    function unwind(uint256 minQuoteOut) external nonReentrant {
         if (!wired) revert NotWired();
         int256 closePnl;
         if (shortId != 0) {

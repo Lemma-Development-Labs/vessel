@@ -61,21 +61,24 @@ Date: 2026-08-29. Branch: `cursor/vessel-delta-neutral-vault-1a23`.
 | --- | --- | --- |
 | `0xde5f72fd` | `DemoUSD.faucet` | anyone (cooldown/cap) |
 | `0x0e830e49` | `BlitzVault.setEngine` / `Tranches.setEngine` | deployer, once, not paused |
-| `0x6e553f65` `0x94bf804d` `0xb460af94` `0xba087652` | vault `deposit/mint/withdraw/redeem` | anyone, not paused |
-| `0x4d69029b` `0x848a49fc` `0xe5c58e5b` `0x61f3d110` | `pullForEngine` / `returnFromEngine` / `creditYield` / `notifyLoss` | engine only |
+| `0x6e553f65` `0x94bf804d` | vault `deposit/mint` | `onlyTranches`, not paused |
+| `0xb460af94` `0xba087652` | vault `withdraw/redeem` | anyone (**pause-exempt** egress) |
+| `0x4d69029b` | `pullForEngine` | engine only, not paused |
+| `0x848a49fc` `0xe5c58e5b` `0x61f3d110` | `returnFromEngine` / `creditYield` / `notifyLoss` | engine only (**pause-exempt** for unwind) |
 | `0x0aa80dc0` `0x909f9c95` | `joinHull` / `joinBallast` | anyone, not paused, `MIN_JOIN=1e6` |
-| `0x23951cba` `0x7018e471` | `exitHull` / `exitBallast` | anyone, not paused |
+| `0x23951cba` `0x7018e471` | `exitHull` / `exitBallast` | anyone (**pause-exempt** egress) |
 | `0x003bdc74` | `claimTreasury` | anyone, not paused (pull to immutable treasury) |
-| `0x5d0f3959` | `settle` | engine only |
-| `0xb8bc6235` | `EngineLite.wire` | deployer, once |
-| `0x4086bf89` `0x9c16a9e8` `0x807763ab` | `deployLiquidity` / `crank` / `unwind` | anyone, not paused |
+| `0x5d0f3959` | `settle` | engine only, not paused |
+| `0xb8bc6235` | `EngineLite.wire` | deployer, once, not paused |
+| `0x4086bf89` `0x9c16a9e8` | `deployLiquidity` / `crank` | anyone, not paused |
+| `0x807763ab` | `unwind` | anyone (**pause-exempt** emergency egress) |
 | `0x8456cb59` `0x3f4ba83a` | `Guardian.pause` / `unpause` | Ownable2Step owner only |
 
 Wire-once: `EngineAlreadySet` / `AlreadyWired` tests green.
 
 Guardian **cannot** move funds: `GuardianFundsTest` — no `transfer`/`pullForEngine`/`withdraw` on the guardian contract; pause/unpause does not change vault balances. Owner calling `vault.pullForEngine` reverts `NotEngine`.
 
-Pause matrix: `PauseMatrixTest.test_everyMutativeSelectorRevertsWhenPaused` covers the selectors above plus `setEngine` on a fresh Tranches. Views (`totalAssets`, `deckStats`, `netDelta`) still work.
+Pause matrix: `PauseMatrixTest` — ingress reverts when paused; egress (`unwind`, exits) remains available. Views (`totalAssets`, `deckStats`, `netDelta`) still work.
 
 ### A6. Oracle / spot mark
 

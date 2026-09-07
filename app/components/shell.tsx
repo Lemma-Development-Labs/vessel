@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           stop. Only assert the pause when we actually read it as true. */}
       {v.paused.status === "ok" && v.paused.value ? (
         <div className="border-b border-amber/30 bg-amber/5 px-4 py-2 text-center text-sm text-amber sm:px-5">
-          Guardian pause is on. Views still work; mutative paths — including unwind — are frozen on-chain.
+          Guardian pause is on. Joins / deploy / crank are frozen. Unwind and exits remain available.
         </div>
       ) : null}
 

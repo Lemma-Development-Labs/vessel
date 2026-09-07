@@ -145,7 +145,8 @@ contract Tranches is ReentrancyGuard {
 
     /// @notice Exit Hull. Always allowed when it improves the ballast ratio.
     /// @dev Share burn floors assets out (dust stays in the deck — protocol/remaining seniors).
-    function exitHull(uint256 shares) external whenNotPaused nonReentrant returns (uint256 assetsOut) {
+    ///      Pause-exempt: Guardian pause freezes joins/deploy/crank, not depositor egress.
+    function exitHull(uint256 shares) external nonReentrant returns (uint256 assetsOut) {
         if (shares == 0) revert ZeroAmount();
         uint256 supply = hullToken.totalSupply();
         assetsOut = (shares * hullTvl) / supply; // floor
@@ -158,7 +159,8 @@ contract Tranches is ReentrancyGuard {
     }
 
     /// @notice Exit Ballast. Reverts SubordinationFloor if the exit would breach 20%.
-    function exitBallast(uint256 shares) external whenNotPaused nonReentrant returns (uint256 assetsOut) {
+    /// @dev Pause-exempt — same egress policy as `exitHull`.
+    function exitBallast(uint256 shares) external nonReentrant returns (uint256 assetsOut) {
         if (shares == 0) revert ZeroAmount();
         uint256 supply = ballastToken.totalSupply();
         assetsOut = (shares * balTvl) / supply; // floor

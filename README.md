@@ -253,6 +253,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **Envio HyperIndex** | `indexer/` — historical crank / funding / NAV tape for Transparency (GraphQL; required because Monad drops archive state). See `docs/ENVIO.md`. |
 | **Chainlink CRE** | `cre/` — DON-consensus orchestration of keeper `decide()` (simulate counts; deploy is EA). See `docs/CRE.md`. |
 | **Hostile audit** | `docs/FINDINGS-08.md` + `docs/risk.md` — stuck-funds, pause freeze, claim honesty. |
+| **Mainnet gates** | `docs/MAINNET-READY.md` — hard gates; not mainnet-ready until Gate 3 audit + Gate 4 deploy. `docs/AUDIT-SCOPE.md` for firms. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
 
 Spot **interface** is UniswapV2 (`IUniswapV2Router02`) so a later `wire` can point at Puddle without changing EngineLite. Today the live `router()` is MockRouter.
