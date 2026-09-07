@@ -83,4 +83,6 @@ export type LastDecision = {
   dryRun: boolean;
   orderId?: number | string;
   note?: string;
+  /** Who produced the decision — CRE DON vs single-machine keeper. */
+  source?: "CRE" | "keeper";
 };

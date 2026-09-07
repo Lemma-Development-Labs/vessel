@@ -1,0 +1,17 @@
+{
+  "schedule": "0 */5 * * * *",
+  "perplContextUrl": "https://testnet.perpl.xyz/api/v1/pub/context",
+  "vesselSnapshotUrl": "http://127.0.0.1:3001/cre/snapshot",
+  "keeperActUrl": "http://127.0.0.1:3001/cre/decision",
+  "envioGraphqlUrl": "",
+  "engineLite": "0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85",
+  "chainId": 10143,
+  "ccipMonadTestnetSelector": "2183018362218727504",
+  "creChainName": "monad-testnet",
+  "useEvmMonad": false,
+  "deviationBandBps": 100,
+  "crankIntervalBlocks": 1500,
+  "maxNotionalPerAction": "100000000",
+  "minGasBudgetWei": "1000000000000000",
+  "maxMarketDataAgeMs": 60000
+}

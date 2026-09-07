@@ -251,6 +251,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **TanStack Query** | Polling deck stats, engine, waterfall. |
 | **Fastify + viem** | `vessel-service/` — permissionless crank loop, Waterfall indexer, GET `/stats` `/waterfall` `/health`. |
 | **Envio HyperIndex** | `indexer/` — historical crank / funding / NAV tape for Transparency (GraphQL; required because Monad drops archive state). See `docs/ENVIO.md`. |
+| **Chainlink CRE** | `cre/` — DON-consensus orchestration of keeper `decide()` (simulate counts; deploy is EA). See `docs/CRE.md`. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
 
 Spot **interface** is UniswapV2 (`IUniswapV2Router02`) so a later `wire` can point at Puddle without changing EngineLite. Today the live `router()` is MockRouter.
@@ -264,7 +265,8 @@ contracts/          Foundry protocol (src / test / script)
 app/                Next.js — /deposit · /portfolio · /transparency · /demo
 vessel-service/     Keeper + indexer + stats API (Railway-shaped)
 indexer/            Envio HyperIndex (Monad testnet 10143) — Transparency crank tape
-docs/               Product + risk + ENVIO.md + ADDRESSES.md
+cre/                Chainlink CRE workflow — consensus over keeper policy.decide()
+docs/               Product + risk + ENVIO.md + CRE.md + ADDRESSES.md
 scripts/            sync.mjs · e2e.ts · keeper.ts · check-secrets.mjs
 ADDRESSES.json      Single source of truth after deploy
 HARDENING.md        Security sweep (not an audit)
@@ -473,6 +475,37 @@ pnpm dev
 ```
 
 Root `pnpm keeper` runs `scripts/keeper.ts` against `app/lib/addresses.ts`.
+
+---
+
+## Chainlink CRE (short-manager orchestration)
+
+The keeper is a single machine we control. A depositor has to trust it. CRE puts
+the *decision* under DON consensus: multiple nodes independently read the venue
+and the chain and must agree before the engine is cranked, reduced, or halted.
+For a protocol whose thesis is that you should not have to trust us, moving the
+decision off our machine is the point.
+
+| Piece | |
+| --- | --- |
+| Layout | `cre/` — cron → HTTP consensus gather → shared `policy.decide()` → HTTP act |
+| Policy | **Imported** from `keeper/src/policy.ts` (same fixtures as `policy.test.ts`) |
+| Default path | `useEvmMonad: false` — HTTP snapshot + `POST /cre/decision` (no fake EVM) |
+| Halt e2e | CRE `halt` → keeper `latchCreHalt()` → killSwitch; Transparency shows `source: CRE` |
+| Full write-up | [`docs/CRE.md`](./docs/CRE.md) |
+
+```bash
+export PATH="$HOME/.cre/bin:$PATH"   # CRE CLI v1.32.0
+cd cre && bun install && bun test
+# after `cre login` or CRE_API_KEY:
+cre workflow supported-chains --output json
+cre workflow simulate . --target local-settings --allow-insecure-rpc
+```
+
+**Simulate / deploy status (honest):** this agent has no `cre login` / `CRE_API_KEY`.
+Both `supported-chains` and `simulate` fail with authentication required — literal
+output is in `docs/CRE.md`. Simulation is the shipped bounty artifact; DON deploy
+is Early Access and is **not** claimed here.
 
 ---
 

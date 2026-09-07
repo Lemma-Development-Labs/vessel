@@ -27,6 +27,12 @@ Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` **579185
 #   HyperRPC:  https://monad-testnet.rpc.hypersync.xyz
 #   App env:   NEXT_PUBLIC_ENVIO_GRAPHQL=<endpoint>
 #   See docs/ENVIO.md · indexer/README.md
+#
+# CRE (Chainlink Runtime Environment) — docs/CRE.md
+#   cre workflow supported-chains requires cre login / CRE_API_KEY (not available in this agent).
+#   Public docs list Monad Testnet (CLI ≥1.30, TS SDK ≥1.19). Default workflow useEvmMonad=false (HTTP path).
+#   Simulate counts for the bounty; DON deploy is Early Access — not claimed here.
+#   CCIP Monad testnet selector (not CRE tenant registry): 2183018362218727504
 ```
 
 # Shipped hashes
