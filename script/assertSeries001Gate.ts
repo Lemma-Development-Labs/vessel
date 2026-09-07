@@ -19,9 +19,10 @@ const HASH_RE = /^0x[a-fA-F0-9]{64}$/;
 function parseShippedHashes(md: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of md.split("\n")) {
-    // Accept: # KEY 0xabc…  or  # KEY   <pending>  —
+    // Shipped-hash rows only: `# KEY   <pending> …` or `# KEY   0xabc… …`
+    // Do not match prose like `# TX_KURU_SPOT and TX_PERPL_SHORT are real…`
     const m = line.match(
-      /^#\s*(TX_KURU_SPOT|TX_PERPL_SHORT|PERPL_KEEPER_ORDER)\s+(\S+)/,
+      /^#\s*(TX_KURU_SPOT|TX_PERPL_SHORT|PERPL_KEEPER_ORDER)\s+(<pending>|0x[a-fA-F0-9]{64})\b/,
     );
     if (!m) continue;
     out[m[1]] = m[2];
