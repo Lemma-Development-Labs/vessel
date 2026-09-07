@@ -3,6 +3,9 @@ node_modules/
 app/node_modules/
 keeper/node_modules/
 vessel-service/node_modules/
+indexer/node_modules/
+indexer/generated/
+indexer/.pnpm-store/
 
 # Env (never commit keys)
 .env

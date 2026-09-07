@@ -1,0 +1,103 @@
+# Vessel HyperIndex schema — entities the Transparency UI / GraphQL consumers query.
+# No @entity decorator (Envio v3).
+
+"""Last net-delta seen, so Crank can fill deltaBefore without an archive eth_call."""
+type CrankCursor {
+  id: ID!
+  deltaAfter: BigInt!
+}
+
+type Crank {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  actor: String!
+  decision: String!
+  """Monad charges gas_limit, not gasUsed — tape must show what was paid."""
+  gasLimit: BigInt!
+  deltaBefore: BigInt!
+  deltaAfter: BigInt!
+  txHash: String!
+}
+
+type Deposit {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  actor: String!
+  tranche: String!
+  assets: BigInt!
+  shares: BigInt!
+  txHash: String!
+}
+
+type Withdrawal {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  actor: String!
+  tranche: String!
+  assets: BigInt!
+  shares: BigInt!
+  txHash: String!
+}
+
+type FundingPrint {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  market: String!
+  rateBps: BigInt!
+  sign: Int!
+  cumulative: BigInt!
+  txHash: String!
+}
+
+"""Tracks cumulative funding for FundingPrint.cumulative."""
+type FundingCursor {
+  id: ID!
+  cumulative: BigInt!
+  lastRateBps: BigInt!
+}
+
+type DeltaSnapshot {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  spotInventory: BigInt!
+  shortNotional: BigInt!
+  netDelta: BigInt!
+  deviationBps: BigInt!
+  txHash: String!
+}
+
+type TrancheNav {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  hullNav: BigInt!
+  ballastNav: BigInt!
+  reserveNav: BigInt!
+  txHash: String!
+}
+
+"""Populated once HullSeries001 trades on Kuru — schema reserved, no handlers yet."""
+type HullTrade {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  price: BigInt!
+  size: BigInt!
+  side: String!
+  impliedYieldBps: BigInt!
+  txHash: String!
+}
+
+type Halt {
+  id: ID!
+  block: BigInt!
+  ts: BigInt!
+  reason: String!
+  clearedAtBlock: BigInt
+  txHash: String!
+}
