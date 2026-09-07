@@ -154,20 +154,15 @@ export function ExitFlow({
 }
 
 /**
- * Operational unwind control for the transparency screen. Unlike the exit
- * flow this is not tied to a position — it is the public lever, shown as one.
+ * Operational unwind control. Always visible — disabled with a reason when
+ * nothing is deployed. Hiding Unwind with capital at risk is a stuck-funds bug.
  */
 export function UnwindCard({ className = "" }: { className?: string }) {
   const v = useVessel();
   const [busy, setBusy] = useState(false);
 
-  const shortId = v.engine.shortId;
   const deployed = v.vault.deployed;
-
-  // Nothing to unwind is a state we only claim when we could actually read it.
-  if (shortId.status === "ok" && shortId.value === 0n) {
-    if (deployed.status === "ok" && deployed.value === 0n) return null;
-  }
+  const nothingDeployed = deployed.status === "ok" && deployed.value === 0n;
 
   const blocked =
     !v.connected
@@ -175,8 +170,12 @@ export function UnwindCard({ className = "" }: { className?: string }) {
       : v.wrongNetwork
         ? "Switch to Monad testnet first"
         : v.paused.status === "ok" && v.paused.value
-          ? "Guardian pause is on"
-          : undefined;
+          ? "Guardian pause is on — unwind reverts on-chain until unpause"
+          : deployed.status !== "ok"
+            ? `Deployed balance unknown — ${deployed.reason}`
+            : nothingDeployed
+              ? "Nothing deployed — vault cash is already idle"
+              : undefined;
 
   return (
     <Card className={`p-6 ${className}`}>
@@ -212,7 +211,7 @@ export function UnwindCard({ className = "" }: { className?: string }) {
         Unwind hedge
       </Button>
       <p className="num mt-3 text-center text-[11px] text-steel">
-        Permissionless — anyone can call unwind(). No owner gate.
+        Permissionless when unpaused — anyone can call unwind(). No owner gate.
       </p>
     </Card>
   );

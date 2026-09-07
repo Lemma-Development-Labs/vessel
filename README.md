@@ -252,6 +252,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **Fastify + viem** | `vessel-service/` — permissionless crank loop, Waterfall indexer, GET `/stats` `/waterfall` `/health`. |
 | **Envio HyperIndex** | `indexer/` — historical crank / funding / NAV tape for Transparency (GraphQL; required because Monad drops archive state). See `docs/ENVIO.md`. |
 | **Chainlink CRE** | `cre/` — DON-consensus orchestration of keeper `decide()` (simulate counts; deploy is EA). See `docs/CRE.md`. |
+| **Hostile audit** | `docs/FINDINGS-08.md` + `docs/risk.md` — stuck-funds, pause freeze, claim honesty. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
 
 Spot **interface** is UniswapV2 (`IUniswapV2Router02`) so a later `wire` can point at Puddle without changing EngineLite. Today the live `router()` is MockRouter.
@@ -266,7 +267,7 @@ app/                Next.js — /deposit · /portfolio · /transparency · /demo
 vessel-service/     Keeper + indexer + stats API (Railway-shaped)
 indexer/            Envio HyperIndex (Monad testnet 10143) — Transparency crank tape
 cre/                Chainlink CRE workflow — consensus over keeper policy.decide()
-docs/               Product + risk + ENVIO.md + CRE.md + ADDRESSES.md
+docs/               Product + risk + FINDINGS-08.md + ENVIO.md + CRE.md + ADDRESSES.md
 scripts/            sync.mjs · e2e.ts · keeper.ts · check-secrets.mjs
 ADDRESSES.json      Single source of truth after deploy
 HARDENING.md        Security sweep (not an audit)

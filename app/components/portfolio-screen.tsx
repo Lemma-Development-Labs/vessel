@@ -68,9 +68,9 @@ export function PortfolioScreen() {
 
   return (
     <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-      <p className="num text-[10.5px] tracking-[0.18em] text-steel">PORTFOLIO</p>
+      <p className="num text-[10.5px] tracking-[0.18em] text-steel">BOOK</p>
       <h1 className="display mt-3 text-[32px] font-bold tracking-[-0.02em] sm:text-[40px]">
-        Your decks
+        Vault &amp; decks
       </h1>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">

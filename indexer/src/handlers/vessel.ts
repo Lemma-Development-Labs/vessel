@@ -65,18 +65,10 @@ EngineLite.Cranked.handler(async ({ event, context }) => {
   const next: CrankCursor = { id: CRANK_CURSOR_ID, deltaAfter };
   context.CrankCursor.set(next);
 
-  const snap: DeltaSnapshot = {
-    id: idOf(event.chainId, event.block.number, event.logIndex),
-    block: blockOf(event),
-    ts: tsOf(event),
-    // Spot / short notional need archive eth_call — leave 0 and store deviation from event.
-    spotInventory: 0n,
-    shortNotional: 0n,
-    netDelta: deltaAfter,
-    deviationBps: deltaAfter < 0n ? -deltaAfter : deltaAfter,
-    txHash: txHashOf(event),
-  };
-  context.DeltaSnapshot.set(snap);
+  // Do NOT invent spotInventory/shortNotional = 0 on crank — that fabricates
+  // inventory on the highest-trust tape. DeltaSnapshot for inventory only on
+  // LiquidityDeployed / Unwound where event params carry real amounts.
+  // netDelta lives on Crank (+ CrankCursor) from the event.
 });
 
 EngineLite.LiquidityDeployed.handler(async ({ event, context }) => {
