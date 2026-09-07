@@ -25,9 +25,11 @@ export function ActionBar({ className = "" }: { className?: string }) {
       ? "Connect a wallet first"
       : v.wrongNetwork
         ? "Switch to Monad testnet (10143)"
-        : paused
-          ? "Guardian pause is on — mutative paths frozen (see /risk)"
-          : undefined;
+        : undefined;
+
+  const ingressGate =
+    gate ??
+    (paused ? "Guardian pause is on — deposits / deploy / crank frozen" : undefined);
 
   const unwindReason =
     gate ??
@@ -37,7 +39,7 @@ export function ActionBar({ className = "" }: { className?: string }) {
         ? "Nothing deployed — vault cash is already idle"
         : undefined);
 
-  const crankReason = gate;
+  const crankReason = ingressGate;
 
   return (
     <section
@@ -98,7 +100,7 @@ export function ActionBar({ className = "" }: { className?: string }) {
       ) : null}
       {paused ? (
         <p className="mt-2 text-xs text-amber">
-          Pause freezes unwind on-chain — that is a stuck-funds risk if the pause key is lost.
+          Pause freezes joins / deploy / crank. Unwind and exits stay available (emergency egress).
         </p>
       ) : null}
     </section>

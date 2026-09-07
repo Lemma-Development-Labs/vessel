@@ -170,7 +170,7 @@ export function UnwindCard({ className = "" }: { className?: string }) {
       : v.wrongNetwork
         ? "Switch to Monad testnet first"
         : v.paused.status === "ok" && v.paused.value
-          ? "Guardian pause is on — unwind reverts on-chain until unpause"
+          ? undefined // unwind is pause-exempt (emergency egress)
           : deployed.status !== "ok"
             ? `Deployed balance unknown — ${deployed.reason}`
             : nothingDeployed

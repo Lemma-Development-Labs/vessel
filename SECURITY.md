@@ -17,12 +17,12 @@ Report vulnerabilities to the maintainers of [Lemma-Development-Labs/vessel](htt
 ## Known limitations (v0 / testnet)
 
 1. **Spot mark is manipulable.** EngineLite `_spotValue()` uses `router.getAmountsOut` (pool mid). A6 mitigation: ±5% of last spot per crank. Mainnet gap: TWAP or dedicated oracle.
-2. **Share issuance is closed (was: public ERC-4626).** `deposit`/`mint` are now `onlyTranches`; previews stay open. The original framing — "raw deposits bypass the 20% floor" — was imprecise: a raw deposit never touches `hullTvl`/`balTvl`, so the ratio was never breached. The real exposure was worse. Tranches keeps an asset-denominated book it redeems through its own vBLITZ, while `creditYield` lifts the share price for *every* holder, so an outside shareholder captured a slice of yield that `settle()` had already credited to Hull and Ballast in full — leaving the book unredeemable and the last exiters unpaid. Tests: `test/unit/ShareIssuance.t.sol`, `test/fuzz/Solvency.t.sol`. The dead-share seed is now an explicit one-shot `seedDeadShares()`.
-8. **Dead-share yield leak (open).** The protocol's own 100 dUSD dead-share seed holds real vBLITZ, so every yield credit strands `g × deadShares / totalShares` in a position nobody can redeem — 11.1% at 800 dUSD of deck TVL, and roughly 65% against the 54 dUSD currently on testnet. Tranches' book therefore runs ahead of what its shares can withdraw, and a full final exit can revert. Value is misallocated, not missing: the vault still backs the book once the dead position is counted. Pinned by `test_deadShareSeedDilutesEveryYieldCredit`. Closing it is an economic change to a deployed protocol, so it is a decision, not a patch.
-3. **Ledger vs vault cash.** `settle()` books Hull/Ballast/reserve/treasury NAV. Positive **spot mark** does not mint dUSD. `totalAssets == idle + deployed` always. `hullTvl+balTvl+reserve+treasuryAccrued` can exceed vault cash until `unwind()` realizes the spot leg. Unfunded `settle` (engine-only, tests) diverges by construction.
-4. **Single-key owner / guardian.** Guardian is pause-only (proven by test). Mainnet gap: timelock + multisig, published guardian policy.
-5. **No deposit caps.** Mainnet gap: progressive limits.
-6. **SimVenue funding pot.** Positive funding is paid from a seeded pot. Empty pot reverts `InsufficientPot`.
-7. **Free / testnet ops.** Keeper `/health` paging is a mainnet gap. dUSD faucet is a demo.
+2. **Share issuance is closed (was: public ERC-4626).** `deposit`/`mint` are now `onlyTranches`; previews stay open. Tests: `test/unit/ShareIssuance.t.sol`, `test/fuzz/Solvency.t.sol`. Dead-share seed is one-shot `seedDeadShares()`.
+3. **Dead-share yield leak (open).** Protocol-owned dead vBLITZ strands a slice of every yield credit. Tranches' book can run ahead of redeemable cash for live holders. Pinned historically by `test_deadShareSeedDilutesEveryYieldCredit` (verify live bytecode). Closing it is an economic change to a deployed protocol.
+4. **Ledger vs vault cash.** `settle()` books Hull/Ballast/reserve/treasury NAV. Positive **spot mark** does not mint dUSD. `totalAssets == idle + deployed` always. Book can exceed vault cash until `unwind()` realizes the spot leg.
+5. **Guardian pause (ingress-only).** Pause freezes joins / deploy / crank / settle / pull. **Emergency egress is allowed:** `EngineLite.unwind`, tranche exits, vault `withdraw`/`redeem`, and engine callbacks needed for unwind. Mainnet gap: timelock + real multisig, published guardian policy.
+6. **No deposit caps.** Mainnet gap: progressive limits.
+7. **SimVenue funding pot.** Positive funding is paid from a seeded pot. Empty pot reverts `InsufficientPot`.
+8. **Free / testnet ops.** Keeper `/health` paging is a mainnet gap. dUSD faucet is a demo.
 
-Until every line in the README “honest gap” is crossed, the banner stays amber and the first word stays **unaudited**.
+Until every line in [`docs/MAINNET-READY.md`](./docs/MAINNET-READY.md) Gates 0–4 is green — including a **third-party audit report** — the banner stays amber and the first word stays **unaudited**. Internal FINDINGS / Slither / fuzz are not Gate 3.

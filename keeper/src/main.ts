@@ -204,8 +204,16 @@ async function main(): Promise<void> {
       gasBudgetWei = 10n ** 18n;
     }
     const book = md.getBook();
-    const age = book.updatedAt ? Date.now() - book.updatedAt : Number.MAX_SAFE_INTEGER;
-    let perplShort = shortNotionalFromPositions(truth.positions, marketId, book.bestAsk ?? 0, 0);
+    const ask = book.bestAsk;
+    let age = book.updatedAt ? Date.now() - book.updatedAt : Number.MAX_SAFE_INTEGER;
+    // Never coerce missing book to 0 — that silently under-hedges. Missing ask ⇒ stale ⇒ halt.
+    if (hasPerpl && (ask == null || !(ask > 0))) {
+      age = Number.MAX_SAFE_INTEGER;
+    }
+    let perplShort = 0n;
+    if (ask != null && ask > 0) {
+      perplShort = shortNotionalFromPositions(truth.positions, marketId, ask, 0);
+    }
     if (perplShort === 0n) {
       for (const p of truth.positions) {
         if (p.mkt === marketId && p.s < 0) perplShort += BigInt(-p.s);
@@ -246,6 +254,16 @@ async function main(): Promise<void> {
       return;
     }
     if (decision.kind === "reduce") {
+      const bid = md.getBook().bestBid;
+      if (bid == null || !(bid > 0)) {
+        const halt: Decision = {
+          kind: "halt",
+          reason: "reduce blocked — missing bestBid (never coerce to 0)",
+        };
+        recordDecision(halt, true, undefined, "missing book");
+        console.warn("DECISION", halt);
+        return;
+      }
       const result = executeDecision(
         decision,
         {
@@ -268,7 +286,7 @@ async function main(): Promise<void> {
           },
         },
         (n) => Number(n > 2n ** 31n ? 2n ** 31n : n),
-        md.getBook().bestBid ?? 0,
+        bid,
       );
       recordDecision(
         decision,

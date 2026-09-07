@@ -188,7 +188,8 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
 
     /// @notice Engine returns `amount` dUSD of previously deployed principal.
     /// @dev Effects before interaction: `deployed` is reduced, then tokens are pulled.
-    function returnFromEngine(uint256 amount) external onlyEngine whenNotPaused nonReentrant {
+    ///      Pause-exempt: required for emergency `EngineLite.unwind` while Guardian is paused.
+    function returnFromEngine(uint256 amount) external onlyEngine nonReentrant {
         if (amount >= deployed) deployed = 0;
         else deployed -= amount;
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
@@ -196,14 +197,16 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
     }
 
     /// @notice Engine donates realized yield dUSD. Does not change `deployed`. Share price rises.
-    function creditYield(uint256 amount) external onlyEngine whenNotPaused nonReentrant {
+    /// @dev Pause-exempt for unwind surplus path while Guardian is paused.
+    function creditYield(uint256 amount) external onlyEngine nonReentrant {
         if (amount == 0) return;
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         emit YieldCredited(amount);
     }
 
     /// @notice Engine realized a loss already paid out of deployed capital. Drops `deployed`.
-    function notifyLoss(uint256 amount) external onlyEngine whenNotPaused nonReentrant {
+    /// @dev Pause-exempt for unwind shortfall path while Guardian is paused.
+    function notifyLoss(uint256 amount) external onlyEngine nonReentrant {
         if (amount > deployed) revert LossExceedsDeployed();
         deployed -= amount;
         emit LossNotified(amount, deployed);
@@ -235,20 +238,20 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
         return super.mint(shares, receiver);
     }
 
+    /// @notice Withdraw assets. Pause-exempt so depositors can exit after emergency unwind.
     function withdraw(uint256 assets, address receiver, address owner_)
         public
         override
-        whenNotPaused
         nonReentrant
         returns (uint256)
     {
         return super.withdraw(assets, receiver, owner_);
     }
 
+    /// @notice Redeem shares. Pause-exempt — same egress policy as `withdraw`.
     function redeem(uint256 shares, address receiver, address owner_)
         public
         override
-        whenNotPaused
         nonReentrant
         returns (uint256)
     {

@@ -50,6 +50,12 @@ describe("prompt 09 review bar", () => {
     expect(badge).not.toMatch(/SIM VENUE — Perpl next/);
   });
 
+  it("pause copy allows unwind egress", () => {
+    const bar = read("components/action-bar.tsx");
+    expect(bar).toMatch(/Unwind and exits stay available/);
+    expect(bar).not.toMatch(/Pause freezes unwind on-chain/);
+  });
+
   it("banner names chain 10143 and not Vessel Finance", () => {
     const copy = read("lib/provider.ts");
     expect(copy).toMatch(/chain 10143/);

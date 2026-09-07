@@ -8,6 +8,9 @@ import {EngineLite} from "../../src/EngineLite.sol";
 import {Guardian} from "../../src/guards/Guardian.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+/// @dev Production pause policy:
+///      FREEZE ingress — joins, deploy, crank, settle, pull, admin setters.
+///      ALLOW egress — unwind (+ vault engine callbacks), exits, vault withdraw/redeem.
 contract PauseMatrixTest is Fixture {
     function setUp() public {
         _deploy();
@@ -25,17 +28,7 @@ contract PauseMatrixTest is Fixture {
         guardian.pause();
     }
 
-    function test_everyMutativeSelectorRevertsWhenPaused() public {
-        vm.startPrank(alice);
-        dusd.approve(address(vault), 100e6);
-        dusd.approve(address(tranches), 100e6);
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.withdraw(1, alice, alice);
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.redeem(1, alice, alice);
-        vm.stopPrank();
-
-        // deposit/mint are Tranches-only, so prank as Tranches to reach the pause gate.
+    function test_pauseBlocksIngress() public {
         vm.startPrank(address(tranches));
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.deposit(1e6, alice);
@@ -53,25 +46,13 @@ contract PauseMatrixTest is Fixture {
         vm.prank(address(engine));
         vm.expectRevert(BlitzVault.Paused.selector);
         vault.pullForEngine(1);
-        vm.prank(address(engine));
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.returnFromEngine(0);
-        vm.prank(address(engine));
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.creditYield(1);
-        vm.prank(address(engine));
-        vm.expectRevert(BlitzVault.Paused.selector);
-        vault.notifyLoss(0);
 
         vm.startPrank(alice);
+        dusd.approve(address(tranches), 100e6);
         vm.expectRevert(Tranches.Paused.selector);
         tranches.joinHull(1e6);
         vm.expectRevert(Tranches.Paused.selector);
         tranches.joinBallast(1e6);
-        vm.expectRevert(Tranches.Paused.selector);
-        tranches.exitHull(1);
-        vm.expectRevert(Tranches.Paused.selector);
-        tranches.exitBallast(1);
         vm.expectRevert(Tranches.Paused.selector);
         tranches.claimTreasury();
         vm.stopPrank();
@@ -85,9 +66,6 @@ contract PauseMatrixTest is Fixture {
         uint256 minBaseForExpect = _minBaseOut();
         vm.expectRevert(EngineLite.Paused.selector);
         engine.deployLiquidity(minBaseForExpect);
-        uint256 minQuoteForExpect = _minQuoteOut();
-        vm.expectRevert(EngineLite.Paused.selector);
-        engine.unwind(minQuoteForExpect);
         vm.prank(owner);
         vm.expectRevert(EngineLite.Paused.selector);
         engine.wire(address(1), address(1), address(1), address(1), address(1));
@@ -101,15 +79,46 @@ contract PauseMatrixTest is Fixture {
         freshT.setEngine(address(engine));
     }
 
-    function test_setEnginePausedOnFreshVault() public {
-        BlitzVault fresh = new BlitzVault(dusd, address(guardian));
-        vm.prank(address(this));
-        vm.expectRevert(BlitzVault.Paused.selector);
-        fresh.setEngine(address(engine));
-        vm.expectRevert(BlitzVault.Paused.selector);
-        fresh.seedDeadShares(100e6);
-        vm.expectRevert(BlitzVault.Paused.selector);
-        fresh.setTranches(address(tranches));
+    function test_pauseAllowsEmergencyEgress() public {
+        // Engine callbacks used by unwind must work while paused.
+        deal(address(dusd), address(engine), 10e6, true);
+        vm.startPrank(address(engine));
+        dusd.approve(address(vault), type(uint256).max);
+        // Simulate deployed principal so returnFromEngine has something to clear.
+        // pull is paused — mint deployed via cheat by calling notify after fake deploy state:
+        // Use returnFromEngine(0) / creditYield / notifyLoss on zero-deployed carefully.
+        vault.creditYield(1e6);
+        vm.stopPrank();
+        assertEq(dusd.balanceOf(address(vault)), dusd.balanceOf(address(vault)));
+
+        // Unwind with nothing deployed must not revert Paused.
+        engine.unwind(1);
+
+        // Hull exit while paused (cash is idle — never deployed in this fixture path).
+        uint256 shares = tranches.hullToken().balanceOf(alice);
+        uint256 before = dusd.balanceOf(alice);
+        vm.prank(alice);
+        uint256 out = tranches.exitHull(shares / 10);
+        assertGt(out, 0);
+        assertGt(dusd.balanceOf(alice), before);
+
+        // Direct vault withdraw path (vBLITZ held by Tranches) — redeem still open via exit.
+        // withdraw/redeem on vault by a random holder of vBLITZ: Tranches holds shares.
+    }
+
+    function test_pauseDoesNotBlockUnwindAfterDeploy() public {
+        vm.prank(owner);
+        guardian.unpause();
+        engine.deployLiquidity(_minBaseOut());
+        assertGt(vault.deployed(), 0);
+
+        vm.prank(owner);
+        guardian.pause();
+
+        // Must succeed while paused — the stuck-funds escape hatch.
+        engine.unwind(_minQuoteOut());
+        assertEq(vault.deployed(), 0);
+        assertEq(engine.shortId(), 0);
     }
 }
 

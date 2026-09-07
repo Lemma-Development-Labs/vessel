@@ -19,14 +19,14 @@ After `deployLiquidity()`, ~90% of vault cash sits at the engine (spot + short).
 
 | Question | Answer |
 | --- | --- |
-| Who can call `unwind`? | **Anyone** (permissionless) when the Guardian is **not** paused. |
+| Who can call `unwind`? | **Anyone** (permissionless), **including while paused**. |
 | Who can call `crank` / `deployLiquidity`? | Anyone (permissionless), subject to pause and engine rules. |
 | Does the UI always expose Unwind? | It must — a hidden Unwind with capital deployed is a stuck-funds bug. |
 | Empty book / router revert | Unwind can fail if the spot leg cannot quote out. Inventory stays at the engine until a quote works. |
 | Dead keeper | Crank/unwind remain callable by any EOAs; hedge *maintenance* stops; waterfall can go stale. |
-| **Guardian pause** | Mutative paths including **unwind, exits, withdraw** revert while paused. Deployed capital is frozen until the pause owner unpauses. **This is the highest stuck-funds class we disclose.** |
-| Keeper key lost | Alone does **not** permanently stuck funds (permissionless unwind/crank), but the hedge stops being maintained. |
-| Guardian / Safe key lost while paused | **Permanent freeze** of deployed capital until that key recovers. Treat pause-key custody as critical. |
+| **Guardian pause** | Freezes **ingress** (joins, deploy, crank, settle, pull). **Allows egress**: permissionless `unwind`, tranche exits, vault withdraw/redeem. |
+| Keeper key lost | Alone does **not** permanently stuck funds (permissionless unwind/crank when unpaused); hedge maintenance stops. |
+| Guardian / Safe key lost while paused | Ingress stays frozen until recovery — capital can still unwind/exit. Still treat pause-key custody as critical. |
 
 ### Privileged functions (access-control table)
 
