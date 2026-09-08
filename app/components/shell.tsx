@@ -33,6 +33,7 @@ const NAV = [
   { href: "/deposit", label: "Deposit" },
   { href: "/portfolio", label: "Book" },
   { href: "/transparency", label: "Transparency" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/series", label: "Series" },
 ] as const;
 
@@ -193,7 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] sm:hidden"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {NAV.map((n) => {
             const on = path === n.href || (n.href === "/deposit" && path === "/");
             return (

@@ -14,6 +14,10 @@ export const SHIPPED = {
     typeof process !== "undefined" &&
       process.env.NEXT_PUBLIC_ENVIO_GRAPHQL?.trim(),
   ),
+  DUNE_DASHBOARD: Boolean(
+    typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_DUNE_DASHBOARD_URL?.trim(),
+  ),
   CRE_DON: false,
   VUSD_MINT: false,
 } as const;
@@ -59,6 +63,11 @@ export function IntegrationChips({ className = "" }: { className?: string }) {
         label="Envio tape ✓"
         ok={SHIPPED.ENVIO_GRAPHQL}
         pending="Envio: coming up"
+      />
+      <Chip
+        label="Dune ✓"
+        ok={SHIPPED.DUNE_DASHBOARD}
+        pending="Dune: SQL ready, dashboard pending"
       />
       <Chip
         label="CRE DON ✓"
