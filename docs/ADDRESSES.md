@@ -28,6 +28,13 @@ Broadcast 2026-08-29 on Monad testnet (`chainId` 10143, `deployedBlock` **579185
 #   App env:   NEXT_PUBLIC_ENVIO_GRAPHQL=<endpoint>
 #   See docs/ENVIO.md · indexer/README.md
 #
+# Dune Analytics — docs/DUNE.md · dune/queries/
+#   Schema: monad_testnet (chainId 10143). SQL templates shipped; dashboard URL pending publish.
+#   App env:   NEXT_PUBLIC_DUNE_DASHBOARD_URL=<public dashboard>
+#              NEXT_PUBLIC_DUNE_QUERY_OVERVIEW=<query id>
+#              DUNE_API_KEY=<server-only>
+#   Flip chip only when NEXT_PUBLIC_DUNE_DASHBOARD_URL is set to a real published dashboard.
+#
 # CRE (Chainlink Runtime Environment) — docs/CRE.md
 #   cre workflow supported-chains requires cre login / CRE_API_KEY (not available in this agent).
 #   Public docs list Monad Testnet (CLI ≥1.30, TS SDK ≥1.19). Default workflow useEvmMonad=false (HTTP path).
