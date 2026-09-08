@@ -9,9 +9,10 @@ report and must never be cited as one.
 
 - `DemoUSD.sol` (testnet only — call out removal for mainnet)
 - `BlitzVault.sol` (ERC-4626, dead shares, engine callbacks, pause egress)
-- `Tranches.sol` / `TrancheToken.sol` (waterfall, floor, settle conservation)
-- `EngineLite.sol` (deploy / crank / unwind, spot PnL cap, pause policy)
-- `Guardian.sol`
+- `Tranches.sol` / `TrancheToken.sol` (waterfall, floor, settle conservation, deposit caps)
+- `EngineLite.sol` (deploy / crank / unwind, spot PnL cap, optional `ISpotOracle`, net-delta halt)
+- `oracles/RouterMidOracle.sol`, `oracles/ManualTwapOracle.sol`
+- `Guardian.sol` (+ planned TimelockController ownership — `script/DeployTimelock.s.sol`)
 - `venues/SimVenue.sol` (testnet) and any live `IVenue` implementation at freeze
 - Router adapter used at freeze (MockRouter today; Kuru adapter when wired)
 - Libraries: `Decimals.sol`

@@ -38,26 +38,18 @@ contract KuruRouter is IRouter, ReentrancyGuard {
     // NativeTransferFailed removed — WMON.deposit reverts on failure.
 
     constructor(address orderBook_, address marginAccount_, address quoteToken_, address baseToken_) {
-        if (orderBook_ == address(0) || marginAccount_ == address(0) || quoteToken_ == address(0) || baseToken_ == address(0))
-        {
+        if (
+            orderBook_ == address(0) || marginAccount_ == address(0) || quoteToken_ == address(0)
+                || baseToken_ == address(0)
+        ) {
             revert ZeroAmount();
         }
         uint8 qDec = IERC20Metadata(quoteToken_).decimals();
         uint8 bDec = IERC20Metadata(baseToken_).decimals();
         if (qDec != 6 || bDec != 18) revert DecimalsMismatch(qDec, bDec);
 
-        (
-            uint32 pricePrecision_,
-            uint96 sizePrecision_,
-            address baseAsset_,
-            ,
-            address quoteAsset_,
-            ,
-            ,
-            ,
-            ,
-            ,
-        ) = IKuruOrderBook(orderBook_).getMarketParams();
+        (uint32 pricePrecision_, uint96 sizePrecision_, address baseAsset_,, address quoteAsset_,,,,,,) =
+            IKuruOrderBook(orderBook_).getMarketParams();
 
         if (quoteAsset_ != quoteToken_) revert QuoteTokenMismatch(quoteToken_, quoteAsset_);
         // Engine holds WMON. Book base must be native MON so we can wrap.

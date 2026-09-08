@@ -7,13 +7,16 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IGuardian} from "./interfaces/IGuardian.sol";
 import {IVenue} from "./interfaces/IVenue.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
+import {ISpotOracle} from "./interfaces/ISpotOracle.sol";
 import {IBlitzVault, ITranches} from "./interfaces/IEngine.sol";
 
 /// @title EngineLite
 /// @notice Deploys vault liquidity 50/50 into WMON spot + a venue short, cranks
 ///         funding + mark PnL into Tranches.settle, and can fully unwind.
-/// @dev Spot mark is router.quoteExactBaseForQuote (manipulable). Per-crank spot
-///      PnL is capped at ±SPOT_PNL_CAP_BPS of the last marked spot value.
+/// @dev Spot mark prefers `spotOracle` when set and fresh; otherwise router mid
+///      (manipulable). Per-crank spot PnL is capped at ±SPOT_PNL_CAP_BPS.
+///      Optional `netDeltaHaltBps`: after a crank breaches the band, further
+///      deploy/crank revert until permissionless unwind clears the latch.
 ///      Swap minOut is ALWAYS caller-supplied — never a magic constant.
 contract EngineLite is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -29,6 +32,7 @@ contract EngineLite is ReentrancyGuard {
     ITranches public tranches;
     IVenue public venue;
     IRouter public router;
+    ISpotOracle public spotOracle;
     address public wmon;
     IERC20 public dUsd;
 
@@ -36,6 +40,10 @@ contract EngineLite is ReentrancyGuard {
     uint256 public shortId;
     uint256 public lastSpotValue;
     uint256 public lastCrank;
+
+    /// @notice Absolute |netDeltaBps| that latches `deltaHalted`. 0 = disabled.
+    int256 public netDeltaHaltBps;
+    bool public deltaHalted;
 
     error NotDeployer();
     error AlreadyWired();
@@ -47,12 +55,18 @@ contract EngineLite is ReentrancyGuard {
     error NoPosition();
     error IntOverflow();
     error MinOutZero();
+    error DeltaHalted();
+    error HaltBpsInvalid();
 
     event Wired(address vault, address tranches, address venue, address router, address wmon);
     event LiquidityDeployed(uint256 pulled, uint256 toSpot, uint256 shortId, uint256 wmonOut);
     event Cranked(address indexed caller, int256 grossYield, int256 netDeltaBps);
     event Unwound(uint256 dUsdReturned, int256 closePnl);
     event SpotPnlCapped(int256 uncapped, int256 capped);
+    event SpotOracleSet(address indexed oracle);
+    event NetDeltaHaltBpsSet(int256 bps);
+    event DeltaHaltLatched(int256 netDeltaBps);
+    event DeltaHaltCleared();
 
     modifier onlyDeployer() {
         if (msg.sender != deployer) revert NotDeployer();
@@ -93,10 +107,24 @@ contract EngineLite is ReentrancyGuard {
         emit Wired(vault_, tranches_, venue_, router_, wmon_);
     }
 
+    /// @notice Optional external mark (TWAP / ManualTwapOracle). address(0) = router mid only.
+    function setSpotOracle(address oracle_) external onlyDeployer whenNotPaused {
+        spotOracle = ISpotOracle(oracle_);
+        emit SpotOracleSet(oracle_);
+    }
+
+    /// @notice Enable on-chain net-delta halt band. 0 disables. Must be in (0, BPS].
+    function setNetDeltaHaltBps(int256 bps) external onlyDeployer whenNotPaused {
+        if (bps < 0 || bps > int256(BPS)) revert HaltBpsInvalid();
+        netDeltaHaltBps = bps;
+        emit NetDeltaHaltBpsSet(bps);
+    }
+
     /// @notice Pull deployable idle, swap half to WMON via IRouter, open equal-notional short.
     /// @param minBaseOut Caller-supplied floor for the spot buy (from off-chain book).
     function deployLiquidity(uint256 minBaseOut) external whenNotPaused nonReentrant {
         if (!wired) revert NotWired();
+        if (deltaHalted) revert DeltaHalted();
         if (shortId != 0) revert AlreadyDeployed();
         if (minBaseOut == 0) revert MinOutZero();
         uint256 amount = vault.deployable();
@@ -113,6 +141,7 @@ contract EngineLite is ReentrancyGuard {
     /// @notice Permissionless. Sweep venue funding, mark spot PnL (capped), settle the waterfall.
     function crank() external whenNotPaused nonReentrant {
         if (!wired) revert NotWired();
+        if (deltaHalted) revert DeltaHalted();
         int256 funding;
         if (shortId != 0) {
             dUsd.forceApprove(address(venue), 0);
@@ -130,7 +159,9 @@ contract EngineLite is ReentrancyGuard {
         int256 grossYield = funding + spotPnl;
         _handoffYield(funding);
         tranches.settle(grossYield);
-        emit Cranked(msg.sender, grossYield, netDeltaBps());
+        int256 nd = netDeltaBps();
+        emit Cranked(msg.sender, grossYield, nd);
+        _maybeLatchDeltaHalt(nd);
     }
 
     /// @notice Close the short, swap WMON back to dUSD, return all dUSD to the vault.
@@ -169,6 +200,10 @@ contract EngineLite is ReentrancyGuard {
             vault.notifyLoss(dep);
         }
         lastSpotValue = 0;
+        if (deltaHalted) {
+            deltaHalted = false;
+            emit DeltaHaltCleared();
+        }
         emit Unwound(cash, closePnl);
     }
 
@@ -233,7 +268,20 @@ contract EngineLite is ReentrancyGuard {
     function _spotValue() internal view returns (uint256) {
         uint256 bal = IERC20(wmon).balanceOf(address(this));
         if (bal == 0) return 0;
+        if (address(spotOracle) != address(0) && !spotOracle.isStale()) {
+            return spotOracle.quoteBaseInQuote(bal);
+        }
         return router.quoteExactBaseForQuote(bal);
+    }
+
+    function _maybeLatchDeltaHalt(int256 ndBps) internal {
+        int256 band = netDeltaHaltBps;
+        if (band == 0) return;
+        int256 mag = ndBps < 0 ? -ndBps : ndBps;
+        if (mag > band) {
+            deltaHalted = true;
+            emit DeltaHaltLatched(ndBps);
+        }
     }
 
     function _swapQuoteForBase(uint256 quoteIn, uint256 minBaseOut) internal returns (uint256 baseOut) {

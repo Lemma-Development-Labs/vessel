@@ -51,6 +51,11 @@ contract Tranches is ReentrancyGuard {
     uint256 public treasuryAccrued;
     uint256 public lastSettle;
 
+    /// @notice Max hullTvl + balTvl after a join. 0 = uncapped (legacy / tests).
+    uint256 public depositCap;
+    /// @notice Soft warning threshold (events only). 0 = unused. Soft ≤ hard when both set.
+    uint256 public softDepositCap;
+
     error NotDeployer();
     error EngineAlreadySet();
     error NotEngine();
@@ -62,6 +67,8 @@ contract Tranches is ReentrancyGuard {
     error ZeroAmount();
     error BelowMinJoin();
     error ImplausibleYield();
+    error DepositCapExceeded(uint256 nextTvl, uint256 cap);
+    error SoftCapAboveHard();
 
     event EngineWired(address indexed engine, uint256 lastSettle);
     event JoinedHull(address indexed user, uint256 assets, uint256 shares);
@@ -69,6 +76,8 @@ contract Tranches is ReentrancyGuard {
     event ExitedHull(address indexed user, uint256 shares, uint256 assets);
     event ExitedBallast(address indexed user, uint256 shares, uint256 assets);
     event TreasuryClaimed(address indexed to, uint256 amount);
+    event DepositCapSet(uint256 hardCap, uint256 softCap);
+    event SoftDepositCapBreached(uint256 nextTvl, uint256 softCap);
     event Waterfall(
         int256 gross,
         uint256 fee,
@@ -119,11 +128,28 @@ contract Tranches is ReentrancyGuard {
         emit EngineWired(engine_, lastSettle);
     }
 
+    /// @notice Set progressive deposit limits. `hardCap=0` disables. Soft emits only.
+    function setDepositCap(uint256 hardCap, uint256 softCap) external onlyDeployer whenNotPaused {
+        if (hardCap != 0 && softCap > hardCap) revert SoftCapAboveHard();
+        depositCap = hardCap;
+        softDepositCap = softCap;
+        emit DepositCapSet(hardCap, softCap);
+    }
+
+    /// @notice Convenience: hard cap only (soft = 80% of hard when hard > 0).
+    function setDepositCap(uint256 hardCap) external onlyDeployer whenNotPaused {
+        uint256 soft = hardCap == 0 ? 0 : (hardCap * 8_000) / BPS;
+        depositCap = hardCap;
+        softDepositCap = soft;
+        emit DepositCapSet(hardCap, soft);
+    }
+
     /// @notice Join the Hull deck. Deposits `assets` dUSD into the vault at current Hull NAV.
     function joinHull(uint256 assets) external whenNotPaused nonReentrant returns (uint256 shares) {
         if (assets < MIN_JOIN) revert BelowMinJoin();
         uint256 newHull = hullTvl + assets;
         _assertFloor(newHull, balTvl, false);
+        _assertDepositCap(newHull + balTvl);
         shares = _previewMint(hullToken, hullTvl, assets);
         hullTvl = newHull;
         hullToken.mint(msg.sender, shares);
@@ -136,6 +162,7 @@ contract Tranches is ReentrancyGuard {
         if (assets < MIN_JOIN) revert BelowMinJoin();
         uint256 newBal = balTvl + assets;
         _assertFloor(hullTvl, newBal, false);
+        _assertDepositCap(hullTvl + newBal);
         shares = _previewMint(ballastToken, balTvl, assets);
         balTvl = newBal;
         ballastToken.mint(msg.sender, shares);
@@ -331,6 +358,13 @@ contract Tranches is ReentrancyGuard {
             if (newBps >= oldBps) return;
         }
         revert SubordinationFloor(_ratioBps(newH, newB));
+    }
+
+    function _assertDepositCap(uint256 nextTvl) internal {
+        uint256 soft = softDepositCap;
+        if (soft != 0 && nextTvl > soft) emit SoftDepositCapBreached(nextTvl, soft);
+        uint256 hard = depositCap;
+        if (hard != 0 && nextTvl > hard) revert DepositCapExceeded(nextTvl, hard);
     }
 
     function _spillToKeepFloor(uint256 newH, uint256 newB, uint256 hullAccrual) internal pure returns (uint256 spill) {

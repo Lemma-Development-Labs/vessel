@@ -239,22 +239,12 @@ contract BlitzVault is ERC4626, ReentrancyGuard {
     }
 
     /// @notice Withdraw assets. Pause-exempt so depositors can exit after emergency unwind.
-    function withdraw(uint256 assets, address receiver, address owner_)
-        public
-        override
-        nonReentrant
-        returns (uint256)
-    {
+    function withdraw(uint256 assets, address receiver, address owner_) public override nonReentrant returns (uint256) {
         return super.withdraw(assets, receiver, owner_);
     }
 
     /// @notice Redeem shares. Pause-exempt — same egress policy as `withdraw`.
-    function redeem(uint256 shares, address receiver, address owner_)
-        public
-        override
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(uint256 shares, address receiver, address owner_) public override nonReentrant returns (uint256) {
         return super.redeem(shares, receiver, owner_);
     }
 }

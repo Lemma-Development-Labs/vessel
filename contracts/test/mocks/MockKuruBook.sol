@@ -50,19 +50,7 @@ contract MockKuruBook {
     function getMarketParams()
         external
         view
-        returns (
-            uint32,
-            uint96,
-            address,
-            uint256,
-            address,
-            uint256,
-            uint32,
-            uint96,
-            uint96,
-            uint256,
-            uint256
-        )
+        returns (uint32, uint96, address, uint256, address, uint256, uint32, uint96, uint96, uint256, uint256)
     {
         return (
             pricePrecision,

@@ -63,9 +63,7 @@ contract Deploy is Script {
             vault = new BlitzVault(quote, address(guardian));
             tranches = new Tranches(address(vault), address(guardian), owner);
             venue = new SimVenue(address(quote), owner);
-            router = IRouter(
-                address(new KuruRouter(KURU_ORDER_BOOK, KURU_MARGIN, address(quote), wmon))
-            );
+            router = IRouter(address(new KuruRouter(KURU_ORDER_BOOK, KURU_MARGIN, address(quote), wmon)));
         } else {
             dusd = new DemoUSD();
             quote = IERC20(address(dusd));
