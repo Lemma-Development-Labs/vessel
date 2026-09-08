@@ -1,4 +1,5 @@
 import type { Live } from "./live";
+import { activeNetwork } from "./networks";
 
 export type DeckKind = "hull" | "ballast";
 
@@ -219,6 +220,8 @@ export function planExit(args: {
   return { kind: "ready", assetsOut };
 }
 
+const net = activeNetwork();
+
 export const COPY = {
   floor: "Ballast must stay at or above 20% of deck TVL. Join Ballast or exit Hull.",
   hullFull: "Hull is full for now — Ballast capacity must grow first (20% floor)",
@@ -231,8 +234,8 @@ export const COPY = {
   },
   impair: "HULL IMPAIRMENT — halted",
   slippage: "price moved — try again",
-  banner: "TESTNET · chain 10143 · unaudited · not Vessel Finance",
-  legal: "Unaudited testnet. Demo dollars (dUSD) have no value. Not an offer of securities.",
+  banner: net.banner,
+  legal: net.legal,
   unwindWhat:
     "Unwind closes the venue short, swaps WMON back to dUSD, and returns every deployed dollar to the vault. It is permissionless — anyone can call it.",
   unwindScope:

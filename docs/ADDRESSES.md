@@ -50,10 +50,13 @@ until this section contains entries.
 
 ```
 # Shipped hashes
-# TX_KURU_SPOT   <pending>   —   2026-09-04   blocked: MON-USDC bestAsk=0 @ block 59560667; no DEPLOYER_PK in this agent env
+# TX_KURU_SPOT   <pending>   —   2026-09-08   blocked: on-chain bestAsk=0 @ Kuru book 0xa241… (Exchange REST MON_USDC depth ≠ this CLOB); no DEPLOYER_PK in agent env
 # PERPL_KEEPER_ORDER  <pending>  —  2026-09-06  blocked: no PERPL_API_KEY in agent env; keeper/ shipped with 24 unit tests green; see keeper/README.md
-# PERPL_POSITION_READER / PERPL_VENUE  <pending deploy> — see cursor/perpl-venue-bf3b; on-chain 0xaf1C… still stub
+# PERPL_POSITION_READER / PERPL_VENUE  <pending deploy> — on-chain 0xaf1C… still stub (isSimulated=true)
 ```
+
+Mainnet (143): see [`ADDRESSES.mainnet.json`](../ADDRESSES.mainnet.json) — **not_deployed**.
+Readiness decisions: [`MAINNET-READINESS-REPORT.md`](./MAINNET-READINESS-REPORT.md).
 
 Perpl testnet references (api-docs 2026-09-04):
 

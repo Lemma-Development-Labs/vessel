@@ -14,6 +14,7 @@
 | Landing | [vessel.wtf](https://vessel.wtf) |
 | Docs | [docs.vessel.wtf](https://docs.vessel.wtf) |
 | **Testnet app (live)** | **[testnet.vessel.wtf](https://testnet.vessel.wtf)** · mirror [vessel-testnet.vercel.app](https://vessel-testnet.vercel.app) |
+| Mainnet app | Same codebase · `NEXT_PUBLIC_CHAIN_ID=143` + [`ADDRESSES.mainnet.json`](./ADDRESSES.mainnet.json) — **not deployed** (see [`docs/MAINNET-READINESS-REPORT.md`](./docs/MAINNET-READINESS-REPORT.md)) |
 | Public status | [testnet.vessel.wtf/status](https://testnet.vessel.wtf/status) |
 | Stats + keeper service | [vessel-service-production.up.railway.app/health](https://vessel-service-production.up.railway.app/health) |
 | Explorer | [testnet.monadvision.com](https://testnet.monadvision.com) |

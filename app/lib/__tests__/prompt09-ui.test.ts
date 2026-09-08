@@ -57,9 +57,12 @@ describe("prompt 09 review bar", () => {
   });
 
   it("banner names chain 10143 and not Vessel Finance", () => {
+    const networks = read("lib/networks.ts");
     const copy = read("lib/provider.ts");
-    expect(copy).toMatch(/chain 10143/);
-    expect(copy).toMatch(/not Vessel Finance/);
+    expect(networks).toMatch(/chain 10143/);
+    expect(networks).toMatch(/not Vessel Finance/);
+    expect(copy).toMatch(/activeNetwork/);
+    expect(copy).toMatch(/banner: net\.banner/);
     expect(copy).not.toMatch(/\bAPY\b/);
     expect(copy).not.toMatch(/partnered|guaranteed/i);
   });
