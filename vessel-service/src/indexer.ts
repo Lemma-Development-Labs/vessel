@@ -301,6 +301,21 @@ export async function startIndexer(opts: {
   // Resume point: persisted cursor + 1, floored at deployedBlock. Only when
   // nothing is persisted do we fall all the way back to deployedBlock.
   let cursor: bigint | null = null;
+  // A redeploy moves every contract, so anything indexed under the previous
+  // deployment describes a protocol we are no longer serving. Clear it before
+  // reading the cursor, or the waterfall log blends two deployments' history.
+  try {
+    const wiped = await store.resetIfRedeployed(chainId, addrs.contracts.Tranches, deployed);
+    if (wiped) {
+      log.warn(
+        { tranches: addrs.contracts.Tranches, deployedBlock: deployed.toString() },
+        "new deployment detected — cleared indexed history from the previous one",
+      );
+    }
+  } catch (err) {
+    log.error({ err: errMsg(err) }, "resetIfRedeployed failed — continuing with existing data");
+  }
+
   try {
     cursor = await store.getCursor(chainId);
   } catch (err) {
