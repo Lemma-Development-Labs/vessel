@@ -229,6 +229,16 @@ export async function startApi(opts: {
         `keeper gas runway ${ks.cranksRemaining} cranks < MIN_CRANKS_RUNWAY ${ks.minCranksRunway}`,
       );
     }
+    // Configured but not cranking is its own failure. Without this, a keeper
+    // that bailed out at preflight and then had its balance topped up would
+    // read healthy while nothing was settling the waterfall.
+    if (ks.configured && !ks.running) {
+      degraded.push(
+        ks.lastError
+          ? `keeper is not cranking: ${ks.lastError}`
+          : "keeper is configured but not cranking",
+      );
+    }
     if (ks.stuckTxHash) degraded.push(`keeper has a stuck crank tx ${ks.stuckTxHash}`);
 
     // ---- indexer ----------------------------------------------------------
