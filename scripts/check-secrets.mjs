@@ -37,6 +37,33 @@ const files = execSync("git ls-files", { encoding: "utf8", maxBuffer: 10 * 1024 
   );
 
 const keyRe = /0x([a-fA-F0-9]{64})/g;
+
+/**
+ * A 32-byte hex value is only key material if something calls it a key.
+ * Block hashes, transaction hashes, state roots and digests are the same
+ * width and are meant to be published — an evidence fixture recording
+ * `blockHash: "0x…"` is the opposite of a leak.
+ *
+ * So we skip a match only when the line it sits on (or the line above it,
+ * for a wrapped assignment) names it as a hash. Deliberately narrow: anything
+ * named like a key, secret, mnemonic or PK is still reported, and a bare hex
+ * with no identifier at all is still reported.
+ */
+const HASH_CONTEXT =
+  /\b(block_?hash|tx_?hash|transaction_?hash|parent_?hash|state_?root|receipts_?root|\w*_?root|digest|sha256|checksum|commit_?hash|merkle\w*|proof|salt|selector|topic|\w*Hash)\b/i;
+const KEY_CONTEXT =
+  /\b(priv\w*|secret|mnemonic|seed_?phrase|\w*_?pk|pk_?\w*|keystore|signing_?key|api_?key)\b/i;
+
+/** Line containing `index`, plus the preceding line for wrapped values. */
+function contextAround(text, index) {
+  const start = text.lastIndexOf("\n", index) + 1;
+  const end = text.indexOf("\n", index);
+  const line = text.slice(start, end === -1 ? text.length : end);
+  const prevStart = text.lastIndexOf("\n", start - 2) + 1;
+  const prev = start > 0 ? text.slice(prevStart, start - 1) : "";
+  return `${prev}\n${line}`;
+}
+
 let bad = 0;
 for (const file of files) {
   let text;
@@ -50,6 +77,9 @@ for (const file of files) {
   while ((m = keyRe.exec(text))) {
     const hex = m[1].toLowerCase();
     if (ALLOW.has(hex)) continue;
+    const ctx = contextAround(text, m.index);
+    // A key-ish name always wins, so mislabelling cannot hide one.
+    if (!KEY_CONTEXT.test(ctx) && HASH_CONTEXT.test(ctx)) continue;
     console.error(`possible key material in ${file}: 0x${hex.slice(0, 8)}…`);
     bad++;
   }
