@@ -13,7 +13,14 @@ jobs:
         working-directory: contracts
     steps:
       - uses: actions/checkout@v4
+      # Pinned, not `stable`. Gas accounting changes between Foundry releases,
+      # so an unpinned toolchain silently moves the baseline that
+      # `forge snapshot --check` measures against — the snapshot gate then fails
+      # on a release nobody asked for, with no contract change behind it.
+      # Bump this deliberately, regenerating .gas-snapshot in the same commit.
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.3
       # foundry.toml pins solc 0.8.24. On a cold runner svm must fetch it, so
       # --offline cannot be used; cache the download instead so runs stay fast.
       - name: cache solc (svm)
