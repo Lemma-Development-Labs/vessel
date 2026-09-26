@@ -75,4 +75,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: scanner self-test (must catch a planted key)
+        run: node scripts/check-secrets.test.mjs
       - run: node scripts/check-secrets.mjs
