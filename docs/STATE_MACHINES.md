@@ -9,8 +9,17 @@ differently, the blueprint wins and the variant is recorded under
 transition also re-checks chain config, caller, receiver, deadline, pause
 dimension, capacity and quota (spec §6).
 
-Nothing here is implemented yet except the observation tags in
-`packages/domain`. Implementation sessions are noted per machine.
+Implementation sessions are noted per machine. **Implemented (Session 2,
+2026-09-30) in `contracts/src/core/TrancheController.sol`:** §1 Hull series,
+§2 subscription, §3 Ballast exit, §7 pause dimensions (`PauseGuardian`). The
+observation tags (§5) live in `packages/domain`. How the contracts encode them:
+
+| Machine | On-chain encoding | Compression vs this document |
+|---|---|---|
+| Hull series | `SeriesState` enum, same names | `DRAFT` is implicit (terms are passed to `openSeries`, which opens the window) |
+| Subscription | `ReqStatus`: `ESCROWED → ADMITTED \| REFUNDABLE → REFUNDED` | `REQUESTED` and `ESCROWED` are one step (funds move in the request tx); `CLAIMED_REFUND` is named `REFUNDED` |
+| Ballast exit | `ExitStatus`: `COOLING → FUNDED \| CANCELLED`; `units` = still-exposed remainder | `ELIGIBLE` is derived (`now ≥ requestedAt + 48 h`); `PARTIALLY_FUNDED` is `COOLING` with `funded > 0`; `USER_LIMITED` is an event (`ExitUserLimited`), the request stays queued |
+| Pause | bitmask `ADMISSION=1, RISK_INCREASE=2, SETTLEMENT=4, CLAIMS=8` | guardian pauses; only governance resumes |
 
 ## 1. Hull series (S2)
 
