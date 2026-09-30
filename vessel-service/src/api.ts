@@ -27,6 +27,7 @@ import {
 } from "./addresses.ts";
 import { fundingApr7dBps, type Store } from "./db.ts";
 import { getIndexerStatus } from "./indexer.ts";
+import { authRoutes, type AuthRouteDeps } from "./auth/routes.ts";
 import { getKeeperStatus, getLastSuccessfulCrank } from "./keeper.ts";
 
 const log = pino({ name: "api", level: process.env.LOG_LEVEL ?? "info" });
@@ -62,6 +63,8 @@ export async function startApi(opts: {
   publicClient?: PublicClient;
   addrs?: VesselAddresses;
   keeperAddress?: `0x${string}`;
+  /** SIWE auth routes (docs/AUTH.md). Omitted → auth is not served. */
+  auth?: AuthRouteDeps;
 }): Promise<ApiHandle> {
   const rpcUrl = getRpcUrl();
   const chainId = getChainId();
@@ -125,6 +128,11 @@ export async function startApi(opts: {
     { allowedOrigins, rateLimitMax: rlMax, rateLimitWindowSec: rlWindowSec },
     "cors allowlist + rate limit configured",
   );
+
+  if (opts.auth) {
+    await app.register(authRoutes(opts.auth));
+    log.info({ domain: opts.auth.settings.domain, origin: opts.auth.settings.origin }, "auth routes registered");
+  }
 
   app.addHook("onSend", async (req, reply, payload) => {
     if (req.method === "GET") {

@@ -1,8 +1,9 @@
 # AUTH
 
-Frozen design (Session 1, 2026-09-23) per [spec/VESSEL_V1.md](spec/VESSEL_V1.md)
-§14. Implementation is the remaining Session 1 work item; nothing below is
-live yet. A wallet connection is display-only and is **not** an authenticated
+Design frozen 2026-09-23 per [spec/VESSEL_V1.md](spec/VESSEL_V1.md) §14;
+**implemented 2026-09-30** in `vessel-service/src/auth/` (tests:
+`vessel-service/test/auth.test.ts`, 15 passing against real Postgres via
+PGlite). Not yet deployed: the app rewrite and shell are the next step. A wallet connection is display-only and is **not** an authenticated
 server session.
 
 ## Model
@@ -33,6 +34,18 @@ separately from public reads (spec §13).
 | `POST /auth/refresh` | rotate refresh token; reuse of a consumed token revokes the whole session family (theft detection) |
 | `POST /auth/logout` | revoke refresh family |
 | `GET /auth/session` | current wallet + expiry, or 401 |
+| `GET /auth/disclosure` | current versioned disclosure text + SHA-256 (single source; the app renders it) |
+| `POST /auth/invitations/redeem` | session required; binds the invitation to the signed-in wallet atomically with creating the participant |
+| `POST /auth/consent` | session + participant required; records `{version, sha256}` only if the hash matches the published text |
+| `GET /auth/eligibility` | backend onboarding status, and on-chain admission as a separate `UNAVAILABLE` field until BetaAdmission exists |
+
+All `POST` routes require `Origin` = `AUTH_ORIGIN` **and** `x-vessel-csrf: 1`
+(403 `CSRF` otherwise). Auth routes have their own rate limit (30/min/IP),
+separate from public reads, and run in an encapsulated Fastify scope so the
+public API's error handling and CORS (GET/HEAD, no credentials) are unchanged.
+SIWE messages must carry `expirationTime` and live ≤ 10 minutes; `issuedAt`
+may lead the server clock by ≤ 60 s. Error codes are listed in
+`src/auth/core.ts` (`AuthErrorCode`).
 
 ## Session policy
 
@@ -48,10 +61,19 @@ separately from public reads (spec §13).
 - Email, if ever collected, is support metadata only — never authority to
   move funds.
 
-## Sequencing constraint
+## Storage and configuration
 
-`vessel-service/src/db.ts` currently carries uncommitted in-flight changes
-(indexer reset on redeploy). Auth tables and code land **after** that work is
-committed, to avoid colliding with it. Invite codes, BetaAdmission linkage,
-and consent versions are later sessions (S5/S8) — this document covers only
-the authenticated shell.
+- Tables (migration `001_identity`): `participants`, `wallets` (address PK,
+  one wallet per participant), `invitations` (SHA-256 only, single-use),
+  `consent_versions`, `consents`, `auth_nonces`, `auth_sessions` (token
+  hashes only), `audit_events`, `intents` (`UNIQUE(account, idempotency_key)`,
+  used from Session 4).
+- `AUTH_DOMAIN` + `AUTH_ORIGIN` enable auth; https required except localhost
+  outside mainnet. `DATABASE_URL` is required on mainnet; without it
+  (local/testnet only) sessions live in an in-process PGlite.
+- Invitations: `pnpm invite:create [ttlDays]` against a real database prints
+  the code once. Non-mainnet runs may pre-seed code hashes with
+  `AUTH_SEED_INVITE_SHA256S`; mainnet refuses that variable.
+- Disclosure: `src/auth/disclosures.ts` holds the testnet text; mainnet has
+  none and refuses to serve one until counsel-reviewed terms exist (G06).
+- BetaAdmission linkage (on-chain) is Session 2.

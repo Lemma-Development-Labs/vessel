@@ -65,22 +65,22 @@ reference must not call the implementation under test.
 
 | Requirement | Artifact | Status |
 |---|---|---|
-| SIWE full validation (domain, URI, chain, nonce, window) | service unit tests | PLANNED-S1 (remaining item) |
-| Nonce single-use; refresh rotation + reuse-revocation | service unit tests | PLANNED-S1 (remaining item) |
-| Session expiry 15m/7d; logout revokes | service unit tests | PLANNED-S1 (remaining item) |
+| SIWE full validation (domain, URI, chain, nonce, window) | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| Nonce single-use; refresh rotation + reuse-revocation | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| Session expiry 15m/7d; logout revokes | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 
 ### Phase 1 named tests (master build prompt §1.6)
 
 | Test | Module | Status |
 |---|---|---|
-| `siwe_rejects_cross_domain_replay` | vessel-service auth | PLANNED-S1 |
-| `siwe_rejects_wrong_chain` | vessel-service auth | PLANNED-S1 |
-| `siwe_rejects_reused_nonce` | vessel-service auth | PLANNED-S1 |
-| `siwe_rejects_expired_nonce` | vessel-service auth | PLANNED-S1 |
-| `refresh_reuse_revokes_family` | vessel-service auth | PLANNED-S1 |
+| `siwe_rejects_cross_domain_replay` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| `siwe_rejects_wrong_chain` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| `siwe_rejects_reused_nonce` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| `siwe_rejects_expired_nonce` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| `refresh_reuse_revokes_family` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `wallet_switch_clears_private_queries` | app | PLANNED-S1 |
-| `invite_single_use_and_hashed` | vessel-service auth | PLANNED-S1 |
-| `invite_binds_only_after_wallet_proof` | vessel-service auth | PLANNED-S1 |
+| `invite_single_use_and_hashed` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
+| `invite_binds_only_after_wallet_proof` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `env_rejects_mainnet_mock_provider` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |
 | `env_rejects_placeholder_address` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |
 | `env_rejects_lab_address_on_mainnet` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |

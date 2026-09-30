@@ -410,7 +410,7 @@ class PgStore implements Store {
  * `?sslmode=disable` in the URL is honoured, since that is the standard way to
  * say so and node-postgres ignores it once an explicit `ssl` option is set.
  */
-function pgSsl(connectionString: string): boolean | { rejectUnauthorized: boolean } {
+export function pgSsl(connectionString: string): boolean | { rejectUnauthorized: boolean } {
   if (/[?&]sslmode=disable\b/.test(connectionString)) return false;
   if (/localhost|127\.0\.0\.1|\.railway\.internal|\.internal(?::\d+)?\//.test(connectionString)) {
     return false;

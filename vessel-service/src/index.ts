@@ -11,6 +11,7 @@ import {
 } from "./addresses.ts";
 import { assertRpcChainIds, loadRuntimeConfig } from "./vendor/vessel-config.ts";
 import { initDb } from "./db.ts";
+import { initAuth } from "./auth/bootstrap.ts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -42,7 +43,9 @@ async function main(): Promise<void> {
   });
   const store = await initDb();
 
-  const api = await startApi({ store, publicClient, addrs });
+  const auth = await initAuth(runtime.environment, runtime.chainId, log);
+
+  const api = await startApi({ store, publicClient, addrs, ...(auth ? { auth: auth.deps } : {}) });
 
   let keeper: KeeperHandle | undefined;
   let indexer: Awaited<ReturnType<typeof startIndexer>> | undefined;
@@ -53,6 +56,7 @@ async function main(): Promise<void> {
     indexer?.stop();
     await api.stop();
     await store.close();
+    await auth?.close();
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));

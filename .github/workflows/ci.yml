@@ -114,9 +114,15 @@ jobs:
           node-version: 20
       - name: vendored packages match their source
         run: node scripts/sync-packages.mjs --check
+      - name: install
+        working-directory: vessel-service
+        run: pnpm install --frozen-lockfile
       - name: typecheck
         working-directory: vessel-service
-        run: pnpm install --frozen-lockfile && pnpm exec tsc --noEmit -p .
+        run: pnpm typecheck
+      - name: auth tests (SIWE, sessions, invitations; real Postgres via PGlite)
+        working-directory: vessel-service
+        run: pnpm test
 
   secrets:
     runs-on: ubuntu-latest
