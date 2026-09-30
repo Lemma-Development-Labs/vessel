@@ -14,7 +14,7 @@ must be treated as fully compromised.
 
 | Secret | What it controls | Action |
 | --- | --- | --- |
-| Deployer private key (`67a9f48c…`) → `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
+| Deployer private key (`67a9f48c…`) → `0x4307C72a92063df4fa189c9e9621b741d457be7C` | **The deployer.** Verified on chain: `Guardian.owner()`, `BlitzVault.deployer()`, `SimVenue.owner()`, and the `Tranches` treasury address. Holds 36.677891042 MON. | Rotate. See 0.3. |
 | Railway API token `c37ac07b-…` | Full Railway account access, including the ability to read service env vars — which is where `KEEPER_PK` lives. | Revoke in Railway → Account → Tokens. |
 | Vercel token `vcp_…` | Full Vercel account access. | Revoke in Vercel → Account → Tokens. |
 
@@ -113,8 +113,26 @@ someone else and the redeploy becomes urgent rather than scheduled.
 
 ```
 curl -s -X POST https://testnet-rpc.monad.xyz -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738","latest"]}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0x4307C72a92063df4fa189c9e9621b741d457be7C","latest"]}'
 ```
+
+> **Erratum and recheck — 2026-09-30.** Commit `b9ce063` replaced the
+> compromised address in this section with `0x85Fe…`, which is the *older*
+> deployment's Safe (v1.4.1, 2-of-3; no private key maps to it). The key in the
+> table above controls the EOA **`0x4307C72a…be7C`**: on chain it is
+> `Guardian.owner()` and `BlitzVault.deployer()` of the compromised deployment
+> (`0x9f47…` / `0x4E3C…`). The address is restored above; the measurements in
+> this section were always of `0x4307…`.
+>
+> Recheck against the watermark (nonce 20 / 36.677891042 MON): the account is
+> now at **nonce 48 / 10.0056 MON**. Archive reads pin the 28 new transactions
+> to **2026-08-29, 11:02:42–15:31:16 UTC** (blocks 57,907,623–57,960,943) —
+> the same afternoon as the redeploy commit (12:07 UTC) and the compromised
+> engine's last crank (12:08:37 UTC) — and **nothing since**. That pattern fits
+> the team's own wind-down, but whether the owner sent them is **unconfirmed
+> in this repository**; owner to confirm. The current deployment is outside
+> this key's reach: its deployer is `0xFfae…0F78` and its owner is the Safe
+> `0xe4f2…0279`, none of whose three owners is `0x4307…`.
 
 ### 0.3 Blast radius on the current deployment
 
@@ -278,7 +296,7 @@ state.
 | `CRANK_INTERVAL_SEC` | Default 300. | Not secret. |
 | `CONFIRMATIONS` | Reorg depth the indexer stays behind head. | Not secret. |
 | `MIN_CRANKS_RUNWAY` | Low-balance alarm threshold, in cranks (computed from the gas limit). | Not secret. |
-| `START_BLOCK` | Backfill origin; defaults to `ADDRESSES.json` `deployedBlock` (57874280). | Not secret. |
+| `START_BLOCK` | Backfill origin; defaults to `ADDRESSES.json` `deployedBlock` (57923009 for the current deployment). | Not secret. |
 | `ALLOWED_ORIGINS` | Comma-separated CORS allowlist. | Not secret. |
 | `SENTRY_DSN` | Error reporting. | Sentry project settings. |
 | `PORT` | Injected by the platform. | Not secret. |
