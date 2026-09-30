@@ -23,17 +23,17 @@ export type VerificationEntry = {
 };
 
 export const VERIFICATION: Record<string, VerificationEntry> = {
-  "Ballast": { state: "unknown", checkedAt: null, address: "0x074207acEf2f60a6B1B86a885D2fF893927109A1" },
-  "BlitzVault": { state: "unknown", checkedAt: null, address: "0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5" },
-  "DemoUSD": { state: "unknown", checkedAt: null, address: "0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05" },
-  "EngineLite": { state: "unknown", checkedAt: null, address: "0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85" },
-  "Guardian": { state: "unknown", checkedAt: null, address: "0x150e153D5aB4683EC576bC1F68b7839D86751208" },
-  "Hull": { state: "unknown", checkedAt: null, address: "0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12" },
-  "MockRouter": { state: "unknown", checkedAt: null, address: "0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C" },
-  "MockWMON": { state: "unknown", checkedAt: null, address: "0x17141F36c4401C6184143250827713b26c3E964F" },
-  "PerplVenue": { state: "unknown", checkedAt: null, address: "0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21" },
-  "SimVenue": { state: "unknown", checkedAt: null, address: "0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7" },
-  "Tranches": { state: "unknown", checkedAt: null, address: "0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842" },
+  "Ballast": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0xCD694B5C79D12708F11FB1adF1594e8e71de650D" },
+  "BlitzVault": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d" },
+  "DemoUSD": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x959E54DcF8576856F7A9424190a9751c68739495" },
+  "EngineLite": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x60eC904955CA843285B24E3F6e7e2034F8f96140" },
+  "Guardian": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x75Bf4C326f054e655C7C138cD847154fEB3bAC19" },
+  "Hull": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x9638da84aA4b30fB9350bb2cA33DCf0b81Ab3Bd2" },
+  "MockRouter": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x68A1Ad5FB46c3Eb804F3375Cba702d806E1890B6" },
+  "MockWMON": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0xEf6Cc6228A39cF8433754dcBe863275AC6Dc5DB5" },
+  "PerplVenue": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x59fc4C09eF7Dc0b754B74d7AEe21EeAC1c94aD6C" },
+  "SimVenue": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d" },
+  "Tranches": { state: "verified", checkedAt: "2026-08-29T12:25:00Z", address: "0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373" },
 };
 
 /** Unknown is the safe default: a name with no entry is never shown as verified. */

@@ -40,6 +40,11 @@ export type Store = {
   listSnapshotsSince(ts: number): Promise<EngineSnapshotRow[]>;
   /** Last fully-indexed block for this chain, or null when nothing is persisted. */
   getCursor(chainId: number): Promise<bigint | null>;
+  /**
+   * Drop every indexed row if the stored deployment identity differs from the
+   * one now configured. Returns true when a reset happened.
+   */
+  resetIfRedeployed(chainId: number, tranches: string, deployedBlock: bigint): Promise<boolean>;
   /** Persist the last fully-indexed block. Only ever called after a range ingested cleanly. */
   setCursor(chainId: number, block: bigint): Promise<void>;
   close(): Promise<void>;
@@ -79,6 +84,19 @@ class MemoryStore implements Store {
     return [...this.snapshots.values()]
       .filter((s) => s.ts >= ts)
       .sort((a, b) => a.ts - b.ts);
+  }
+
+  private deployment: string | null = null;
+
+  async resetIfRedeployed(chainId: number, tranches: string, deployedBlock: bigint): Promise<boolean> {
+    const id = `${chainId}:${tranches.toLowerCase()}:${deployedBlock}`;
+    if (this.deployment === id) return false;
+    const had = this.deployment !== null;
+    this.deployment = id;
+    this.waterfall.clear();
+    this.snapshots.clear();
+    this.cursors.clear();
+    return had;
   }
 
   async getCursor(chainId: number): Promise<bigint | null> {
@@ -131,6 +149,17 @@ CREATE TABLE IF NOT EXISTS engine_snapshots (
 CREATE TABLE IF NOT EXISTS indexer_cursor (
   chain_id INTEGER PRIMARY KEY,
   last_block BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+
+-- Which deployment the indexed rows belong to. A redeploy moves the contracts,
+-- so every previously indexed event describes a protocol that is no longer the
+-- one being served. Without this the waterfall log silently blends two
+-- deployments' history, which is worse than having none.
+CREATE TABLE IF NOT EXISTS indexer_deployment (
+  chain_id INTEGER PRIMARY KEY,
+  tranches TEXT NOT NULL,
+  deployed_block BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
 `;
@@ -305,6 +334,41 @@ class PgStore implements Store {
       short_notional: r.short_notional,
       ts: Number(r.ts),
     }));
+  }
+
+  async resetIfRedeployed(chainId: number, tranches: string, deployedBlock: bigint): Promise<boolean> {
+    const addr = tranches.toLowerCase();
+    const { rows } = await this.pool.query<{ tranches: string; deployed_block: string }>(
+      `SELECT tranches, deployed_block FROM indexer_deployment WHERE chain_id = $1`,
+      [chainId],
+    );
+    const cur = rows[0];
+    const same = cur && cur.tranches.toLowerCase() === addr && BigInt(cur.deployed_block) === deployedBlock;
+    if (same) return false;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM waterfall_events");
+      await client.query("DELETE FROM engine_snapshots");
+      await client.query("DELETE FROM indexer_cursor WHERE chain_id = $1", [chainId]);
+      await client.query(
+        `INSERT INTO indexer_deployment (chain_id, tranches, deployed_block, updated_at)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (chain_id) DO UPDATE SET
+           tranches = EXCLUDED.tranches,
+           deployed_block = EXCLUDED.deployed_block,
+           updated_at = EXCLUDED.updated_at`,
+        [chainId, addr, deployedBlock.toString(), Math.floor(Date.now() / 1000)],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+    return Boolean(cur);
   }
 
   async getCursor(chainId: number): Promise<bigint | null> {
