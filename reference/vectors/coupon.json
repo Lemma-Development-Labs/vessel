@@ -1,0 +1,11 @@
+{
+  "unit": "USDC:6",
+  "cases": [
+    {
+      "principal": "1000000000",
+      "rateBps": "800",
+      "seconds": "2419200",
+      "expected": "6136986"
+    }
+  ]
+}

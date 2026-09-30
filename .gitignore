@@ -34,3 +34,6 @@ contracts/foundry-pp/
 
 # Local screenshots (walkthrough artifacts live outside the repo)
 /*.png
+
+# Python
+__pycache__/
