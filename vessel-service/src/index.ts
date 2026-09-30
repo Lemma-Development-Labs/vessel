@@ -13,6 +13,7 @@ import { assertRpcChainIds, loadRuntimeConfig } from "./vendor/vessel-config.ts"
 import { initDb } from "./db.ts";
 import { initAuth } from "./auth/bootstrap.ts";
 import { loadV2Manifest } from "./v2/manifest.ts";
+import { startV2Keeper, type V2KeeperHandle } from "./v2/runner.ts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -59,12 +60,25 @@ async function main(): Promise<void> {
     ...(v1 ? { v1 } : {}),
   });
 
+  let v2Keeper: V2KeeperHandle | null = null;
+  if (v2Manifest) {
+    v2Keeper = await startV2Keeper({
+      manifest: v2Manifest,
+      pc: publicClient,
+      chain: vesselChain(rpcUrl, chainId),
+      rpcUrl,
+      environment: runtime.environment,
+      log,
+    });
+  }
+
   let keeper: KeeperHandle | undefined;
   let indexer: Awaited<ReturnType<typeof startIndexer>> | undefined;
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
     keeper?.stop();
+    v2Keeper?.stop();
     indexer?.stop();
     await api.stop();
     await store.close();
