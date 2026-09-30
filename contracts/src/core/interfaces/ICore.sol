@@ -14,4 +14,9 @@ interface IStrategyEngine {
 
     /// @notice Send `amount` USDC back to AssetCustody (the only permitted destination).
     function release(uint256 amount) external;
+
+    /// @notice Called by AssetCustody immediately after transferring `amount` to the engine, so the
+    ///         engine attributes exactly that amount to the book. Tokens sent any other way are
+    ///         not the book's and must never be valued as it.
+    function credit(uint256 amount) external;
 }

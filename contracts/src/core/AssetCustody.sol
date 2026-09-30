@@ -102,6 +102,7 @@ contract AssetCustody {
         if (amount > activeIdle) revert Insufficient();
         activeIdle -= amount;
         usdc.safeTransfer(engine, amount);
+        IStrategyEngine(engine).credit(amount);
         emit ToEngine(amount);
     }
 

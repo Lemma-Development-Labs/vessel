@@ -46,6 +46,10 @@ contract TestEngine is IStrategyEngine {
         return (usdc.balanceOf(address(this)), stale ? 1 : block.timestamp);
     }
 
+    function credit(uint256) external view {
+        require(msg.sender == custody, "only custody");
+    }
+
     function release(uint256 amount) external {
         require(msg.sender == custody, "only custody");
         usdc.transfer(custody, amount);
