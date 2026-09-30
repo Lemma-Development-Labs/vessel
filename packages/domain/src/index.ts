@@ -25,3 +25,11 @@ export {
   conservationHolds,
   type GoldenVector,
 } from "./goldenVectors.js";
+
+export {
+  decodeMoney,
+  encodeMoney,
+  MoneySchemaError,
+  type Money,
+  type MoneyJson,
+} from "./money.js";

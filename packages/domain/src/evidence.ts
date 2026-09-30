@@ -33,18 +33,36 @@ export interface Evidence {
   source: string;
   /** key into UNIT_DEFS for the value's unit */
   units: string;
+  /** pointers to raw evidence: tx hashes, content-hashed archives, reports */
+  evidenceRefs: string[];
 }
 
 /** Envelope for data that could not be read: no block, no value. */
 export type UnavailableEvidence = Pick<
   Evidence,
-  "schemaVersion" | "environment" | "chainId" | "observedAt" | "source"
+  | "schemaVersion"
+  | "environment"
+  | "chainId"
+  | "observedAt"
+  | "source"
+  | "evidenceRefs"
 >;
 
 export type Tagged<T> =
   | {
-      tag: Exclude<SourceTag, "UNAVAILABLE">;
+      tag: "LIVE" | "STALE" | "SIMULATED";
       value: T;
+      evidence: Evidence;
+    }
+  | {
+      /**
+       * Sources disagree (MISMATCH) or only some were readable (PARTIAL).
+       * The reason is mandatory: a mismatch shown without its cause is a
+       * number the reader cannot act on. Never resolve it by averaging.
+       */
+      tag: "PARTIAL" | "MISMATCH";
+      value: T;
+      reason: string;
       evidence: Evidence;
     }
   | {

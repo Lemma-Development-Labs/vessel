@@ -17,6 +17,7 @@ const evidence: Evidence = {
   observedAt: "2026-09-23T18:53:38Z",
   source: "rpc:https://testnet-rpc.monad.xyz",
   units: "DUSD",
+  evidenceRefs: [],
 };
 
 const unavailable: Tagged<bigint> = {
@@ -28,6 +29,7 @@ const unavailable: Tagged<bigint> = {
     chainId: 10143,
     observedAt: "2026-09-23T18:53:38Z",
     source: "rpc:https://testnet-rpc.monad.xyz",
+    evidenceRefs: [],
   },
 };
 
@@ -45,8 +47,14 @@ describe("Tagged", () => {
 
   it("only LIVE authorizes new risk", () => {
     expect(canAuthorizeNewRisk({ tag: "LIVE", value: 1n, evidence })).toBe(true);
-    for (const tag of ["STALE", "PARTIAL", "MISMATCH", "SIMULATED"] as const) {
+    for (const tag of ["STALE", "SIMULATED"] as const) {
       expect(canAuthorizeNewRisk({ tag, value: 1n, evidence }), tag).toBe(false);
+    }
+    for (const tag of ["PARTIAL", "MISMATCH"] as const) {
+      expect(
+        canAuthorizeNewRisk({ tag, value: 1n, reason: "rpc disagreement", evidence }),
+        tag,
+      ).toBe(false);
     }
     expect(canAuthorizeNewRisk(unavailable)).toBe(false);
   });
@@ -57,3 +65,7 @@ describe("Tagged", () => {
     expect(typeof round.blockNumber).toBe("string");
   });
 });
+
+// Compile-time: PARTIAL and MISMATCH must carry a reason.
+// @ts-expect-error a MISMATCH without a reason must not typecheck
+const _noReason: Tagged<bigint> = { tag: "MISMATCH", value: 1n, evidence };
