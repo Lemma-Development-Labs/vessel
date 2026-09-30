@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import type { PublicClient } from "viem";
+import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
+import { pgliteSql } from "../src/auth/sql.ts";
+import { indexPass, migrateV2Indexer, type LogSource } from "../src/v2/indexer.ts";
 import { v1Routes, type V1Deps } from "../src/v2/api.ts";
 import type { Snapshot } from "../src/vendor/verify/checks.ts";
 
@@ -104,5 +107,48 @@ describe("/v1 evidence API", () => {
     expect((await a.inject({ method: "GET", url: "/v1/series/abc" })).statusCode).toBe(400);
     const none = await (await app(async () => snap(), stubClient(0))).inject({ method: "GET", url: "/v1/series/9" });
     expect(none.statusCode).toBe(404);
+  });
+
+  it("history is UNAVAILABLE (503) when no index is configured or before the first pass", async () => {
+    const a = await app(async () => snap());
+    const r = await a.inject({ method: "GET", url: "/v1/history" });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ status: "UNAVAILABLE", error: "STALE_DATA" });
+
+    const sql = pgliteSql(new PGlite());
+    await migrateV2Indexer(sql);
+    const b = Fastify();
+    await b.register(v1Routes({ manifest, client: stubClient(), read: async () => snap(), sourceLabel: "x", historySql: sql }));
+    const r2 = await b.inject({ method: "GET", url: "/v1/history" });
+    expect(r2.statusCode).toBe(503);
+    expect(r2.json().reason).toMatch(/not completed a pass/);
+    await sql.close();
+  });
+
+  it("history serves canonical indexed events at the indexed block", async () => {
+    const sql = pgliteSql(new PGlite());
+    await migrateV2Indexer(sql);
+    const hash = `0x${"ab".repeat(32)}` as `0x${string}`;
+    const src: LogSource = {
+      chainId: 10143,
+      head: async () => 5n,
+      finalized: async () => 5n,
+      blockHash: async () => hash,
+      logs: async () => [
+        { blockNumber: 3n, blockHash: hash, txHash: `0x${"cd".repeat(32)}`, logIndex: 0, address: manifest.contracts.TrancheController as `0x${string}`, event: "DepositRequested", args: { assets: 100_000_000n } },
+      ],
+    };
+    await indexPass(sql, src, { startBlock: 1n, chunk: 100n, maxReorgDepth: 64n });
+    const a = Fastify();
+    await a.register(v1Routes({ manifest, client: stubClient(), read: async () => snap(), sourceLabel: "x", historySql: sql }));
+    const r = await a.inject({ method: "GET", url: "/v1/history?limit=10" });
+    expect(r.statusCode).toBe(200);
+    const body = r.json();
+    expect(body).toMatchObject({ status: "LIVE", blockNumber: "5", blockHash: hash, chainId: 10143 });
+    expect(body.data).toEqual([
+      expect.objectContaining({ event: "DepositRequested", blockNumber: "3", finalized: true, args: { assets: "100000000" } }),
+    ]);
+    expect(r.headers["cache-control"]).toBe("no-store");
+    await sql.close();
   });
 });

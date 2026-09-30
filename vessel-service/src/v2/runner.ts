@@ -119,10 +119,19 @@ export interface V2KeeperHandle {
 }
 
 /**
- * Start the v2 keeper when a v2 manifest and V2_KEEPER_PK are configured.
- * Journal storage: DATABASE_URL, or an in-process PGlite outside mainnet
- * (durability then ends with the process — logged loudly).
+ * Open the v2 operational database: DATABASE_URL, or an in-process PGlite
+ * outside mainnet (durability then ends with the process — logged loudly).
+ * Shared by the keeper journal, the v2 indexer and /v1/history.
  */
+export function openV2Sql(environment: "local" | "testnet" | "mainnet", log: Logger): Sql {
+  const dbUrl = process.env.DATABASE_URL?.trim();
+  if (dbUrl) return pgSql(new pg.Pool({ connectionString: dbUrl, ssl: pgSsl(dbUrl) }));
+  if (environment === "mainnet") throw new Error("mainnet v2 services require DATABASE_URL (durable journal)");
+  log.warn("DATABASE_URL unset — v2 journal and index in in-process PGlite (NOT durable across restarts)");
+  return pgliteSql(new PGlite());
+}
+
+/** Start the v2 keeper when a v2 manifest and V2_KEEPER_PK are configured. */
 export async function startV2Keeper(opts: {
   manifest: Manifest;
   pc: PublicClient;
@@ -130,6 +139,7 @@ export async function startV2Keeper(opts: {
   rpcUrl: string;
   environment: "local" | "testnet" | "mainnet";
   log: Logger;
+  sql: Sql;
 }): Promise<V2KeeperHandle | null> {
   const pk = process.env.V2_KEEPER_PK?.trim() as Hex | undefined;
   if (!pk) {
@@ -137,14 +147,7 @@ export async function startV2Keeper(opts: {
     return null;
   }
   if (!/^0x[0-9a-fA-F]{64}$/.test(pk)) throw new Error("V2_KEEPER_PK must be 0x + 64 hex chars");
-  const dbUrl = process.env.DATABASE_URL?.trim();
-  let sql: Sql;
-  if (dbUrl) sql = pgSql(new pg.Pool({ connectionString: dbUrl, ssl: pgSsl(dbUrl) }));
-  else if (opts.environment === "mainnet") throw new Error("mainnet keeper requires DATABASE_URL (durable journal)");
-  else {
-    opts.log.warn("DATABASE_URL unset — v2 keeper journal in in-process PGlite (NOT durable across restarts)");
-    sql = pgliteSql(new PGlite());
-  }
+  const sql = opts.sql;
   await migrateJournal(sql);
 
   const chainPort = viemChainPort(opts.pc, opts.chain, opts.rpcUrl, pk);
@@ -184,7 +187,6 @@ export async function startV2Keeper(opts: {
   return {
     stop() {
       running = false;
-      void sql.close();
     },
   };
 }

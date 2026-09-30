@@ -13,7 +13,8 @@ import { assertRpcChainIds, loadRuntimeConfig } from "./vendor/vessel-config.ts"
 import { initDb } from "./db.ts";
 import { initAuth } from "./auth/bootstrap.ts";
 import { loadV2Manifest } from "./v2/manifest.ts";
-import { startV2Keeper, type V2KeeperHandle } from "./v2/runner.ts";
+import { openV2Sql, startV2Keeper, type V2KeeperHandle } from "./v2/runner.ts";
+import { startV2Indexer } from "./v2/indexerLoop.ts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -48,9 +49,18 @@ async function main(): Promise<void> {
   const auth = await initAuth(runtime.environment, runtime.chainId, log);
 
   const v2Manifest = loadV2Manifest(runtime.chainId, log);
-  const v1 = v2Manifest
-    ? { manifest: v2Manifest, client: publicClient, sourceLabel: `rpc:${new URL(rpcUrl).host} (finalized block, direct chain read)` }
-    : undefined;
+  const v2Sql = v2Manifest ? openV2Sql(runtime.environment, log) : null;
+  const v1 =
+    v2Manifest && v2Sql
+      ? {
+          manifest: v2Manifest,
+          client: publicClient,
+          sourceLabel: `rpc:${new URL(rpcUrl).host} (finalized block, direct chain read)`,
+          historySql: v2Sql,
+        }
+      : undefined;
+  const v2Indexer =
+    v2Manifest && v2Sql ? await startV2Indexer({ manifest: v2Manifest, pc: publicClient, sql: v2Sql, log }) : null;
 
   const api = await startApi({
     store,
@@ -61,9 +71,10 @@ async function main(): Promise<void> {
   });
 
   let v2Keeper: V2KeeperHandle | null = null;
-  if (v2Manifest) {
+  if (v2Manifest && v2Sql) {
     v2Keeper = await startV2Keeper({
       manifest: v2Manifest,
+      sql: v2Sql,
       pc: publicClient,
       chain: vesselChain(rpcUrl, chainId),
       rpcUrl,
@@ -79,8 +90,10 @@ async function main(): Promise<void> {
     log.info({ signal }, "shutting down");
     keeper?.stop();
     v2Keeper?.stop();
+    v2Indexer?.stop();
     indexer?.stop();
     await api.stop();
+    await v2Sql?.close();
     await store.close();
     await auth?.close();
     process.exit(0);

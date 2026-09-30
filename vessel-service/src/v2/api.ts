@@ -2,6 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { parseAbi, type Address, type PublicClient } from "viem";
 import { evaluate, overall, type Snapshot } from "../vendor/verify/checks.ts";
 import { readSnapshot, type Manifest } from "../vendor/verify/read.ts";
+import type { Sql } from "../auth/sql.ts";
+import { history } from "./indexer.ts";
 
 /**
  * `/v1` evidence API for the v2 book (spec §12–§13). Every response carries the
@@ -22,6 +24,8 @@ export interface V1Deps {
   /** injectable for tests; defaults to the verifier's finalized-block reader */
   read?: () => Promise<Snapshot>;
   sourceLabel: string;
+  /** v2 event index for /v1/history; omitted → history reports UNAVAILABLE */
+  historySql?: Sql;
 }
 
 const controllerAbi = parseAbi([
@@ -98,6 +102,32 @@ export function v1Routes(d: V1Deps): FastifyPluginAsync {
         },
         checks,
       };
+    });
+
+    app.get<{ Querystring: { limit?: string } }>("/v1/history", async (req, reply) => {
+      const limit = Math.min(Math.max(Number.parseInt(req.query.limit ?? "50", 10) || 50, 1), 200);
+      if (!d.historySql) {
+        return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: "event index not configured" });
+      }
+      try {
+        const [cur] = await d.historySql.query<{ block_number: string; block_hash: string }>(
+          "SELECT block_number, block_hash FROM v2_indexer_cursor WHERE chain_id = $1",
+          [d.manifest.chainId],
+        );
+        if (!cur) {
+          return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: "event index has not completed a pass yet" });
+        }
+        const rows = await history(d.historySql, d.manifest.chainId, limit);
+        return {
+          ...envelope(d, null, "LIVE"),
+          source: "indexer (projection of chain events; canonical rows only)",
+          blockNumber: String(cur.block_number),
+          blockHash: cur.block_hash,
+          data: rows,
+        };
+      } catch (err) {
+        return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: err instanceof Error ? err.message : "index read failed" });
+      }
     });
 
     app.get<{ Params: { id: string } }>("/v1/series/:id", async (req, reply) => {
