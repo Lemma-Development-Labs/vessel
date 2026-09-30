@@ -88,7 +88,20 @@ Wiring and role reads at the pinned block:
    `KEEPER_PK` beside public endpoints) — violates the spec §5 boundary
    "public data cannot sign"; split scheduled (docs/ARCHITECTURE.md).
 
-## Unresolved dependency register (spec §4 G01–G08)
+## Testnet venue facts recorded on unmerged branches (not re-verified)
+
+Recorded on `cursor/perpl-venue-bf3b` / `cursor/hull-series-gate-bf3b`
+(2026-09-06/07). **UNVERIFIED here**; testnet-only — never mainnet defaults.
+
+| Claim | Value | Source |
+|---|---|---|
+| Perpl testnet Exchange (proxy) | `0x1964C32f0bE608E7D29302AFF5E61268E72080cc` → impl `0x5dce9e6a404b1971aec34a30212337717a7232d1` | perpl-venue `docs/ADDRESSES.md` |
+| Perpl testnet MON market | ID 64, `priceDecimals=5`, `lotDecimals=0` | `PerplPositionReader.sol` NatSpec |
+| Perpl testnet collateral | AUSD `0xa9012a055bd4e0edff8ce09f960291c09d5322dc` | perpl-venue `docs/ADDRESSES.md` |
+| Kuru testnet MON-USDC book | `bestAsk = 0` (empty) at block 60533271 | hull-series-gate `docs/SERIES-001.md` |
+| Vessel Perpl account | none — `PERPL_ACCOUNT_ID <pending>`; the branch design has a keeper EOA own it (contradicts D13) | perpl-venue `docs/ADDRESSES.md` |
+
+## Unresolved dependency register (spec §4 G01–G08, route gates G09–G10)
 
 Owners are **proposed** per spec §25 and unconfirmed by the named people.
 
@@ -101,7 +114,9 @@ Owners are **proposed** per spec §25 and unconfirmed by the named people.
 | G05 | Independent security reviewer | Engagement, scope, findings | Kunal | OPEN — blocks external deposits (D14) |
 | G06 | Beta participant eligibility + offering terms | Counsel review, consent version | Kunal | OPEN — blocks invitations |
 | G07 | Two-person operating coverage | Named primary/backup with availability | Kunal + Daksh | OPEN |
-| G08 | Current repository status and deployed artifacts | This file + docs/sessions/01.md | Session 1 | **CLOSED 2026-09-23** (drift items 1–4 remain as follow-ups) |
+| G08 | Current repository status and deployed artifacts | This file + [INVENTORY.md](INVENTORY.md) + docs/sessions/01.md | Session 1 | **REOPENED 2026-09-30** — the 09-23 close did not cover the 13 unmerged `cursor/*` branches (Kuru router, Perpl reader/venue, Perpl keeper, oracles, caps, Envio). Now inventoried with reproduced test counts; closes when the drift items below are fixed in README/FACTS/powers.md and the eleven live addresses are re-verified on Sourcify. |
+| G09 | Provider route qualification (D30) | Route record: source/destination tokens and decimals, provider contracts and versions, finality, size and fee bounds, recovery path, testnet delivery + refund receipts | Daksh | OPEN — no provider selected; Epoch is a candidate whose published network list does not establish Monad support (HANDBOOK_v4 ch. 6) |
+| G10 | Beneficiary authentication and recovery (D30) | EIP-712 binding verified on arrival (ERC-1271 for contract wallets), observed-amount crediting, recovery on Monad with the quote service offline | Daksh | OPEN — no adapter exists |
 
 ## Source register
 
