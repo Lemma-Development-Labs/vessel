@@ -19,10 +19,20 @@ Checkpoint and evidence: [sessions/01.md](sessions/01.md).
 Inventory: [INVENTORY.md](INVENTORY.md). All thirteen named Phase 1 tests
 DONE ([TEST_PLAN.md](TEST_PLAN.md)).
 
-## Session 2 — next
+## Session 2 — Day 1 of the 3-day plan (ADR-008) · closed 2026-09-30 · `local complete`
 
-Economic core and complete local claim lifecycle. Resume instruction at the
-end of [sessions/01.md](sessions/01.md).
+Checkpoint: [sessions/02.md](sessions/02.md). 147 contract tests, coverage 98.91%.
+
+Done: golden vectors exported from the reference model; `packages/math`
+(independent TS port); Solidity `Waterfall`/`Coupon`/`Coverage` matching all
+8 golden + 10,000 seeded cases; v2 core contracts in `contracts/src/core`
+(TrancheController, AssetCustody, ClaimEscrow, BallastToken, PauseGuardian)
+with 28 lifecycle tests; randomized invariant campaign (32,768 calls in CI profile). Accounting as
+implemented: [ACCOUNTING.md](ACCOUNTING.md).
+
+Not in this session (by plan): real venues and valuation adapter (Day 2),
+48 h timelock contract (governance is an address today; the Safe/timelock
+wiring lands with deployment), D30 route adapter and vUSD lab (deferred).
 
 ## Blockers and follow-ups
 

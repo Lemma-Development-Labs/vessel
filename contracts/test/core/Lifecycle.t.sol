@@ -511,6 +511,124 @@ contract LifecycleTest is Test {
         new TestUSDC();
     }
 
+    // ------------------------------------------------------------------ coverage of remaining paths
+    function test_pay_treasury_only_from_liability_and_not_while_unwinding() public {
+        uint256 sid = _book();
+        vm.prank(op);
+        c.deployToEngine(8_000e6);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
+        engine.applyPnl(200e6);
+        c.settle();
+        uint256 liability = c.treasuryLiability();
+        assertGt(liability, 0);
+        uint256 a = c.activeAssets();
+        vm.prank(gov);
+        vm.expectRevert(TrancheController.CapExceeded.selector);
+        c.payTreasury(liability + 1);
+        vm.prank(gov);
+        c.payTreasury(liability);
+        assertEq(usdc.balanceOf(treasury), liability);
+        assertEq(c.activeAssets(), a, "paying a recognized liability does not change A");
+
+        vm.warp(vm.getBlockTimestamp() + 22 days);
+        engine.applyPnl(50e6);
+        c.matureSeries(sid);
+        vm.prank(gov);
+        vm.expectRevert(TrancheController.SeriesBusy.selector);
+        c.payTreasury(1);
+    }
+
+    function test_series_cancelled_when_nothing_admitted_and_refund_after_window() public {
+        vm.prank(gov);
+        uint256 sid = c.openSeries(800, bytes32(0));
+        uint256 id = _hull(alice, sid, 1_000e6, 0); // no Ballast, no reserve: cover and reserve fail
+        vm.warp(vm.getBlockTimestamp() + 72 hours);
+        vm.prank(alice);
+        vm.expectRevert(TrancheController.BadStatus.selector);
+        c.cancelDeposit(id); // window closed but not yet activated: still frozen? series is open
+        c.activateSeries(sid);
+        assertEq(uint256(_state(sid)), uint256(TrancheController.SeriesState.CANCELLED));
+        assertEq(c.activeSeries(), 0);
+        c.claimRefund(id);
+        assertEq(usdc.balanceOf(alice), 20_000e6);
+    }
+
+    function test_deadline_and_minimum_unit_refunds() public {
+        vm.prank(bob);
+        uint256 late = c.requestDeposit(BALLAST, 0, 100e6, bob, 0, vm.getBlockTimestamp() + 1 hours);
+        vm.prank(carl);
+        uint256 greedy = c.requestDeposit(BALLAST, 0, 100e6, carl, 1_000e18, vm.getBlockTimestamp() + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 2 hours);
+        c.processDepositBatch(10);
+        (,,,,,,,, TrancheController.ReqStatus s1,) = _dep(late);
+        (,,,,,,,, TrancheController.ReqStatus s2,) = _dep(greedy);
+        assertEq(uint256(s1), uint256(TrancheController.ReqStatus.REFUNDABLE), "deadline");
+        assertEq(uint256(s2), uint256(TrancheController.ReqStatus.REFUNDABLE), "minimum units");
+        assertEq(c.pendingReserved(), 0);
+        (uint256 deps,) = c.queueLengths();
+        assertEq(deps, 2);
+    }
+
+    function test_hull_deadline_refund_at_activation() public {
+        vm.prank(gov);
+        c.contributeReserve(200e6);
+        _ballast(bob, 3_000e6);
+        c.processDepositBatch(10);
+        vm.prank(gov);
+        uint256 sid = c.openSeries(800, bytes32(0));
+        vm.prank(alice);
+        uint256 id = c.requestDeposit(HULL, sid, 1_000e6, alice, 0, vm.getBlockTimestamp() + 1 hours);
+        vm.warp(vm.getBlockTimestamp() + 72 hours);
+        c.activateSeries(sid);
+        (,,,,,,,, TrancheController.ReqStatus st,) = _dep(id);
+        assertEq(uint256(st), uint256(TrancheController.ReqStatus.REFUNDABLE));
+    }
+
+    function test_further_loss_while_impaired_hits_ballast_reserve_then_hull() public {
+        vm.prank(gov);
+        c.contributeReserve(200e6);
+        _ballast(bob, 3_000e6);
+        c.processDepositBatch(10);
+        vm.prank(gov);
+        uint256 sid = c.openSeries(800, bytes32(0));
+        _hull(alice, sid, 6_000e6, 0);
+        vm.warp(vm.getBlockTimestamp() + 72 hours);
+        c.activateSeries(sid);
+        vm.prank(op);
+        c.deployToEngine(8_000e6);
+        engine.applyPnl(-3_500e6);
+        c.settle();
+        assertTrue(c.impaired());
+        uint256 h = c.hullNav();
+        engine.applyPnl(-100e6);
+        vm.warp(vm.getBlockTimestamp() + 1);
+        c.settle();
+        assertEq(c.hullNav(), h - 100e6);
+        _assertIdentity();
+        assertEq(c.hullClaimable(sid, alice), 0);
+    }
+
+    function test_setters_are_bounded_and_ballast_is_not_approvable() public {
+        vm.startPrank(gov);
+        c.setCloseCost(50e6);
+        assertEq(c.closeCost(), 50e6);
+        c.setMaxValuationAge(30);
+        vm.expectRevert(TrancheController.AboveCeiling.selector);
+        c.setMaxValuationAge(61);
+        vm.expectRevert(TrancheController.AboveCeiling.selector);
+        c.setMaxValuationAge(0);
+        vm.expectRevert(TrancheController.AboveCeiling.selector);
+        c.setAllowance(bob, 25_000e6 + 1);
+        vm.stopPrank();
+        vm.expectRevert(BallastToken.NonTransferable.selector);
+        bal.approve(carl, 1);
+        vm.expectRevert(BallastToken.NonTransferable.selector);
+        bal.transferFrom(bob, carl, 1);
+        vm.prank(bob);
+        vm.expectRevert(TrancheController.ZeroAddress.selector);
+        c.requestDeposit(BALLAST, 0, 1e6, address(0), 0, vm.getBlockTimestamp() + 1 days);
+    }
+
     // ------------------------------------------------------------------ view helpers
     function _withCoupon(uint256 principal, uint256 rateBps, uint256 secs) internal pure returns (uint256) {
         return principal + (principal * rateBps * secs) / (10_000 * uint256(365 days));

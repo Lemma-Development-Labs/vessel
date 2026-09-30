@@ -16,32 +16,32 @@ reference must not call the implementation under test.
 | Requirement | Artifact | Status |
 |---|---|---|
 | Conservation `ΔH+ΔB+ΔR+FT = G` on golden vectors | `packages/domain/test/golden.test.ts` over `docs/spec/ACCOUNTING_GOLDEN_VECTORS.json` | DONE |
-| All **8** vectors of `reference/reference_model.py` (adds loss_recovery, partial_fee, fee_waiver) | `reference/reference_model.py` (PASS 2026-09-30); `packages/domain` holds 5 → extend to 8 via `reference/vectors/*.json` | PARTIAL → PLANNED-S2 |
-| Conservation identity in contracts | v0: `contracts/test/fuzz/Conservation.t.sol` (v0 identity incl. treasury) | COVERED-V0 → PLANNED-S2 for v2 waterfall |
-| Loss carryforward L (no fee on recovery) | reference model + Solidity vectors | PLANNED-S2 |
-| Fee split FR/FT with reserve-deficit cap | reference model + Solidity vectors | PLANNED-S2 |
-| Two-pass rule: impaired epoch recomputed with zero fees | reference model + Solidity vectors | PLANNED-S2 |
+| All **8** vectors + 5,000 seeded (+ fee-disabled) cases of `reference/reference_model.py` | `contracts/test/differential/Vectors.t.sol` + `packages/math` over `reference/vectors/*` | DONE (2026-09-30) — Python, TypeScript and Solidity agree exactly |
+| Conservation identity in contracts | on-chain assert in `Waterfall.settle`; `testFuzz_conservation_and_loss_order`; `contracts/test/core/CoreInvariant.t.sol` | DONE (2026-09-30) |
+| Loss carryforward L (no fee on recovery) | `contracts/test/differential/Vectors.t.sol` + `packages/math` (loss_recovery, partial_fee) | DONE (2026-09-30) |
+| Fee split FR/FT with reserve-deficit cap | `contracts/test/differential/Vectors.t.sol` + `packages/math` (positive) | DONE (2026-09-30) |
+| Two-pass rule: impaired epoch recomputed with zero fees | `contracts/test/differential/Vectors.t.sol` + `packages/math` (fee_waiver) + `contracts/test/core/Lifecycle.t.sol` impairment | DONE (2026-09-30) |
 | Integer/no-Number money handling | `packages/domain/test/units.test.ts` (BigInt parse/format, rejects float forms) | DONE (schemas) — adoption in app/service pending |
-| No negative tranche balances / insolvency is explicit | invariant campaign | PLANNED-S2 |
+| No negative tranche balances / insolvency is explicit | `test_insolvency_reverts_not_floors`; `contracts/test/core/CoreInvariant.t.sol` | DONE (2026-09-30) |
 
 ## Hull lifecycle (spec §8)
 
 | Requirement | Artifact | Status |
 |---|---|---|
-| Series state machine (8 states, atomic activation) | Foundry unit + invariant | PLANNED-S2 |
-| Coupon accrual (simple, stops at maturity/termination) | v0: `Tranches` accrual tests exist for perpetual 8% | COVERED-V0 → PLANNED-S2 |
-| Proportional funding before claims (no first-claimer edge) | Foundry scenario | PLANNED-S2 |
+| Series state machine (8 states, atomic activation) | `contracts/test/core/Lifecycle.t.sol` (activation, cover exclusion, min-rate refund, no mid-series entry, maturity, impairment) | DONE (2026-09-30) — invariant over series lifecycle PLANNED-S7 |
+| Coupon accrual (simple, stops at maturity/termination) | coupon vector; `test_coupon_stops_at_maturity`; cumulative-truncation test in `packages/math` | DONE (2026-09-30) |
+| Proportional funding before claims (no first-claimer edge) | `test_senior_impairment_pro_rata_and_cumulative_recovery` | DONE (2026-09-30) |
 | Rate policy (EWMA, haircut, cap, no fabricated history) | TS rate module tests | PLANNED-S4 (needs 30d data) |
 
 ## Ballast and queues (spec §9)
 
 | Requirement | Artifact | Status |
 |---|---|---|
-| Inflation/first-depositor defense | v0: `test/unit/Inflation.t.sol` + dead shares | COVERED-V0 → re-verify for v2 custody in S2 |
-| 48h cooldown, cancel, partial fills, user-limited skip | Foundry queue tests | PLANNED-S2 |
-| No claimable exit without segregated funds (D10) | invariant | PLANNED-S2 |
-| Subordination: 30% gate / 20% floor incl. projected coupon | v0: 20% floor tests in `Tranches.t.sol` | COVERED-V0 (floor only) → PLANNED-S2 |
-| Zero-B with supply blocks deposits | Foundry unit | PLANNED-S2 |
+| Inflation/first-depositor defense | virtual offsets + donation quarantine: `test_donation_does_not_raise_capacity_or_yield` | DONE (2026-09-30) — offsets for mainnet remain P02 |
+| 48h cooldown, cancel, partial fills, user-limited skip | `contracts/test/core/Lifecycle.t.sol` | DONE (2026-09-30) |
+| No claimable exit without segregated funds (D10) | escrow backing check in `ClaimEscrow.fund`; `contracts/test/core/CoreInvariant.t.sol` | DONE (2026-09-30) |
+| Subordination: 30% gate / 20% floor incl. projected coupon | coverage vector; `test_payout_blocked_below_projected_30pct_cover`; `test_activation_excludes_what_would_break_projected_cover` | DONE (2026-09-30) — 20% intervention is keeper policy (S3) |
+| Zero-B with supply blocks deposits | `test_zero_B_blocks_deposit` | DONE (2026-09-30) |
 
 ## Risk policy and execution (spec §10–§11)
 
@@ -99,7 +99,7 @@ reference must not call the implementation under test.
 
 | Requirement | Artifact | Status |
 |---|---|---|
-| Lifetime budgets, per-wallet quotas, atomic reservation across all entry paths | Foundry invariants | PLANNED-S2/S3 |
+| Lifetime budgets, per-wallet quotas, atomic reservation across all entry paths | `test_lifetime_cap_across_all_paths_and_withdrawal_does_not_refill`, `test_refund_releases_only_unadmitted`, `test_not_eligible_without_allowance`; `contracts/test/core/CoreInvariant.t.sol` | DONE (2026-09-30) for native paths; D30 route deferred (ADR-008) |
 | Stage transitions behind 48h timelock | Foundry + governance tests | PLANNED-S3 |
 
 ## Scenario campaign (spec §23)

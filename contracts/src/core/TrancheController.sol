@@ -388,8 +388,13 @@ contract TrancheController is ReentrancyGuard {
         DepositRequest storage d = deposits[id];
         if (d.owner != msg.sender) revert NotOwner();
         if (d.status != ReqStatus.ESCROWED) revert BadStatus();
-        if (d.tranche == Tranche.HULL && series_[d.seriesId].state != SeriesState.SUBSCRIPTION_OPEN) {
-            revert BadStatus();
+        if (d.tranche == Tranche.HULL) {
+            // The ordered set freezes when the window closes, not when someone calls activate:
+            // a late cancel could otherwise change who is admitted under the cover limit.
+            Series storage s = series_[d.seriesId];
+            if (s.state != SeriesState.SUBSCRIPTION_OPEN || block.timestamp >= s.subscriptionEnd) {
+                revert BadStatus();
+            }
         }
         _makeRefundable(id, "cancelled");
     }
