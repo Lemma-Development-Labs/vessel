@@ -108,12 +108,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div
         role="note"
-        data-testid="network-banner"
         className={`border-b px-4 py-2 text-center text-xs leading-snug sm:px-5 md:px-7 ${
           BANNER.tone === "mainnet" ? "border-red/40 bg-red/10 text-red" : "border-amber/25 bg-amber/10 text-amber"
         }`}
       >
-        <span className="font-semibold tracking-[0.06em]">{BANNER.text}</span>
+        <span data-testid="network-banner" className="font-semibold tracking-[0.06em]">{BANNER.text}</span>
         <span className="hidden sm:inline">
           {v.engine.simulated.status === "ok" && v.engine.simulated.value
             ? " Sim badge visible when SimVenue is active."
