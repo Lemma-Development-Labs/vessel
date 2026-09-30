@@ -41,7 +41,7 @@ dUSD: 4 decimal places in tables, 2 in summaries.
 
 ## Honesty chrome (every route)
 
-- Thin amber banner: `TESTNET — demo assets, unaudited contracts.`
+- Thin amber banner, derived by `lib/banner.ts` (spec §15): `TESTNET · NO REAL VALUE · NO INDEPENDENT REVIEW` — the last part is the *actual* review status. Mainnet is `PRIVATE MAINNET BETA · REAL FUNDS AT RISK · <review scope + date>` on red, and never says no-real-value.
 - SIM VENUE chip when SimVenue is active
 - Footer legal line includes **unaudited**
 - dUSD is demo dollars. Never call it USDC.
@@ -63,4 +63,6 @@ No layout shift on data load — skeletons sized to content.
 
 ## Provider
 
-Screens consume `VesselDataProvider` only. Mock (`NEXT_PUBLIC_USE_MOCK≠0`) vs Chain (`=0`). Do not special-case screens for chain.
+Screens consume `VesselDataProvider` only for protocol data. Mock only when `NEXT_PUBLIC_USE_MOCK=1` exactly (`lib/mock-flag.ts`); anything else is Chain. Do not special-case screens for chain.
+
+Exception — identity: wallet connection for sign-in and the SIWE session use wagmi and `lib/auth.ts` directly (`/onboarding`, the session chip). Mock mode fakes chain *data*, never the user's wallet or session, so these must stay real in both modes.

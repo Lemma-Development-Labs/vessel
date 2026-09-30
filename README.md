@@ -35,8 +35,9 @@ cd app && pnpm i && pnpm test        # 37 tests
 pnpm dev                             # http://localhost:3000
 ```
 
-`app/.env.example` lists every variable. The app defaults to the **mock**
-provider; set `NEXT_PUBLIC_USE_MOCK=0` for live chain reads. Check which one a
+`app/.env.example` lists every variable. The app serves **mock** fixture data
+only when `NEXT_PUBLIC_USE_MOCK=1` exactly (as `.env.example` sets it); unset
+or any other value means live chain reads. Check which one a
 deployment is serving with `curl <url>/health` — it reports `provider`.
 
 The landing site lives in a **separate** repo (`vessel-landing`). This repository is the protocol, the testnet app, and the keeper/stats service.
@@ -247,7 +248,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **OpenZeppelin** | ERC-20, ERC-4626, Ownable, ReentrancyGuard, SafeERC20. |
 | **Sourcify** | `https://sourcify-api-monad.blockvision.org/` — verified bytecode ↔ this repo. |
 | **Next.js 16 / React 19 / Tailwind 4** | `app/` — Deposit, Portfolio, Transparency. |
-| **wagmi + viem** | Wallet + reads/writes when `NEXT_PUBLIC_USE_MOCK=0`. |
+| **wagmi + viem** | Wallet and SIWE sign-in in every mode; chain reads/writes unless `NEXT_PUBLIC_USE_MOCK=1`. |
 | **TanStack Query** | Polling deck stats, engine, waterfall. |
 | **Fastify + viem** | `vessel-service/` — permissionless crank loop, Waterfall indexer, GET `/stats` `/waterfall` `/health`. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
@@ -290,7 +291,7 @@ cd vessel-service && pnpm install && cd ..
 | File | Vars |
 | --- | --- |
 | `contracts/.env` | `MONAD_TESTNET_RPC` · `MONAD_MAINNET_RPC` · `DEPLOYER_PK` · `SEEDER_PK` (**must ≠** deployer) |
-| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` stage (no wallet). `=0` against chain. RPC CSV + fallback. Chain 10143 or Anvil 31337. Optional `NEXT_PUBLIC_STATS_URL`. |
+| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` stages fixture data; anything else reads the chain. RPC CSV + fallback. Chain 10143 or Anvil 31337. Optional `NEXT_PUBLIC_STATS_URL`. |
 | `.env` | `RPC_URL` · `KEEPER_PK` (gas only, ≠ deployer) · `E2E_PK` (burner, ≠ both) · `CRANK_INTERVAL_SEC=300` · `DEPLOYER_PK` (SetRate / e2e only) |
 
 ```bash
@@ -435,7 +436,7 @@ Testnet UI: [testnet.vessel.wtf](https://testnet.vessel.wtf).
 | `/demo` | Stage states |
 | `/health` | Liveness |
 
-`NEXT_PUBLIC_USE_MOCK=1` — `MockVesselProvider` (1.8s fake txs). `=0` — `ChainVesselProvider` (wagmi). Production build uses `app/.env.production` (`USE_MOCK=0`, chain 10143).
+`NEXT_PUBLIC_USE_MOCK=1` — `MockVesselProvider` (1.8s fake txs). Otherwise — `ChainVesselProvider` (wagmi). Production build uses `app/.env.production` (`USE_MOCK=0`, chain 10143).
 
 Stats: if `NEXT_PUBLIC_STATS_URL` is set, the app prefers `GET /waterfall` then falls back to `getLogs` from `deployedBlock`.
 

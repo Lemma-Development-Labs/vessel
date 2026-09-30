@@ -78,7 +78,7 @@ reference must not call the implementation under test.
 | `siwe_rejects_reused_nonce` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `siwe_rejects_expired_nonce` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `refresh_reuse_revokes_family` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
-| `wallet_switch_clears_private_queries` | app | PLANNED-S1 |
+| `wallet_switch_clears_private_queries` | `app/lib/__tests__/auth.test.ts` | DONE (2026-09-30) |
 | `invite_single_use_and_hashed` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `invite_binds_only_after_wallet_proof` | `vessel-service/test/auth.test.ts` | DONE (2026-09-30) |
 | `env_rejects_mainnet_mock_provider` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |

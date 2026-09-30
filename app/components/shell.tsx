@@ -11,6 +11,9 @@ import { ADDRESSES } from "@/lib/addresses";
 import { AddressChip, Badge } from "@/components/ui";
 import { Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
+import { useSession } from "@/lib/auth";
+import { networkBanner } from "@/lib/banner";
+import { TARGET_CHAIN_ID } from "@/lib/wagmi";
 
 function Wordmark() {
   return (
@@ -30,7 +33,10 @@ const NAV = [
   { href: "/deposit", label: "Deposit" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/transparency", label: "Transparency" },
+  { href: "/onboarding", label: "Onboarding" },
 ] as const;
+
+const BANNER = networkBanner(TARGET_CHAIN_ID, process.env.NEXT_PUBLIC_REVIEW_STATUS);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const v = useVessel();
@@ -84,6 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Badge kind="sim" />
             )}
             <NetworkPill />
+            <SessionChip />
             {v.connected ? (
               <button
                 type="button"
@@ -99,8 +106,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="border-b border-amber/25 bg-amber/10 px-4 py-2 text-center text-xs leading-snug text-amber sm:px-5 md:px-7">
-        {COPY.banner}
+      <div
+        role="note"
+        data-testid="network-banner"
+        className={`border-b px-4 py-2 text-center text-xs leading-snug sm:px-5 md:px-7 ${
+          BANNER.tone === "mainnet" ? "border-red/40 bg-red/10 text-red" : "border-amber/25 bg-amber/10 text-amber"
+        }`}
+      >
+        <span className="font-semibold tracking-[0.06em]">{BANNER.text}</span>
         <span className="hidden sm:inline">
           {v.engine.simulated.status === "ok" && v.engine.simulated.value
             ? " Sim badge visible when SimVenue is active."
@@ -258,5 +271,21 @@ function ToastHost() {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Signed-in state (SIWE session), distinct from merely having a wallet connected. */
+function SessionChip() {
+  const session = useSession();
+  if (!session.data) return null;
+  return (
+    <Link
+      href="/onboarding"
+      data-testid="session-chip"
+      className="hidden min-h-11 items-center rounded-lg border border-white/14 px-2.5 text-[11px] text-ink sm:inline-flex"
+      title={`Signed in as ${session.data.address}`}
+    >
+      signed in
+    </Link>
   );
 }
