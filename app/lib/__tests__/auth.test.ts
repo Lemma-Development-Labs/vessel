@@ -31,10 +31,19 @@ describe("wallet switch", () => {
     expect(qc.getQueryData(["deck", "stats"])).toEqual({ hullTvl: "1" });
   });
 
-  it("treats a disconnect as a switch, and no session as nothing to clear", () => {
-    expect(sessionMismatch(A, undefined)).toBe(true);
+  it("ends the session on disconnect only after a wallet was connected here", () => {
+    expect(sessionMismatch(A, undefined, A)).toBe(true); // wallet disconnected in this page
+    expect(sessionMismatch(A, undefined)).toBe(false); // fresh page load, wallet not reconnected yet
+    expect(sessionMismatch(A, B)).toBe(true); // another wallet on load
     expect(sessionMismatch(null, B)).toBe(false);
     expect(sessionMismatch(undefined, undefined)).toBe(false);
+  });
+
+  it("a page reload keeps the session and its private data", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(eligibilityKey, { address: A });
+    expect(handleAccountChange(qc, A, undefined, undefined)).toBe(false);
+    expect(qc.getQueryData(eligibilityKey)).toBeDefined();
   });
 });
 

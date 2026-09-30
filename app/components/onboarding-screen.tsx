@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useAccount, useChainId, useConnect, useSwitchChain } from "wagmi";
 import {
   AuthApiError,
@@ -87,8 +87,22 @@ function ErrorLine({ error }: { error: unknown }) {
   );
 }
 
+const noopSubscribe = () => () => {};
+
+/**
+ * False during SSR and the hydrating render, true after mount. Wallet state is
+ * only knowable in the browser (the wallet may restore its connection before
+ * React hydrates), so it must not decide what the first render shows.
+ */
+function useMounted(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
+
 export function OnboardingScreen() {
-  const { address, isConnected } = useAccount();
+  const mounted = useMounted();
+  const account = useAccount();
+  const address = mounted ? account.address : undefined;
+  const isConnected = mounted && account.isConnected;
   const chainId = useChainId();
   const { connectors, connect, isPending: connecting, error: connectError } = useConnect();
   const { switchChain, isPending: switching } = useSwitchChain();
@@ -234,7 +248,7 @@ export function OnboardingScreen() {
           )}
         </Step>
 
-        <Step n={5} title="Participant status" state={consented ? "current" : "locked"}>
+        <Step n={5} title="Participant status" state={consented ? "done" : "locked"}>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
             <dt className="text-steel">Backend onboarding</dt>
             <dd className="text-ink" data-testid="backend-onboarding">

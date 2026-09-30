@@ -35,10 +35,12 @@ async function authFetch<T>(path: string, init: { method?: "GET" | "POST"; body?
     method,
     credentials: "same-origin",
     cache: "no-store",
-    headers:
-      method === "POST"
-        ? { "content-type": "application/json", "x-vessel-csrf": "1" }
-        : { accept: "application/json" },
+    // content-type only with a body: an empty JSON body is a 400 at the server.
+    headers: {
+      accept: "application/json",
+      ...(method === "POST" ? { "x-vessel-csrf": "1" } : {}),
+      ...(init.body === undefined ? {} : { "content-type": "application/json" }),
+    },
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
   });
   let json: unknown = null;
@@ -194,17 +196,30 @@ export function clearPrivateQueries(qc: QueryClient): void {
 }
 
 /**
- * A session belongs to one wallet. If the connected wallet changes or
- * disconnects while a session exists, the private data on screen belongs to
- * someone else: clear it and end the session (spec §14).
+ * A session belongs to one wallet (spec §14). It ends when:
+ *  - a *different* wallet is connected, or
+ *  - the wallet this page had connected disconnects.
+ * A page that simply has not reconnected the wallet yet (every page load
+ * starts that way) is not a switch: treating it as one logged users out on
+ * every refresh.
  */
-export function sessionMismatch(sessionAddress: string | null | undefined, walletAddress: string | undefined): boolean {
+export function sessionMismatch(
+  sessionAddress: string | null | undefined,
+  walletAddress: string | undefined,
+  previousWalletAddress?: string,
+): boolean {
   if (!sessionAddress) return false;
-  return !walletAddress || walletAddress.toLowerCase() !== sessionAddress.toLowerCase();
+  if (walletAddress) return walletAddress.toLowerCase() !== sessionAddress.toLowerCase();
+  return previousWalletAddress !== undefined;
 }
 
-export function handleAccountChange(qc: QueryClient, sessionAddress: string | null | undefined, walletAddress: string | undefined): boolean {
-  if (!sessionMismatch(sessionAddress, walletAddress)) return false;
+export function handleAccountChange(
+  qc: QueryClient,
+  sessionAddress: string | null | undefined,
+  walletAddress: string | undefined,
+  previousWalletAddress?: string,
+): boolean {
+  if (!sessionMismatch(sessionAddress, walletAddress, previousWalletAddress)) return false;
   clearPrivateQueries(qc);
   qc.setQueryData(sessionKey, null);
   return true;
@@ -216,11 +231,14 @@ export function useWalletSwitchGuard(): void {
   const { address, status } = useAccount();
   const session = useSession();
   const loggingOut = useRef(false);
+  const previous = useRef<string | undefined>(undefined);
   useEffect(() => {
     // wagmi reports "reconnecting"/"connecting" with no address on load; only
     // a settled state is evidence that the wallet actually changed.
     if (status === "reconnecting" || status === "connecting") return;
-    if (handleAccountChange(qc, session.data?.address, address) && !loggingOut.current) {
+    const prev = previous.current;
+    previous.current = address;
+    if (handleAccountChange(qc, session.data?.address, address, prev) && !loggingOut.current) {
       loggingOut.current = true;
       void authFetch("/logout", { method: "POST" })
         .catch(() => undefined)
