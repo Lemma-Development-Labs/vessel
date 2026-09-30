@@ -34,11 +34,31 @@ Not in this session (by plan): real venues and valuation adapter (Day 2),
 48 h timelock contract (governance is an address today; the Safe/timelock
 wiring lands with deployment), D30 route adapter and vUSD lab (deferred).
 
+## Sessions 3 + 4 — Day 2 of the 3-day plan · 2026-09-30 · `local complete`, testnet deploy pending
+
+Checkpoint: [sessions/03.md](sessions/03.md). 155 contract tests; service 40;
+verify-cli 7.
+
+Done: `DeployV2.s.sol` (TimelockController 300 s owned by the Safe,
+PauseGuardian, TrancheController, labelled `SimulatedEngine`); Safe
+Transaction Builder batches for the timelock; durable keeper journal
+(fencing, nonce-pinned dispatch, UNKNOWN on timeout) and v2 keeper policy;
+independent `vessel-verify` CLI; `/v1` evidence API (book, series,
+requests, history); reorg-aware event indexer. Full rehearsal on Anvil:
+deploy → Safe batches → timelock delay enforced → keeper admitted, deployed
+and settled a deposit → `vessel-verify` OVERALL PASS.
+
+Not done: the Monad testnet broadcast — waits on `contracts/.env`
+(`DEPLOYER_PK`, `MONAD_TESTNET_RPC`) from the owner; runbook in
+[../deployments/README.md](../deployments/README.md).
+
 ## Blockers and follow-ups
 
 | Item | Owner | Blocks |
 |---|---|---|
 | Fund the testnet keeper | Kunal | v0 demo settlement |
+| Add `contracts/.env` with a fresh `DEPLOYER_PK` + `MONAD_TESTNET_RPC`, then Safe signers approve batches 01 → 03 → 02 | Priya / Safe signers | v2 testnet deploy |
+| Fund a separate v2 keeper key (`V2_KEEPER_PK`) with testnet MON | Priya | v2 keeper on testnet |
 | Confirm the 2026-08-29 transactions from compromised key `0x4307…` | Kunal | incident record |
 | Evidence Safe `0xe4f2…0279` signer independence | Kunal | G07, R07 |
 | Evidence OPS.md §0 Railway/Vercel token rotation | Kunal | R05 |
@@ -50,4 +70,4 @@ wiring lands with deployment), D30 route adapter and vUSD lab (deferred).
 
 ## Resume instruction
 
-Start **Session 2** per the resume instruction in [sessions/01.md](sessions/01.md).
+Run the testnet deploy (Day 2 tail), then **Day 3** per the resume instruction in [sessions/03.md](sessions/03.md).

@@ -49,7 +49,7 @@ reference must not call the implementation under test.
 |---|---|---|
 | Delta bands, slice caps, slippage refusal | keeper policy tests + adapter replay | PLANNED-S3 |
 | Paired slicing, failed-leg compensation, UNHEDGED_ALERT | adapter replay tests (recorded venue traces) | PLANNED-S3 |
-| Idempotent orders, lost-ack reconciliation, two keepers | journal/outbox tests, fencing-token test | PLANNED-S3 |
+| Idempotent orders, lost-ack reconciliation, two keepers | `vessel-service/test/keeper-v2.test.ts` (persist-before-dispatch, crash restart, `timeout_is_unknown_not_failed`, `two_workers_one_signs`, `stale_worker_rejected_by_fencing`, allowlist, superseded) | DONE (2026-09-30) for v2 controller actions; venue orders PLANNED-S3 (G01) |
 | Margin stress +30% MON without top-up | stress model | PLANNED-S3 (gated G02) |
 
 ## Evidence and data (spec §12–§13)
@@ -57,9 +57,9 @@ reference must not call the implementation under test.
 | Requirement | Artifact | Status |
 |---|---|---|
 | Tagged type LIVE/STALE/UNAVAILABLE/PARTIAL/MISMATCH/SIMULATED; UNAVAILABLE has no value; only LIVE authorizes risk | `packages/domain/test/evidence.test.ts` + typecheck | DONE (schemas) |
-| Single-block snapshot with blockHash; PARTIAL/MISMATCH on skew | verifier CLI tests | PLANNED-S4 |
-| Event identity (chainId, blockHash, txHash, logIndex); reorg replay | indexer tests | PLANNED-S4 |
-| Independent CLI recomputes hedge + waterfall without Vessel API | CLI golden runs | PLANNED-S4 |
+| Single-block snapshot with blockHash; PARTIAL/MISMATCH on skew | `tools/verify-cli/test/checks.test.ts`; `/v1/book` in `vessel-service/test/v1-api.test.ts` | DONE (2026-09-30) — every read pinned to one finalized block; failed check → MISMATCH; venue PARTIAL arrives with real venues (G01) |
+| Event identity (chainId, blockHash, txHash, logIndex); reorg replay | `vessel-service/test/v2-indexer.test.ts` (`dedupe_uses_full_event_identity`, `reorg_replay`, finality); `/v1/history` tests | DONE (2026-09-30) |
+| Independent CLI recomputes hedge + waterfall without Vessel API | `vessel-verify` (book identity, backing, caps, units) — local Anvil run OVERALL PASS | PARTIAL (2026-09-30) — book checks DONE; hedge recompute BLOCKED on G01 (testnet engine is SIMULATED) |
 
 ## Auth (spec §14, docs/AUTH.md)
 
