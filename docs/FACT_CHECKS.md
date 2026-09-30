@@ -68,17 +68,56 @@ Wiring and role reads at the pinned block:
 | `BlitzVault.asset()` | DemoUSD `0x959E…9495` | vault asset is dUSD |
 | `DemoUSD.decimals()` | 6 | |
 
+## Recheck — 2026-09-30 (`scripts/fact-check-chain.sh`, Foundry 1.8.3)
+
+Raw output: [evidence/phase1/factcheck-2026-09-30.txt](evidence/phase1/factcheck-2026-09-30.txt).
+
+- **Mainnet** finalized block **109302324**
+  (`0x6cda21fa3748f54a455f9192163dd159bbd98546c477a2ee330c9f3a13895d38`):
+  USDC 6 / AUSD 6 / WMON 18 decimals and code sizes **unchanged**. Kuru
+  MON/USDC + MON/AUSD implementation still `0x5e3446c6…99a0`; Perpl Exchange
+  implementation still `0xa9ab97a4…1b2a` — **no venue upgrade since 09-23**.
+- **Testnet** finalized block **66951701**
+  (`0x59bf5d8571cad7bcdccb9ce131e08d545544e49f8b76b53a5e66c9a4084cbd37`): all
+  eleven manifest contracts have unchanged code sizes; owner, treasury and
+  SimVenue owner are the Safe `0xe4f2…0279` (v1.4.1, 2-of-3, same owners);
+  not paused; venue simulated; router MockRouter; asset DemoUSD.
+- **Deployer** of the live deployment (immutable `deployer()` on Tranches,
+  BlitzVault, EngineLite): `0xFfae50A3Ecc660fFF2B83e0B75F52c0A5F4E0F78`. Its
+  single-use powers are spent (engines set, tranches set, dead shares seeded,
+  engine wired). **Seeder**: `0x138114870DF3FB683862bd31b4b185aF4e979b8E`,
+  100 dUSD at block 57,923,138. Deployment block 57923009 = 2026-08-29 12:20 UTC.
+- **Sourcify**: all eleven `exact_match` (verified 2026-08-29), re-queried
+  2026-09-30; `app/lib/verification.ts` regenerated with per-contract links.
+
+### Operational findings (2026-09-30)
+
+1. **Keeper out of gas.** `EngineLite.lastCrank` = 2026-09-28 06:56 UTC. The
+   service's own `/health` is degraded: keeper `0x2A3f…de65` holds 0.023 MON
+   against 0.1326 MON per crank (1.3M gas limit × 102 gwei), runway 0. No
+   funding accrues and the waterfall does not settle until it is funded.
+   Owner: Kunal. Funding it is a value-moving action and was not taken here.
+2. **Compromised key moved after its watermark.** `0x4307…be7C` (not
+   `0x85Fe…` — see the OPS.md §0 erratum) is at nonce 48 / 10.0056 MON versus
+   the recorded watermark nonce 20 / 36.677891042 MON. All 28 transactions
+   fall on 2026-08-29 11:02–15:31 UTC (blocks 57,907,623–57,960,943), the
+   redeploy afternoon; none since. Sender intent **unconfirmed** — owner to
+   confirm. The current deployment is outside this key's reach.
+3. **Doc error corrected.** Commit `b9ce063` had replaced the compromised EOA
+   with the older Safe `0x85Fe…` in OPS.md §0 and labelled that Safe
+   "Deployer" in README/FACTS/ADDRESSES.md. Fixed on 2026-09-30.
+
 ## Drift and open items found this session (2026-09-23)
 
-1. **README.md, FACTS.md, and docs/security/powers.md describe the superseded
-   deployment** (`0x66B5…`/`0xdb46…`, block 57918591, Safe `0x85Fe…`). The live
+1. **FIXED 2026-09-30.** ~~README.md, FACTS.md, and docs/security/powers.md describe the superseded
+   deployment~~ (`0x66B5…`/`0xdb46…`, block 57918591, Safe `0x85Fe…`). The live
    deployment is the one above. Doc updates should follow the in-flight
    `harden/p0-testnet` work, not race it.
 2. **New Safe signer-key independence unverified.** The previous Safe's three
    signer keys were generated on one machine (README). Whether the new Safe's
    signers (`0x56d7…`, `0x8d02…`, `0xbFFA…`) are independently controlled is
    not evidenced anywhere. Owner: Kunal.
-3. **Sourcify verification of the eleven current addresses not yet re-run**
+3. **RESOLVED 2026-09-30** (all eleven `exact_match`, re-queried). ~~Sourcify verification of the eleven current addresses not yet re-run~~
    this session. The uncommitted `app/lib/verification.ts` asserts
    all-verified but must be regenerated via `pnpm verify:manifest`, not
    hand-edited (its own header says so).
@@ -114,7 +153,7 @@ Owners are **proposed** per spec §25 and unconfirmed by the named people.
 | G05 | Independent security reviewer | Engagement, scope, findings | Kunal | OPEN — blocks external deposits (D14) |
 | G06 | Beta participant eligibility + offering terms | Counsel review, consent version | Kunal | OPEN — blocks invitations |
 | G07 | Two-person operating coverage | Named primary/backup with availability | Kunal + Daksh | OPEN |
-| G08 | Current repository status and deployed artifacts | This file + [INVENTORY.md](INVENTORY.md) + docs/sessions/01.md | Session 1 | **REOPENED 2026-09-30** — the 09-23 close did not cover the 13 unmerged `cursor/*` branches (Kuru router, Perpl reader/venue, Perpl keeper, oracles, caps, Envio). Now inventoried with reproduced test counts; closes when the drift items below are fixed in README/FACTS/powers.md and the eleven live addresses are re-verified on Sourcify. |
+| G08 | Current repository status and deployed artifacts | This file + [INVENTORY.md](INVENTORY.md) + docs/sessions/01.md | Session 1 | **CLOSED 2026-09-30** — reopened 09-30 for the unmerged branch assets, now inventoried with reproduced test counts; docs re-pointed to the live deployment; all eleven addresses re-verified on Sourcify; chain facts re-read at finalized blocks. Open follow-ups (Safe signer independence, token rotation, keeper funding) are tracked above, not in G08. |
 | G09 | Provider route qualification (D30) | Route record: source/destination tokens and decimals, provider contracts and versions, finality, size and fee bounds, recovery path, testnet delivery + refund receipts | Daksh | OPEN — no provider selected; Epoch is a candidate whose published network list does not establish Monad support (HANDBOOK_v4 ch. 6) |
 | G10 | Beneficiary authentication and recovery (D30) | EIP-712 binding verified on arrival (ERC-1271 for contract wallets), observed-amount crediting, recovery on Monad with the quote service offline | Daksh | OPEN — no adapter exists |
 
