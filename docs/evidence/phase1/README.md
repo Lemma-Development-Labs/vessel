@@ -13,3 +13,4 @@ Branch runs used detached worktrees at the `origin/cursor/*` tips fetched on 202
 | forge-perpl-venue.txt | `forge test` at `origin/cursor/perpl-venue-bf3b` (tail) |
 | forge-mainnet-gates.txt | `forge test` at `origin/cursor/mainnet-gates-bf3b` (tail) |
 | keeper-mainnet-gates.txt | `cd keeper && pnpm install --ignore-scripts && pnpm test` at `origin/cursor/mainnet-gates-bf3b` |
+| onboarding-desktop.png, onboarding-mobile-360.png | `cd app && pnpm e2e` — full-page screenshots at the end of the onboarding journey (test wallets generated per run) |

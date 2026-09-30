@@ -124,6 +124,34 @@ jobs:
         working-directory: vessel-service
         run: pnpm test
 
+  e2e:
+    # Real browser (Chromium) against the real app and vessel-service. Needs
+    # the public Monad testnet RPC: the service checks its chain ID at startup.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: install service
+        working-directory: vessel-service
+        run: pnpm install --frozen-lockfile
+      - name: install app
+        working-directory: app
+        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: onboarding journey (desktop + 360 px)
+        working-directory: app
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: app/test-results
+          retention-days: 7
+
   secrets:
     runs-on: ubuntu-latest
     steps:

@@ -85,7 +85,7 @@ reference must not call the implementation under test.
 | `env_rejects_placeholder_address` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |
 | `env_rejects_lab_address_on_mainnet` | `packages/config/test/config.test.ts` | DONE (2026-09-30) |
 | `money_schema_rejects_js_number` | `packages/domain/test/money.test.ts` | DONE (2026-09-30) |
-| `onboarding_desktop_and_mobile_360px` (Playwright) | app | PLANNED-S1 |
+| `onboarding_desktop_and_mobile_360px` (Playwright) | `app/e2e/onboarding.spec.ts` — desktop 1280 px + mobile 360 px, real app + service, zero browser errors | DONE (2026-09-30) |
 
 ## App (spec §15)
 
