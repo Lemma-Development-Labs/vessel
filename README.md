@@ -177,7 +177,7 @@ Explorer: [MonadVision testnet](https://testnet.monadvision.com). RPC: `https://
 All eleven are **Sourcify-verified `exact_match`** on chain 10143 (verified
 2026-08-29, re-checked 2026-09-30 against the Sourcify API) — the app reads that
 state per contract from a generated manifest (`app/lib/verification.ts`) rather
-than asserting it. Code, wiring and roles re-read at finalized block 66,951,701
+than asserting it. Code, wiring and roles re-read at finalized block 66,956,024
 on 2026-09-30: [docs/FACT_CHECKS.md](./docs/FACT_CHECKS.md).
 
 ### Roles (addresses, never keys)

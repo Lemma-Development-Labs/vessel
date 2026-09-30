@@ -72,13 +72,13 @@ Wiring and role reads at the pinned block:
 
 Raw output: [evidence/phase1/factcheck-2026-09-30.txt](evidence/phase1/factcheck-2026-09-30.txt).
 
-- **Mainnet** finalized block **109302324**
-  (`0x6cda21fa3748f54a455f9192163dd159bbd98546c477a2ee330c9f3a13895d38`):
+- **Mainnet** finalized block **109306648**
+  (`0x5d75a46451617533bc85368ae783a907d5ad8fe3a7b87800e4f5bc2546fa5c89`):
   USDC 6 / AUSD 6 / WMON 18 decimals and code sizes **unchanged**. Kuru
   MON/USDC + MON/AUSD implementation still `0x5e3446c6…99a0`; Perpl Exchange
   implementation still `0xa9ab97a4…1b2a` — **no venue upgrade since 09-23**.
-- **Testnet** finalized block **66951701**
-  (`0x59bf5d8571cad7bcdccb9ce131e08d545544e49f8b76b53a5e66c9a4084cbd37`): all
+- **Testnet** finalized block **66956024**
+  (`0x65f5ddc9009424eff1d047ffd8607632756342be5aa17f180debb6aebd47fb3f`): all
   eleven manifest contracts have unchanged code sizes; owner, treasury and
   SimVenue owner are the Safe `0xe4f2…0279` (v1.4.1, 2-of-3, same owners);
   not paused; venue simulated; router MockRouter; asset DemoUSD.

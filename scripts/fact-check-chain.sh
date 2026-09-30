@@ -12,6 +12,7 @@ set -uo pipefail
 M=${MONAD_MAINNET_RPC:-https://rpc.monad.xyz}
 T=${MONAD_TESTNET_RPC:-https://testnet-rpc.monad.xyz}
 MANIFEST="$(cd "$(dirname "$0")/.." && pwd)/ADDRESSES.json"
+# EIP-1967 implementation slot: keccak256 hash of "eip1967.proxy.implementation" minus 1.
 EIP1967_IMPL=0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
 
 pin() { cast block finalized -f number,hash,timestamp --rpc-url "$1" | tr '\n' ' '; }
@@ -20,9 +21,9 @@ impl() { cast storage "$1" "$EIP1967_IMPL" --rpc-url "$2" --block "$3" 2>&1 | se
 addr() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['contracts'][sys.argv[2]])" "$MANIFEST" "$1"; }
 
 echo "mainnet chainId $(cast chain-id --rpc-url "$M")"
-read -r MB MH MT < <(pin "$M"); echo "mainnet finalized $MB $MH ts=$MT"
+read -r MB MH MT < <(pin "$M"); echo "mainnet finalized number=$MB blockHash=$MH ts=$MT"
 echo "testnet chainId $(cast chain-id --rpc-url "$T")"
-read -r TB TH TT < <(pin "$T"); echo "testnet finalized $TB $TH ts=$TT"
+read -r TB TH TT < <(pin "$T"); echo "testnet finalized number=$TB blockHash=$TH ts=$TT"
 
 echo "--- mainnet refs @ $MB"
 while read -r name a; do
