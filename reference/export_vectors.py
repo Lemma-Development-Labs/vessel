@@ -61,6 +61,19 @@ def main() -> None:
     (OUT / "settlement_seeded.json").write_text(
         json.dumps({"unit": "USDC:6", "seed": 20260930, "cases": cases}) + "\n"
     )
+    # Same cases as flat 32-byte big-endian words for Solidity (16 words per
+    # case): H B R G(int256, two's complement) C L feesDisabled | H' B' R' F FR
+    # FT L' impaired | pad.
+    def word(v: int) -> bytes:
+        return (v % (1 << 256)).to_bytes(32, "big")
+    blob = bytearray()
+    for c in cases:
+        i, o = c["in"], c["out"]
+        vals = [int(i[k]) for k in "HBRGCL"] + [int(i["feesDisabled"])]
+        vals += [int(o[k]) for k in ("H", "B", "R", "F", "FR", "FT", "Lnext")] + [int(o["impaired"]), 0]
+        for v in vals:
+            blob += word(v)
+    (OUT / "settlement_seeded.bin").write_bytes(bytes(blob))
 
     # Coupon: principal x rate x seconds / 365 days, floored, 8% on 1,000 USDC for 28 days.
     coupon = Fraction(rm.usd(1000) * 8 * 28, 100 * 365)
