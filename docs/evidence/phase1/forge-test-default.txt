@@ -1,0 +1,177 @@
+Compiling 73 files with Solc 0.8.24
+Solc 0.8.24 finished in 92.03s
+Compiler run successful with warnings:
+Warning (2018): Function state mutability can be restricted to view
+  --> test/unit/DemoUSD.t.sol:39:5:
+   |
+39 |     function test_noPrivilegedMint() public {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 5 tests for test/unit/BlitzVault.t.sol:BlitzVaultTest
+[PASS] test_deployableIs90Percent() (gas: 265809)
+[PASS] test_guardianCannotSetEngine() (gas: 42621)
+[PASS] test_onlyEnginePulls() (gas: 275880)
+[PASS] test_pauseBlocksDeposit() (gas: 96780)
+[PASS] test_wireOnce() (gas: 45041)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 5.91ms (235.08µs CPU time)
+
+Ran 3 tests for test/unit/Reentrancy.t.sol:ReentrancyTest
+[PASS] test_maliciousTokenCannotReenterDeposit() (gas: 3693070)
+[PASS] test_maliciousTokenCannotReenterVaultDuringDeposit() (gas: 3718833)
+[PASS] test_maliciousVenueCannotReenterCrank() (gas: 10284644)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.06ms (2.52ms CPU time)
+
+Ran 3 tests for test/unit/Decimals.t.sol:DecimalsTest
+[PASS] test_dusdToWmonRoundTripDown() (gas: 223)
+[PASS] test_wmonToDusdDownFloorsDust() (gas: 399)
+[PASS] test_wmonToDusdUpRoundsLosses() (gas: 311)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 53.00µs (13.46µs CPU time)
+
+Ran 4 tests for test/unit/Guardian.t.sol:GuardianTest
+[PASS] test_pauseBlocksAllMutative() (gas: 238921)
+[PASS] test_twoStepOwnership() (gas: 137454)
+[PASS] test_unpauseRestores() (gas: 331505)
+[PASS] test_viewsWorkWhilePaused() (gas: 136830)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 6.94ms (267.25µs CPU time)
+
+Ran 4 tests for test/unit/DemoUSD.t.sol:DemoUSDTest
+[PASS] test_faucetCooldown() (gas: 182730)
+[PASS] test_faucetLifetimeCap() (gas: 568190)
+[PASS] test_faucetMints100() (gas: 110100)
+[PASS] test_noPrivilegedMint() (gas: 15799)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 858.54µs (179.83µs CPU time)
+
+Ran 3 tests for test/unit/Mocks.t.sol:MocksTest
+[PASS] test_routerExpiredAndBadPath() (gas: 91676)
+[PASS] test_routerRoundTrip1to1() (gas: 288802)
+[PASS] test_wmonOnlyRouterMints() (gas: 57322)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 8.21ms (3.53ms CPU time)
+
+Ran 1 test for test/unit/EngineLite.t.sol:PerplVenueTest
+[PASS] test_stubRevertsAndViews() (gas: 32671)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 245.92µs (39.50µs CPU time)
+
+Ran 4 tests for test/unit/Inflation.t.sol:InflationTest
+[PASS] test_deadShareSeedExists() (gas: 24818)
+[PASS] test_donationCannotInflateTrancheShares() (gas: 755907)
+[PASS] test_minJoinCannotRoundVictimToZero() (gas: 495615)
+[PASS] test_rawFirstDepositorAttackIsUnreachable() (gas: 176588)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.68ms (470.42µs CPU time)
+
+Ran 5 tests for test/unit/Rounding.t.sol:RoundingTest
+[PASS] test_feeCeilsAt1WeiGross() (gas: 589057)
+[PASS] test_hullAccrualFloors() (gas: 589984)
+[PASS] test_lossAgainstBallastTakesFullWei() (gas: 545622)
+[PASS] test_shareBurnFloorsAssetsOut() (gas: 337245)
+[PASS] test_shareMintFloorsAt1Wei() (gas: 468082)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 2.41ms (1.80ms CPU time)
+
+Ran 2 tests for test/unit/PauseMatrix.t.sol:GuardianFundsTest
+[PASS] test_guardianHasNoTokenMovement() (gas: 213902)
+[PASS] test_guardianOwnerCannotPullVault() (gas: 62040)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.03ms (74.75µs CPU time)
+
+Ran 6 tests for test/unit/CoverageBoost.t.sol:CoverageBoostTest
+[PASS] test_claimTreasuryAfterFundedSettle() (gas: 700561)
+[PASS] test_lossEatsReserve() (gas: 652804)
+[PASS] test_routerBadPathTwoTokens() (gas: 149409)
+[PASS] test_unwindCashLessThanDeployedAndZero() (gas: 2265934)
+[PASS] test_vaultMintAndReturnZero() (gas: 634563)
+[PASS] test_viewsAndPauseIdempotence() (gas: 155168)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.58ms (4.95ms CPU time)
+
+Ran 6 tests for test/unit/ShareIssuance.t.sol:SeedDeadSharesTest
+[PASS] test_nobodyCanMintBeforeTranchesIsWired() (gas: 263154)
+[PASS] test_onlyDeployerCanSeed() (gas: 397602)
+[PASS] test_seedMustPrecedeSetTranches() (gas: 273592)
+[PASS] test_seedOnlyOnce() (gas: 284225)
+[PASS] test_seedRejectsZero() (gas: 46219)
+[PASS] test_setTranchesOnlyOnceOnlyDeployerNonZero() (gas: 335118)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.69ms (496.75µs CPU time)
+
+Ran 9 tests for test/unit/EngineLite.t.sol:EngineLiteTest
+[PASS] test_alreadyDeployedReverts() (gas: 400843)
+[PASS] test_crankNotWiredReverts() (gas: 40893)
+[PASS] test_crankWithoutPositionIsZeroGross() (gas: 108826)
+[PASS] test_negativeSpotPnlIsCapped() (gas: 639055)
+[PASS] test_notDeployerCannotWireFresh() (gas: 43931)
+[PASS] test_simVenueRateBound() (gas: 64666)
+[PASS] test_unwindAfterDeployClearsBook() (gas: 608916)
+[PASS] test_wireOnce() (gas: 57852)
+[PASS] test_wireZeroAddressReverts() (gas: 51292)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 1.94ms (871.17µs CPU time)
+
+Ran 2 tests for test/unit/PauseMatrix.t.sol:PauseMatrixTest
+[PASS] test_everyMutativeSelectorRevertsWhenPaused() (gas: 761814)
+[PASS] test_setEnginePausedOnFreshVault() (gas: 97799)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.44ms (432.29µs CPU time)
+
+Ran 5 tests for test/unit/ShareIssuance.t.sol:ShareIssuanceTest
+[PASS] test_contractCallerLockedOut() (gas: 518604)
+[PASS] test_everyCallerIsLockedOutOfDepositAndMint() (gas: 4515736)
+[PASS] test_previewsRemainOpen() (gas: 128841)
+[PASS] test_tranchesCanStillMint() (gas: 411575)
+[PASS] test_withdrawRedeemStayOpenButOutsidersHoldNothing() (gas: 97937)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 11.48ms (5.61ms CPU time)
+
+Ran 12 tests for test/unit/Edge.t.sol:EdgeCasesTest
+[PASS] test_claimTreasury() (gas: 558538)
+[PASS] test_emptyBallastJoinHullRevertsFloorAndNegativeImpairs() (gas: 684729)
+[PASS] test_exitAllThenRejoin() (gas: 586713)
+[PASS] test_hundredCranksSameBlockOnlyFirstSucceeds() (gas: 7007108)
+[PASS] test_implausibleYieldReverts() (gas: 518162)
+[PASS] test_minJoinRevertsDust() (gas: 94464)
+[PASS] test_rateFlipMidEpoch() (gas: 1066656)
+[PASS] test_settleEmptyHullPositiveYield() (gas: 376348)
+[PASS] test_sharePriceMonotoneOnPositiveSettle() (gas: 595307)
+[PASS] test_spotPnlCapEmits() (gas: 1138174)
+[PASS] test_unwindWithAccruedFunding() (gas: 1061599)
+[PASS] test_vaultIdentityIdlePlusDeployed() (gas: 24807)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 11.91ms (5.81ms CPU time)
+
+Ran 1 test for test/integration/FullCycle.t.sol:FullCycleTest
+[PASS] test_fullCycleBalancesToWei() (gas: 1778775)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.96ms (851.21µs CPU time)
+
+Ran 18 tests for test/unit/Tranches.t.sol:TranchesTest
+[PASS] test_dtZeroReverts() (gas: 556848)
+[PASS] test_emptyTvlPositiveYieldReverts() (gas: 51459)
+[PASS] test_exitBallastRevertsAtFloor() (gas: 531589)
+[PASS] test_exitHullImprovesRatio() (gas: 604566)
+[PASS] test_int256MinYieldReverts() (gas: 508985)
+[PASS] test_negativeSmallEatsBallast() (gas: 579626)
+[PASS] test_negativeThroughReserveThenImpair() (gas: 634752)
+[PASS] test_onlyEngineSettle() (gas: 34802)
+[PASS] test_pauseBlocksJoin() (gas: 143772)
+[PASS] test_positiveYieldGGreaterThanFeePlusAccrual() (gas: 641797)
+[PASS] test_positiveYieldGLessThanAccrual() (gas: 612073)
+[PASS] test_settleAtYieldCapConserves() (gas: 631043)
+[PASS] test_settleNegativeCapDrainsBallast() (gas: 551930)
+[PASS] test_spillToKeepFloorOnThinBallast() (gas: 603794)
+[PASS] test_subordinationJoinBallastAlwaysOk() (gas: 654467)
+[PASS] test_subordinationJoinHullRevertsAtFloor() (gas: 556271)
+[PASS] test_unfundedSettleDivergesLedgerFromVaultCash() (gas: 669097)
+[PASS] test_wireOnce() (gas: 45144)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 454.56ms (3.81ms CPU time)
+
+Ran 1 test for test/fork/ForkAccounting.t.sol:ForkAccountingTest
+[SKIP] test_forkVaultIdentityAndFloor() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 1.33s (1.33s CPU time)
+
+Ran 3 tests for test/fuzz/Conservation.t.sol:ConservationFuzz
+[PASS] testFuzz_conservation(int96,uint32) (runs: 10000, μ: 155481, ~: 147508)
+[PASS] testFuzz_floorHoldsOnJoinsExits(uint8,uint256) (runs: 10000, μ: 226709, ~: 266317)
+[PASS] testFuzz_sharePriceMonotoneOnNonNegativeG(uint256,uint32) (runs: 10000, μ: 182331, ~: 185200)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.98s (6.41s CPU time)
+
+Ran 4 tests for test/fuzz/Solvency.t.sol:SolvencyFuzz
+[PASS] testFuzz_driftStaysWithinOneWeiPerOperation(uint256,uint8) (runs: 10000, μ: 1326503, ~: 1038445)
+[PASS] testFuzz_solvencyUnderMixedTraffic(uint256,uint8) (runs: 10000, μ: 1894541, ~: 1469743)
+[PASS] test_deadShareSeedDoesNotEarn() (gas: 661956)
+[PASS] test_fullExitAfterYieldStrandsNothing() (gas: 1604181)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 2.97s (5.49s CPU time)
+
+Ran 21 test suites in 2.99s (7.82s CPU time): 100 tests passed, 0 failed, 1 skipped (101 total tests)
+forge test 2>&1  109.37s user 1.93s system 102% cpu 1:49.08 total
+exit=0

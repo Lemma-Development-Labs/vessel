@@ -1,0 +1,16 @@
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 37.9s using pnpm v10.33.3
+ ✓ lib/__tests__/rule0.test.ts (15 tests) 15ms
+
+ Test Files  3 passed (3)
+      Tests  40 passed (40)
+   Start at  15:12:51
+   Duration  508ms (transform 90ms, setup 0ms, collect 134ms, tests 26ms, environment 0ms, prepare 733ms)
+
+test exit=0
+
+> app@0.1.0 lint ./app
+> eslint
+
+lint exit=0
