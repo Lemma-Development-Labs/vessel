@@ -12,6 +12,7 @@ import {
 import { assertRpcChainIds, loadRuntimeConfig } from "./vendor/vessel-config.ts";
 import { initDb } from "./db.ts";
 import { initAuth } from "./auth/bootstrap.ts";
+import { loadV2Manifest } from "./v2/manifest.ts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -45,7 +46,18 @@ async function main(): Promise<void> {
 
   const auth = await initAuth(runtime.environment, runtime.chainId, log);
 
-  const api = await startApi({ store, publicClient, addrs, ...(auth ? { auth: auth.deps } : {}) });
+  const v2Manifest = loadV2Manifest(runtime.chainId, log);
+  const v1 = v2Manifest
+    ? { manifest: v2Manifest, client: publicClient, sourceLabel: `rpc:${new URL(rpcUrl).host} (finalized block, direct chain read)` }
+    : undefined;
+
+  const api = await startApi({
+    store,
+    publicClient,
+    addrs,
+    ...(auth ? { auth: auth.deps } : {}),
+    ...(v1 ? { v1 } : {}),
+  });
 
   let keeper: KeeperHandle | undefined;
   let indexer: Awaited<ReturnType<typeof startIndexer>> | undefined;

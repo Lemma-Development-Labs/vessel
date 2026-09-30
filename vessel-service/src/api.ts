@@ -28,6 +28,7 @@ import {
 import { fundingApr7dBps, type Store } from "./db.ts";
 import { getIndexerStatus } from "./indexer.ts";
 import { authRoutes, type AuthRouteDeps } from "./auth/routes.ts";
+import { v1Routes, type V1Deps } from "./v2/api.ts";
 import { getKeeperStatus, getLastSuccessfulCrank } from "./keeper.ts";
 
 const log = pino({ name: "api", level: process.env.LOG_LEVEL ?? "info" });
@@ -65,6 +66,8 @@ export async function startApi(opts: {
   keeperAddress?: `0x${string}`;
   /** SIWE auth routes (docs/AUTH.md). Omitted → auth is not served. */
   auth?: AuthRouteDeps;
+  /** v2 evidence API (/v1/*). Omitted → not served. */
+  v1?: V1Deps;
 }): Promise<ApiHandle> {
   const rpcUrl = getRpcUrl();
   const chainId = getChainId();
@@ -128,6 +131,11 @@ export async function startApi(opts: {
     { allowedOrigins, rateLimitMax: rlMax, rateLimitWindowSec: rlWindowSec },
     "cors allowlist + rate limit configured",
   );
+
+  if (opts.v1) {
+    await app.register(v1Routes(opts.v1));
+    log.info({ environment: opts.v1.manifest.environment, controller: opts.v1.manifest.contracts.TrancheController }, "v1 evidence routes registered");
+  }
 
   if (opts.auth) {
     await app.register(authRoutes(opts.auth));

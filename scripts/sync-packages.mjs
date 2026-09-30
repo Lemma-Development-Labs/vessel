@@ -23,6 +23,16 @@ const TARGETS = [
     source: "packages/config/src/index.ts",
     dest: "vessel-service/src/vendor/vessel-config.ts",
   },
+  // The /v1 API reads the book with the independent verifier's own code, so the
+  // API and `vessel-verify` cannot silently disagree about what they check.
+  {
+    source: "tools/verify-cli/src/checks.ts",
+    dest: "vessel-service/src/vendor/verify/checks.ts",
+  },
+  {
+    source: "tools/verify-cli/src/read.ts",
+    dest: "vessel-service/src/vendor/verify/read.ts",
+  },
 ];
 
 function render(sourcePath) {
