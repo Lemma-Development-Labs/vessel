@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pkg: [domain, config]
+        pkg: [domain, config, math]
     defaults:
       run:
         working-directory: packages/${{ matrix.pkg }}
@@ -93,7 +93,7 @@ jobs:
           node-version: 20
       # config's lint imports the shared money rules from packages/domain.
       - name: install domain (shared lint rules)
-        if: matrix.pkg == 'config'
+        if: matrix.pkg != 'domain'
         working-directory: packages/domain
         run: pnpm install --frozen-lockfile
       - run: pnpm install --frozen-lockfile
