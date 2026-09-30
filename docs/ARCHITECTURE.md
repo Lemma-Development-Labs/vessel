@@ -76,3 +76,97 @@ the single testnet source of truth (synced into app/service); local Anvil
 overwrites it — snapshot first (FACTS.md). Mainnet manifests do not exist and
 must not be fabricated; mainnet manifest validation must fail if any
 vUSD/svUSD artifact is present (D17).
+
+## Target diagrams (v2)
+
+Scoped to what the spec fixes; the prose in [spec/VESSEL_V1.md](spec/VESSEL_V1.md)
+§5–§12 and [HANDBOOK_v4.md](HANDBOOK_v4.md) ch. 6 governs detail.
+
+### Trust boundaries
+
+```mermaid
+flowchart LR
+  subgraph UI["User interface — display + prepare"]
+    App["App + Terminal (apps/web)"]
+    Wallet["User wallet — authorizes user actions"]
+  end
+  subgraph Public["Public data — read, explain, prepare; cannot sign or set NAV"]
+    API["services/api (SIWE, /v1, prepare)"]
+    MCP["services/mcp (read/verify; prepare gated)"]
+    IDX["indexer (rebuildable projection)"]
+    CLI["tools/verify-cli (no API/DB dependency)"]
+  end
+  subgraph Protocol["Protocol — custody, claims, policy (no proxies)"]
+    Core["AssetCustody · TrancheController · HullSeries · BallastToken\nRequestQueue · ClaimEscrow · ReserveLedger · BetaAdmission"]
+    Risk["EngineManager · ValuationAdapter"]
+    Route["InboundFundingAdapter (D30)"]
+  end
+  subgraph Exec["Venue execution — pinned, narrow"]
+    Kuru["KuruAdapter"]
+    Coll["CollateralAdapter USDC→AUSD"]
+    Perpl["PerplAccountAdapter"]
+  end
+  subgraph Ops["Operations — separate identities"]
+    Keeper["services/keeper (journal, outbox, one writer)"]
+    Signer["services/signer (typed allowlist, fencing)"]
+    Sentinel["services/sentinel (separate RPC/provider)"]
+  end
+  subgraph Gov["Governance"]
+    Safe["2-of-3 multisig"] --> TL["48 h timelock"]
+    Guard["Guardian — pause only, cannot resume"]
+  end
+  App --> API
+  App --> Wallet --> Core
+  API --> IDX
+  CLI --> Core
+  CLI --> Exec
+  Keeper --> Signer --> Exec
+  Keeper --> Risk
+  Risk --> Core
+  Core --> Exec
+  Route --> Core
+  Sentinel --> Guard --> Core
+  TL --> Core
+  API -. "no route" .-x Signer
+  MCP -. "no route" .-x Signer
+```
+
+### Native request lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> Requested: requestDeposit (wallet-authorized, quota reserved)
+  Requested --> Escrowed: USDC in pending escrow (outside A, earns nothing)
+  Escrowed --> Admitted: settle book, forward price, min output met
+  Escrowed --> Refundable: cancel / expiry / cap / min unmet / series cancelled
+  Refundable --> ClaimedRefund: claim (releases never-admitted reservation)
+  Admitted --> ExitRequested: Ballast requestBallastRedeem / Hull maturity
+  ExitRequested --> PartiallyFunded: liquidity + projected 30% cover permit part
+  ExitRequested --> Funded: whole eligible amount funded into ClaimEscrow
+  PartiallyFunded --> Funded: remaining units funded later
+  PartiallyFunded --> Admitted: cancel unfunded Ballast remainder
+  Funded --> Claimed: claim to fixed receiver
+  Claimed --> [*]
+  ClaimedRefund --> [*]
+```
+
+### Inbound supported-chain route (D30)
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> QUOTED
+  QUOTED --> AUTHORIZED: EIP-712 binding signed
+  AUTHORIZED --> SOURCE_COMMITTED: source tx
+  SOURCE_COMMITTED --> IN_TRANSIT
+  IN_TRANSIT --> ARRIVED: authenticated Monad USDC receipt (observed amount)
+  IN_TRANSIT --> RECOVERY_PENDING: timeout / provider fault
+  RECOVERY_PENDING --> RECOVERABLE
+  ARRIVED --> CLOSED: subscription ADMITTED or REFUNDABLE→CLAIMED_REFUND
+  RECOVERABLE --> CLOSED
+  note right of ARRIVED
+    Subscription machine runs separately:
+    NOT_REQUESTED → RESERVED → PENDING → ADMITTED | REFUNDABLE → CLAIMED_REFUND
+    ARRIVED + REFUNDABLE = transfer worked, investment did not
+  end note
+```

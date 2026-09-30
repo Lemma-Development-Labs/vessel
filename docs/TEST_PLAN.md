@@ -16,6 +16,7 @@ reference must not call the implementation under test.
 | Requirement | Artifact | Status |
 |---|---|---|
 | Conservation `ΔH+ΔB+ΔR+FT = G` on golden vectors | `packages/domain/test/golden.test.ts` over `docs/spec/ACCOUNTING_GOLDEN_VECTORS.json` | DONE |
+| All **8** vectors of `reference/reference_model.py` (adds loss_recovery, partial_fee, fee_waiver) | `reference/reference_model.py` (PASS 2026-09-30); `packages/domain` holds 5 → extend to 8 via `reference/vectors/*.json` | PARTIAL → PLANNED-S2 |
 | Conservation identity in contracts | v0: `contracts/test/fuzz/Conservation.t.sol` (v0 identity incl. treasury) | COVERED-V0 → PLANNED-S2 for v2 waterfall |
 | Loss carryforward L (no fee on recovery) | reference model + Solidity vectors | PLANNED-S2 |
 | Fee split FR/FT with reserve-deficit cap | reference model + Solidity vectors | PLANNED-S2 |
@@ -68,6 +69,24 @@ reference must not call the implementation under test.
 | Nonce single-use; refresh rotation + reuse-revocation | service unit tests | PLANNED-S1 (remaining item) |
 | Session expiry 15m/7d; logout revokes | service unit tests | PLANNED-S1 (remaining item) |
 
+### Phase 1 named tests (master build prompt §1.6)
+
+| Test | Module | Status |
+|---|---|---|
+| `siwe_rejects_cross_domain_replay` | vessel-service auth | PLANNED-S1 |
+| `siwe_rejects_wrong_chain` | vessel-service auth | PLANNED-S1 |
+| `siwe_rejects_reused_nonce` | vessel-service auth | PLANNED-S1 |
+| `siwe_rejects_expired_nonce` | vessel-service auth | PLANNED-S1 |
+| `refresh_reuse_revokes_family` | vessel-service auth | PLANNED-S1 |
+| `wallet_switch_clears_private_queries` | app | PLANNED-S1 |
+| `invite_single_use_and_hashed` | vessel-service auth | PLANNED-S1 |
+| `invite_binds_only_after_wallet_proof` | vessel-service auth | PLANNED-S1 |
+| `env_rejects_mainnet_mock_provider` | packages/config | PLANNED-S1 |
+| `env_rejects_placeholder_address` | packages/config | PLANNED-S1 |
+| `env_rejects_lab_address_on_mainnet` | packages/config | PLANNED-S1 |
+| `money_schema_rejects_js_number` | packages/domain | PLANNED-S1 |
+| `onboarding_desktop_and_mobile_360px` (Playwright) | app | PLANNED-S1 |
+
 ## App (spec §15)
 
 | Requirement | Artifact | Status |
@@ -92,3 +111,15 @@ rotation, stale oracles, RPC disagreement, reorg replay, paused claims,
 refund races, queue starvation, exit-at-maturity crowd) is tracked here as the
 release checklist for R01/R05; each lands with its owning session. Nightly
 100k-action randomized campaign: PLANNED-S7.
+
+## Inbound supported-chain funding (D30, Handbook v4 ch. 6)
+
+| Requirement | Artifact | Status |
+|---|---|---|
+| Solver / tx sender never becomes beneficiary; EIP-712 binding (ERC-1271 for contract wallets) | `solver_cannot_become_beneficiary`, `forged_binding_rejected` | PLANNED-S6 |
+| Credit the observed transfer amount, never adapter balance | `adapter_uses_observed_amount_not_balance` | PLANNED-S6 |
+| One `BetaAdmission` ledger across native and remote entry | `inbound_shares_global_cap_with_native` (concurrent) | PLANNED-S2 (ledger) / S6 (adapter) |
+| Late arrival after Hull close is refundable on Monad | `late_arrival_refundable` | PLANNED-S6 |
+| Duplicate/racing callbacks → one terminal disposition | `duplicate_callback_single_disposition` | PLANNED-S6 |
+| Recovery with the quote service offline | `recovery_without_quote_service` | PLANNED-S6 |
+| Overdelivery goes to a separate credit | `overdelivery_to_credit` | PLANNED-S6 |
