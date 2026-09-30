@@ -63,7 +63,10 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
     scope.setErrorHandler(async (err, req, reply) => {
       if (err instanceof AuthError) return reply.code(err.status).send({ error: err.code });
       if ((err as { validation?: unknown }).validation) return reply.code(400).send({ error: "BAD_REQUEST" });
-      if ((err as { statusCode?: number }).statusCode === 429) return reply.code(429).send({ error: "RATE_LIMITED" });
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status === 429) return reply.code(429).send({ error: "RATE_LIMITED" });
+      // Fastify's own client errors (malformed/empty JSON, oversized body…) stay 4xx.
+      if (status !== undefined && status >= 400 && status < 500) return reply.code(status).send({ error: "BAD_REQUEST" });
       req.log.error({ err }, "unhandled");
       return reply.code(500).send({ error: "INTERNAL" });
     });

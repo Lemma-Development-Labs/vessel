@@ -168,6 +168,18 @@ describe("SIWE", () => {
     expect((await post("/auth/verify", signed)).json()).toEqual({ error: "SIWE_EXPIRED" });
   });
 
+  it("answers malformed requests with 4xx, never a 500", async () => {
+    const empty = await app.inject({
+      method: "POST",
+      url: "/auth/nonce",
+      headers: { origin: ORIGIN, [CSRF_HEADER]: "1", "content-type": "application/json" },
+    });
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json()).toEqual({ error: "BAD_REQUEST" });
+    const garbage = await post("/auth/verify", "{not json", {}, { "content-type": "application/json" });
+    expect(garbage.statusCode).toBe(400);
+  });
+
   it("refuses state-changing auth calls without the app origin and CSRF header", async () => {
     expect((await post("/auth/nonce", undefined, {}, { origin: "https://evil.example" })).statusCode).toBe(403);
     const noHeader = await app.inject({ method: "POST", url: "/auth/nonce", headers: { origin: ORIGIN } });
