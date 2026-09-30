@@ -73,6 +73,51 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
 
+  packages:
+    # Shared schema source and environment guards (docs/ARCHITECTURE.md
+    # decision 2). Each package is standalone with its own lockfile.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pkg: [domain, config]
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.pkg }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # config's lint imports the shared money rules from packages/domain.
+      - name: install domain (shared lint rules)
+        if: matrix.pkg == 'config'
+        working-directory: packages/domain
+        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - name: lint (bans JavaScript Number in economic code)
+        run: pnpm lint
+
+  service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: vendored packages match their source
+        run: node scripts/sync-packages.mjs --check
+      - name: typecheck
+        working-directory: vessel-service
+        run: pnpm install --frozen-lockfile && pnpm exec tsc --noEmit -p .
+
   secrets:
     runs-on: ubuntu-latest
     steps:

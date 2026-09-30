@@ -1,9 +1,9 @@
 {
-  "name": "@vessel/domain",
+  "name": "@vessel/config",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Vessel shared schema source: evidence tags, environments, integer units, golden accounting vectors",
+  "description": "Vessel environment and release-manifest guards: fail startup on wrong chain, placeholder addresses, mocks or lab code on mainnet",
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest run",
@@ -11,11 +11,11 @@
     "lint": "eslint src"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "eslint": "^9.39.5",
-    "typescript": "^5.6.3",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.7"
   },
   "packageManager": "pnpm@10.33.3"
 }

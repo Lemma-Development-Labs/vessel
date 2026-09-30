@@ -17,7 +17,7 @@ export const moneyRestrictedSyntax = [
   { selector: "MemberExpression[object.name='Math']", message: MSG },
   { selector: "CallExpression[callee.property.name=/^(toFixed|toPrecision)$/]", message: MSG },
   { selector: "UnaryExpression[operator='+']", message: MSG },
-  { selector: "Literal[raw=/^[0-9]*\\.[0-9]|e/i][value>0]", message: MSG },
+  { selector: "Literal[value=type(number)][raw=/[.eE]/]", message: MSG },
 ];
 
 export const moneyRules = {

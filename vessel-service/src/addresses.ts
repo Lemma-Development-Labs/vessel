@@ -207,9 +207,10 @@ export function getKeeperPk(): Hex | undefined {
  * ADDRESSES_JSON env (full ADDRESSES.json blob) or ../ADDRESSES.json
  * relative to process.cwd() (vessel-service/ → repo root).
  */
-export function loadAddresses(): VesselAddresses {
+/** The raw manifest text and where it came from: ADDRESSES_JSON, else ../ADDRESSES.json. */
+export function readManifestSource(): { raw: string; source: string } {
   const blob = process.env.ADDRESSES_JSON?.trim();
-  if (blob) return parseAddresses(blob, "ADDRESSES_JSON");
+  if (blob) return { raw: blob, source: "ADDRESSES_JSON" };
 
   const file = resolve(process.cwd(), "..", "ADDRESSES.json");
   if (!existsSync(file)) {
@@ -217,7 +218,12 @@ export function loadAddresses(): VesselAddresses {
       `ADDRESSES.json not found at ${file} and ADDRESSES_JSON is unset`,
     );
   }
-  return parseAddresses(readFileSync(file, "utf8"), file);
+  return { raw: readFileSync(file, "utf8"), source: file };
+}
+
+export function loadAddresses(): VesselAddresses {
+  const { raw, source } = readManifestSource();
+  return parseAddresses(raw, source);
 }
 
 export function vesselChain(rpcUrl: string, chainId: number): Chain {
