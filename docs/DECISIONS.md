@@ -120,3 +120,13 @@ people named.
 - **Replacement:** none yet. The 2026-09-30 master build prompt describes a target tree (`apps/web`, `services/*`, `packages/*`, root `pnpm-workspace.yaml`) and also says "do not erase working code to match the tree".
 - **Resolution:** the frozen decision stands. New code lands directly in target paths (`packages/config`, `reference/`, later `contracts/core` etc.); `app/` → `apps/web` and `vessel-service/` → `services/api` move only when their Vercel/Railway pipelines are re-tested. Migration map: [INVENTORY.md](INVENTORY.md) §4.
 - **Review owner:** Kunal · **Status:** recorded conflict; revisit before S5.
+
+### ADR-008 — Three-day build scope (2026-09-30)
+
+- **Old rule:** the full V1 scope of spec §2 plus D30, built over eight sessions.
+- **Replacement:** the build is compressed into three days of feature phases (Day 1: economic core; Day 2: testnet deployment, execution journal, verifier, API, indexer; Day 3: app, Terminal, MCP/SDK, release packet). **Deferred:** the vUSD/svUSD testnet lab (spec §18) and the D30 inbound adapter and provider (the core keeps route-compatible reservation and beneficiary fields). **Short leg on testnet:** a clearly labelled SIMULATED test venue; the Perpl reader and client code are kept; G01 stays BLOCKED.
+- **Reason:** founder deadline. Time-based gates (30-day rate history, 28-day maturity, independent review) and external capability gates (G01–G04) cannot close in three days in any case.
+- **Accounting impact:** none — the waterfall, fee and loss order are unchanged.
+- **Migration effect:** deferred items return as later phases; nothing deferred is labelled live.
+- **Tests:** unchanged per feature; deferred features stay PLANNED in TEST_PLAN.
+- **Review owner:** Kunal · **Status:** accepted.
