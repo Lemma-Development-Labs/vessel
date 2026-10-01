@@ -24,3 +24,28 @@ Verified explorer URLs:
 - Mainnet: `https://monadvision.com/address/<addr>`
 
 Verify runsheet: [docs.monad.xyz/guides/verify-smart-contract](https://docs.monad.xyz/guides/verify-smart-contract). Match `solc 0.8.24` and `optimizer_runs = 200` from `contracts/foundry.toml`. Constructor args via `cast abi-encode`.
+
+## v2 core — Monad testnet (2026-10-01)
+
+Source of truth: [`deployments/testnet-v2.json`](../deployments/testnet-v2.json)
+(release manifest, schema v1). Block 67163430. Deployer
+`0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86` (no role after deploy). Governance: Safe
+`0xe4f24B16CFF9171f555E4643262991023b5C0279` → TimelockController (300 s; proposer,
+executor and canceller = Safe; deployer holds no timelock role). Guardian =
+Safe (pause only). Operator (v2 keeper) `0xd1588b68d6beac5328E61166b952619b63dbf16f`. Asset =
+DemoUSD above. Engine is **SIMULATED**; G01–G04 BLOCKED; not audited.
+
+| Contract | Testnet (10143) | Deploy | Verified |
+| --- | --- | --- | --- |
+| TimelockController | [`0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097`](https://testnet.monadvision.com/address/0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097) | [tx](https://testnet.monadvision.com/tx/0xe73e385b8f4426093c98c62b7cbf48c1d440267f9393f008c3a78de4e3c18b92) | Sourcify exact |
+| PauseGuardian | [`0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1`](https://testnet.monadvision.com/address/0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1) | [tx](https://testnet.monadvision.com/tx/0x53eb4a7d21dedb3d79ce23501ac9dc56dadd4135e4d88ca209059a0184ab1770) | Sourcify exact |
+| TrancheController | [`0x33EC27A870debF8D8565256A972448530589d37F`](https://testnet.monadvision.com/address/0x33EC27A870debF8D8565256A972448530589d37F) | [tx](https://testnet.monadvision.com/tx/0x2a20d7e6950140795755470f80819be8f93a7c5ad000ced4ca90c66c4017766d) | Sourcify exact |
+| AssetCustody | [`0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5`](https://testnet.monadvision.com/address/0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5) | created by TrancheController | Sourcify exact |
+| ClaimEscrow | [`0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF`](https://testnet.monadvision.com/address/0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF) | created by TrancheController | Sourcify exact |
+| BallastToken | [`0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd`](https://testnet.monadvision.com/address/0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd) | created by TrancheController | Sourcify exact |
+| SimulatedEngine | [`0x0137903a9308cC675c13E5aB935c27707eE4Be6A`](https://testnet.monadvision.com/address/0x0137903a9308cC675c13E5aB935c27707eE4Be6A) | [tx](https://testnet.monadvision.com/tx/0x06e3ed434bbc612e1c0688b466e6bfece9f04fd7e172f769cf67a31c7a26ed19) | Sourcify exact |
+
+Reserve seed: 20 dUSD sent to the timelock
+([tx](https://testnet.monadvision.com/tx/0x375b264f42e07dd71dde48b1b8b6b31aac39b63100b31de984a68b31938c80de)).
+Wiring (engine, caps, reserve, funding rate) is pending Safe batch 01 —
+see [`deployments/README.md`](../deployments/README.md).
