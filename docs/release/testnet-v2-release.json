@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "release": "testnet-v2",
+  "releaseCommit": "a6accd6aa91d03873f34b40e7f611188451c8721",
+  "branch": "p-development",
+  "environment": "testnet",
+  "chainId": 10143,
+  "deployedBlock": 67163430,
+  "manifest": "deployments/testnet-v2.json",
+  "contracts": {
+    "AssetCustody": "0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5",
+    "BallastToken": "0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd",
+    "ClaimEscrow": "0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF",
+    "DemoUSD": "0x959E54DcF8576856F7A9424190a9751c68739495",
+    "PauseGuardian": "0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1",
+    "SimulatedEngine": "0x0137903a9308cC675c13E5aB935c27707eE4Be6A",
+    "TimelockController": "0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097",
+    "TrancheController": "0x33EC27A870debF8D8565256A972448530589d37F"
+  },
+  "roles": {
+    "deployer": "0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86",
+    "governanceSafe": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
+    "guardian": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
+    "operator": "0xd1588b68d6beac5328E61166b952619b63dbf16f"
+  },
+  "governance": {
+    "safe": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
+    "safeThreshold": "2 of 3 (read on chain 2026-10-01)",
+    "timelockDelaySeconds": 300,
+    "deployerRoles": "none (hasRole checked on chain)"
+  },
+  "sourceVerification": "Sourcify exact_match for all 7 v2 contracts (app/lib/verification.ts, verifiedAt from Sourcify)",
+  "engine": {
+    "venue": "sim",
+    "status": "SIMULATED \u2014 labelled in contract (isSimulated), manifest, API, SDK, MCP and app"
+  },
+  "onchainState": {
+    "engineWired": false,
+    "stageCap": "0",
+    "note": "wiring waits on Safe batch 01 (deployments/governance/testnet-v2-01-wire.*.safe.json)"
+  },
+  "tests": {
+    "contracts": "155 passed, 1 skipped (fork, by design)",
+    "app": "49 unit + 2 Playwright",
+    "service": "40",
+    "math": "17",
+    "sdk": "9",
+    "mcp": "9",
+    "verifyCli": "7",
+    "independentCheckTestnet": "PASS (vessel-verify, finalized block)"
+  },
+  "activationAuthorized": false,
+  "scope": "testnet only \u2014 demo dollars (dUSD), no real value; mainnet beta NOT authorized",
+  "gates": {
+    "R01": {
+      "status": "PASS",
+      "owner": "Kunal",
+      "evidence": [
+        "docs/DECISIONS.md (ADR-008 scope)",
+        "reference/vectors + packages/math: 8 golden + 10,000 seeded settlements, Python = TS = Solidity",
+        "docs/ACCOUNTING.md",
+        "docs/STATE_MACHINES.md"
+      ],
+      "checkedAt": "2026-10-01"
+    },
+    "R02": {
+      "status": "BLOCKED",
+      "owner": "Daksh",
+      "evidence": [
+        "docs/FACT_CHECKS.md G01, G02, G04 OPEN"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "testnet short leg is a labelled simulator"
+    },
+    "R03": {
+      "status": "BLOCKED",
+      "owner": "Daksh",
+      "evidence": [
+        "G03 OPEN \u2014 no oracle identified",
+        "onchain reconstruction exists: tools/verify-cli PASS on testnet"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "reconstruction half done; independent price sources missing"
+    },
+    "R04": {
+      "status": "BLOCKED",
+      "owner": "Kunal",
+      "evidence": [
+        "30-day rate history requires 30 days of observed carry; Hull rate set by governance with a terms hash"
+      ],
+      "checkedAt": "2026-10-01"
+    },
+    "R05": {
+      "status": "BLOCKED",
+      "owner": "Kunal",
+      "evidence": [
+        "G05 OPEN \u2014 no independent security review"
+      ],
+      "checkedAt": "2026-10-01"
+    },
+    "R06": {
+      "status": "PARTIAL",
+      "owner": "Daksh",
+      "evidence": [
+        "local Anvil: keeper admitted a deposit, deployed to engine, settled (docs/sessions/03.md)",
+        "contracts Lifecycle suite 28 tests incl. maturity and exits"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "no complete 28-day maturity rehearsal on testnet yet"
+    },
+    "R07": {
+      "status": "BLOCKED",
+      "owner": "Kunal + Daksh",
+      "evidence": [
+        "G07 OPEN \u2014 two-person coverage",
+        "keeper journal with fencing (vessel-service/test/keeper-v2.test.ts)"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "monitoring, restore and incident drills not run"
+    },
+    "R08": {
+      "status": "PARTIAL",
+      "owner": "Priya",
+      "evidence": [
+        "Anvil rehearsal + DeployV2Rehearsal tests",
+        "testnet deploy block 67163430, all txs status 1",
+        "Sourcify exact_match x7",
+        "roles verified on chain (docs/ADDRESSES.md)"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "one public deploy; mainnet path (48h timelock, chain 143 guard) not rehearsed"
+    },
+    "R09": {
+      "status": "PARTIAL",
+      "owner": "Priya",
+      "evidence": [
+        "app on v2: deposit, portfolio, withdraw, series, transparency, terminal",
+        "screenshots desktop + 390px; header fits 360-1440px",
+        "live testnet read verified in browser",
+        "Rule 0 tests: no fabricated zeros"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "cold wallet path on a wired book not yet possible (batch 01 pending)"
+    },
+    "R10": {
+      "status": "BLOCKED",
+      "owner": "Kunal",
+      "evidence": [
+        "G06 OPEN \u2014 eligibility and offering terms not reviewed"
+      ],
+      "checkedAt": "2026-10-01"
+    },
+    "R11": {
+      "status": "PASS",
+      "owner": "Priya",
+      "evidence": [
+        "cold stdio test of tools/vessel-mcp against testnet (docs/MCP.md)",
+        "prepare security tests tools/vessel-mcp/test/mcp.test.ts",
+        "prepare tools disabled by default"
+      ],
+      "checkedAt": "2026-10-01",
+      "note": "no AI host compatibility claimed"
+    },
+    "R12": {
+      "status": "NOT_APPLICABLE",
+      "owner": "Kunal",
+      "evidence": [
+        "stage cap 0 until governance batch 01; any increase goes through the Safe + timelock"
+      ],
+      "checkedAt": "2026-10-01"
+    }
+  }
+}

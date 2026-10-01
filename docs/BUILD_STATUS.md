@@ -54,13 +54,24 @@ the timelock, `vessel-verify` OVERALL PASS (empty book). Addresses:
 [ADDRESSES.md](ADDRESSES.md#v2-core--monad-testnet-2026-10-01). Wiring waits
 on Safe batch 01 (files generated in `deployments/governance/`).
 
+## Day 3 — app, Terminal, SDK/MCP, release · 2026-10-01 · `testnet GO (conditional)`, mainnet NO-GO
+
+Checkpoint: [sessions/05.md](sessions/05.md). Decision:
+[release/GO_NO_GO.md](release/GO_NO_GO.md). 286 tests across seven suites.
+
+Done: app on the v2 book (deposit, portfolio, withdraw, series,
+transparency) and `/terminal` with a typed command palette; `packages/sdk`
+(evidence-enveloped reads, unsigned preparation); `tools/vessel-mcp`
+(spec read/verify tools, prepare gated); release record with all twelve
+gates evaluated.
+
 ## Blockers and follow-ups
 
 | Item | Owner | Blocks |
 |---|---|---|
 | Fund the testnet keeper | Kunal | v0 demo settlement |
 | Safe signers: import and sign batch 01 schedule → (after 5 min) execute; then 03, then 02 | Safe signers | v2 testnet wiring and series 1 |
-| Fund v2 keeper `0xd158…f16f` with testnet MON; set `V2_KEEPER_PK` on Railway | Priya | v2 keeper on testnet |
+| Set `V2_KEEPER_PK` (keeper `0xd158…f16f`, funded 5 MON) and the v2 manifest on Railway; `NEXT_PUBLIC_STATS_URL` on Vercel | Priya | v2 keeper + app evidence panels |
 | Confirm the 2026-08-29 transactions from compromised key `0x4307…` | Kunal | incident record |
 | Evidence Safe `0xe4f2…0279` signer independence | Kunal | G07, R07 |
 | Evidence OPS.md §0 Railway/Vercel token rotation | Kunal | R05 |
@@ -72,4 +83,4 @@ on Safe batch 01 (files generated in `deployments/governance/`).
 
 ## Resume instruction
 
-Run the testnet deploy (Day 2 tail), then **Day 3** per the resume instruction in [sessions/03.md](sessions/03.md).
+Meet the two testnet GO conditions in [release/GO_NO_GO.md](release/GO_NO_GO.md), then follow [sessions/05.md](sessions/05.md).
