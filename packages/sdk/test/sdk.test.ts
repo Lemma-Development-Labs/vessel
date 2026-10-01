@@ -90,10 +90,9 @@ describe("prepare — encodes only, from the manifest, for the owner", () => {
     expect(decodeFunctionData({ abi, data: ex.calls[0]!.data }).args).toEqual([10n, getAddress(OWNER), 9n]);
     const cl = prepareClaimExit({ manifest: m, id: 3n, now: NOW });
     expect(cl.calls[0]!.to).toBe(m.contracts.ClaimEscrow);
-    // Value of TrancheController.exitKey(3) read from the deployed testnet controller.
-    expect(decodeFunctionData({ abi, data: cl.calls[0]!.data }).args?.[0]).toBe(
-      "0xf821155de02bd175962676dc844b90bd0dab68a5d46427280b95f267c3c60a73",
-    );
+    // TrancheController.exitKey(3), read from the deployed testnet controller (a public keccak hash).
+    const exitKey3Hash = "0xf821155de02bd175962676dc844b90bd0dab68a5d46427280b95f267c3c60a73";
+    expect(decodeFunctionData({ abi, data: cl.calls[0]!.data }).args?.[0]).toBe(exitKey3Hash);
   });
 });
 
