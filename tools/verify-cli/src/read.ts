@@ -52,8 +52,26 @@ export function parseManifest(raw: unknown): Manifest {
   return m;
 }
 
-export function client(rpcUrl: string): PublicClient {
-  return createPublicClient({ transport: http(rpcUrl) });
+/**
+ * Public Monad RPCs cap requests per second (testnet: 15/s, JSON-RPC error
+ * -32011, which viem does not retry) and count every call inside a batch, so
+ * batching does not help. Space requests out so a snapshot's parallel reads
+ * stay under the cap.
+ */
+export function pacedFetch(perSecond = 10): typeof fetch {
+  const gapMs = 1000 / perSecond;
+  let next = 0;
+  return async (input, init) => {
+    const now = Date.now();
+    const at = Math.max(now, next);
+    next = at + gapMs;
+    if (at > now) await new Promise((r) => setTimeout(r, at - now));
+    return fetch(input, init);
+  };
+}
+
+export function client(rpcUrl: string, perSecond = 10): PublicClient {
+  return createPublicClient({ transport: http(rpcUrl, { fetchFn: pacedFetch(perSecond) }) });
 }
 
 export async function readSnapshot(pc: PublicClient, m: Manifest, blockTag: "finalized" | "latest" = "finalized"): Promise<Snapshot> {

@@ -1,5 +1,6 @@
 import pino from "pino";
 import { createPublicClient, http } from "viem";
+import { pacedFetch } from "./vendor/verify/read.ts";
 import { startApi } from "./api.ts";
 import {
   getChainId,
@@ -42,7 +43,8 @@ async function main(): Promise<void> {
   log.info({ environment: runtime.environment, chainId: runtime.chainId }, "config guards passed");
   const publicClient = createPublicClient({
     chain: vesselChain(rpcUrl, chainId),
-    transport: http(rpcUrl),
+    // Paced under the public RPC's per-second cap (see pacedFetch); raise RPC_MAX_RPS on a private RPC.
+    transport: http(rpcUrl, { fetchFn: pacedFetch(Number(process.env.RPC_MAX_RPS ?? "10")) }),
   });
   const store = await initDb();
 
