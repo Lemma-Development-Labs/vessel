@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [packages/domain, packages/config, packages/math, tools/verify-cli]
+        dir: [packages/domain, packages/config, packages/math, packages/sdk, tools/verify-cli, tools/vessel-mcp]
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

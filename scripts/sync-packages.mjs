@@ -33,6 +33,14 @@ const TARGETS = [
     source: "tools/verify-cli/src/read.ts",
     dest: "vessel-service/src/vendor/verify/read.ts",
   },
+  // The SDK reads and checks the book with the same verifier code.
+  { source: "tools/verify-cli/src/checks.ts", dest: "packages/sdk/src/vendor/verify/checks.ts" },
+  { source: "tools/verify-cli/src/read.ts", dest: "packages/sdk/src/vendor/verify/read.ts" },
+  // The MCP server is a thin transport over the SDK; it reuses the SDK, not a copy of its logic.
+  ...["index.ts", "state.ts", "prepare.ts", "manifests/testnet.ts", "vendor/verify/checks.ts", "vendor/verify/read.ts"].map((f) => ({
+    source: `packages/sdk/src/${f}`,
+    dest: `tools/vessel-mcp/src/vendor/sdk/${f}`,
+  })),
 ];
 
 function render(sourcePath) {
