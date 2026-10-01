@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { useVessel } from "@/lib/context";
-import { COPY } from "@/lib/provider";
+import { useBook } from "@/lib/book/context";
+import { COPY } from "@/lib/copy";
+import { PAUSE } from "@/lib/book/types";
+import { V2 } from "@/lib/book/release";
 import { USE_MOCK } from "@/lib/providers";
 import { formatBlock, shorten } from "@/lib/format";
-import { ADDRESSES } from "@/lib/addresses";
 import { AddressChip, Badge } from "@/components/ui";
 import { Val } from "@/components/live";
+import { mapLive } from "@/lib/live";
 import { ConnectButton } from "@/components/connect";
 import { useSession } from "@/lib/auth";
 import { networkBanner } from "@/lib/banner";
@@ -30,17 +32,29 @@ function Wordmark() {
 }
 
 const NAV = [
-  { href: "/deposit", label: "Deposit" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/transparency", label: "Transparency" },
-  { href: "/onboarding", label: "Onboarding" },
+  { href: "/deposit", label: "Deposit", short: "Deposit", mobile: true },
+  { href: "/portfolio", label: "Portfolio", short: "Portfolio", mobile: true },
+  { href: "/withdraw", label: "Withdraw", short: "Withdraw", mobile: true },
+  { href: "/series", label: "Series", short: "Series", mobile: true },
+  { href: "/transparency", label: "Transparency", short: "Proof", mobile: true },
+  { href: "/onboarding", label: "Onboarding", short: "Onboarding", mobile: false },
 ] as const;
+
+const PAUSE_NAMES: [number, string][] = [
+  [PAUSE.ADMISSION, "deposits"],
+  [PAUSE.RISK_INCREASE, "deployment"],
+  [PAUSE.SETTLEMENT, "settlement"],
+  [PAUSE.CLAIMS, "claims"],
+];
 
 const BANNER = networkBanner(TARGET_CHAIN_ID, process.env.NEXT_PUBLIC_REVIEW_STATUS);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const v = useVessel();
+  const v = useBook();
   const path = usePathname();
+  const book = v.book.status === "ok" ? v.book.value : null;
+  const engine = v.engine.status === "ok" ? v.engine.value : null;
+  const paused = book ? PAUSE_NAMES.filter(([bit]) => book.pausedMask & bit).map(([, n]) => n) : [];
   const { toasts, dismissToast } = v;
 
   useEffect(() => {
@@ -81,14 +95,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               Docs↗
             </a>
-            {v.engine.simulated.status === "ok" && !v.engine.simulated.value ? (
-              <Badge
-                kind="hedged"
-                venue={v.engine.venueName.status === "ok" ? v.engine.venueName.value : undefined}
-              />
-            ) : (
-              <Badge kind="sim" />
-            )}
+            {/* Only a read of simulated=false earns the hedged chip; unread, unwired or simulated is SIM. */}
+            {engine && !engine.simulated ? <Badge kind="hedged" /> : <Badge kind="sim" />}
             <NetworkPill />
             <SessionChip />
             {v.connected ? (
@@ -114,16 +122,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <span data-testid="network-banner" className="font-semibold tracking-[0.06em]">{BANNER.text}</span>
         <span className="hidden sm:inline">
-          {v.engine.simulated.status === "ok" && v.engine.simulated.value
-            ? " Sim badge visible when SimVenue is active."
-            : ""}
+          {engine === null || engine.simulated ? " Strategy engine is simulated on testnet." : ""}
         </span>
         {v.reconnecting ? (
           <span className="ml-2 text-steel">reconnecting…</span>
         ) : (
           <span className="num ml-2 hidden text-steel sm:inline">
             block{" "}
-            <Val of={v.engine.lastBlock}>{(b) => formatBlock(b)}</Val>
+            <Val of={mapLive(v.clock, (c) => c.number)}>{(b) => formatBlock(b)}</Val>
             {v.isMock ? " · mock" : ""}
           </span>
         )}
@@ -142,19 +148,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      {v.impaired ? (
+      {book?.impaired ? (
         <div role="alert" className="border-b border-red/40 bg-red/10 px-4 py-3 text-center text-sm text-red sm:px-5">
           {COPY.impair}
         </div>
       ) : null}
 
-      {/* v.paused is a Live<boolean>. Testing the OBJECT is always truthy, which
-          showed "Guardian pause is on" on every screen while the chain said
-          paused=false — a fabricated claim of exactly the kind Rule 0 exists to
-          stop. Only assert the pause when we actually read it as true. */}
-      {v.paused.status === "ok" && v.paused.value ? (
+      {/* Only assert a pause we actually read; an unread mask asserts nothing. */}
+      {paused.length ? (
         <div className="border-b border-amber/30 bg-amber/5 px-4 py-2 text-center text-sm text-amber sm:px-5">
-          Guardian pause is on. Views still work; mutative paths are frozen.
+          Guardian pause is on for {paused.join(", ")}. Views still work.
         </div>
       ) : null}
 
@@ -173,7 +176,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Docs
             </a>
           </div>
-          <AddressChip address={ADDRESSES.EngineLite} href={`https://testnet.monadvision.com/address/${ADDRESSES.EngineLite}`} />
+          <AddressChip address={V2.TrancheController} href={`https://testnet.monadvision.com/address/${V2.TrancheController}`} />
         </div>
         <p className="mx-auto mt-4 max-w-[1280px] text-[11px] tracking-wide">{COPY.legal}</p>
       </footer>
@@ -182,8 +185,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] sm:hidden"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-3">
-          {NAV.map((n) => {
+        <div className="grid grid-cols-5">
+          {NAV.filter((n) => n.mobile).map((n) => {
             const on = path === n.href || (n.href === "/deposit" && path === "/");
             return (
               <Link
@@ -191,7 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={n.href}
                 className={`flex min-h-12 items-center justify-center text-xs ${on ? "text-ink" : "text-steel"}`}
               >
-                {n.label}
+                {n.short}
               </Link>
             );
           })}
@@ -204,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function NetworkPill() {
-  const v = useVessel();
+  const v = useBook();
   if (USE_MOCK) {
     return (
       <span className="num hidden items-center gap-1.5 rounded-full border border-amber/40 px-3 py-1 text-[11px] text-amber sm:inline-flex">
@@ -234,7 +237,7 @@ function NetworkPill() {
 }
 
 function ToastHost() {
-  const { toasts, dismissToast } = useVessel();
+  const { toasts, dismissToast } = useBook();
   if (!toasts.length) return null;
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex max-w-md flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-20 sm:bottom-auto sm:w-80">

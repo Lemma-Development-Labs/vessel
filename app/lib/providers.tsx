@@ -5,8 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { useWalletSwitchGuard } from "./auth";
-import { ChainVesselProvider } from "./chain";
-import { MockVesselProvider } from "./mock";
+import { ChainBookProvider } from "./book/chain";
+import { MockBookProvider } from "./book/mock";
 import { mockEnabled } from "./mock-flag";
 import { wagmiConfig } from "./wagmi";
 
@@ -25,9 +25,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   const inner = USE_MOCK ? (
-    <MockVesselProvider demo={demo}>{children}</MockVesselProvider>
+    <MockBookProvider demo={demo}>{children}</MockBookProvider>
   ) : (
-    <ChainVesselProvider>{children}</ChainVesselProvider>
+    <ChainBookProvider>{children}</ChainBookProvider>
   );
 
   // The wallet (and therefore SIWE sign-in) is real in both modes: mock mode

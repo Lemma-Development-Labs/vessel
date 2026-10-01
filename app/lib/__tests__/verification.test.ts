@@ -53,9 +53,11 @@ function manifestDrift(manifestNames: string[], deployedNames: string[]) {
 
 const STATES: VerificationState[] = ["verified", "unverified", "unknown"];
 
-const deployed: Record<string, string> = JSON.parse(
-  readFileSync(join(ROOT, "ADDRESSES.json"), "utf8"),
-).contracts;
+/** Every deployed contract the app shows: the v0 table plus the v2 release manifest. */
+const deployed: Record<string, string> = {
+  ...JSON.parse(readFileSync(join(ROOT, "ADDRESSES.json"), "utf8")).contracts,
+  ...JSON.parse(readFileSync(join(ROOT, "deployments/testnet-v2.json"), "utf8")).contracts,
+};
 
 describe("verification badge — status is read, never asserted", () => {
   it("transparency-screen.tsx never hardcodes a verified badge", () => {
@@ -185,9 +187,7 @@ describe("the manifest tracks the deployment exactly", () => {
     // contract SET. A redeploy keeps the same names with new addresses, so
     // without this a stale "verified" badge would ride straight through onto
     // contracts nobody had checked. Binding state to address makes that fail.
-    const addresses = JSON.parse(
-      readFileSync(resolve(__dirname, "../../../ADDRESSES.json"), "utf8"),
-    ) as { contracts: Record<string, string> };
+    const addresses = { contracts: deployed };
 
     const mismatched: string[] = [];
     for (const [name, entry] of Object.entries(VERIFICATION)) {

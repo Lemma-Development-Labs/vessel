@@ -1,49 +1,41 @@
 import Link from "next/link";
 
 const STATES = [
-  { q: "", label: "Default seeded book" },
-  { q: "empty", label: "Empty — no user position" },
+  { q: "", label: "Seeded book — open series, positions, an exit cooling, claims ready" },
+  { q: "unwired", label: "Freshly deployed — empty book, no engine, no series (today's testnet)" },
+  { q: "empty", label: "Connected, no positions yet" },
+  { q: "notinvited", label: "Wallet not on the beta allowlist" },
   { q: "disconnected", label: "Not connected" },
-  { q: "negative", label: "Negative epoch waterfall" },
-  { q: "error", label: "RPC reconnecting" },
-  { q: "floor", label: "Ballast exit blocked by floor" },
+  { q: "paused", label: "Guardian paused deposits" },
   { q: "impair", label: "Hull impairment banner" },
+  { q: "error", label: "RPC reconnecting" },
   { q: "wrongnet", label: "Wrong network" },
-  { q: "boarded", label: "User already boarded" },
-  { q: "undeployed", label: "Hedge not deployed yet" },
 ];
+
+const ROUTES = ["/deposit", "/portfolio", "/withdraw", "/series", "/transparency"];
 
 export default function DemoStatesPage() {
   return (
     <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-12">
       <h1 className="display text-3xl font-bold">Demo states</h1>
       <p className="mt-2 text-sm text-dim">
-        MockProvider variants via <span className="num">?demo=</span>. Use these for screenshots.
+        Mock provider variants via <span className="num">?demo=</span> (needs <span className="num">NEXT_PUBLIC_USE_MOCK=1</span>).
+        Use these for screenshots.
       </p>
-      <ul className="mt-8 space-y-3">
+      <ul className="mt-8 space-y-4">
         {STATES.map((s) => (
           <li key={s.q || "default"}>
-            <Link className="text-purple" href={`/deposit${s.q ? `?demo=${s.q}` : ""}`}>
-              {s.label}
-            </Link>
-            <span className="num ml-2 text-xs text-steel">
-              {s.q ? `?demo=${s.q}` : "/deposit"}
-            </span>
+            <p>{s.label}</p>
+            <p className="mt-1 flex flex-wrap gap-3">
+              {ROUTES.map((r) => (
+                <Link key={r} className="num text-xs text-purple" href={`${r}${s.q ? `?demo=${s.q}` : ""}`}>
+                  {r}
+                </Link>
+              ))}
+            </p>
           </li>
         ))}
       </ul>
-      <p className="mt-8 text-sm text-dim">
-        Transparency negative:{" "}
-        <Link href="/transparency?demo=negative" className="text-purple">
-          /transparency?demo=negative
-        </Link>
-      </p>
-      <p className="mt-2 text-sm text-dim">
-        Transparency undeployed:{" "}
-        <Link href="/transparency?demo=undeployed" className="text-purple">
-          /transparency?demo=undeployed
-        </Link>
-      </p>
     </div>
   );
 }

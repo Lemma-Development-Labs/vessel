@@ -1,239 +1,226 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useVessel } from "@/lib/context";
-import { type DeckKind, type PositionMeta } from "@/lib/provider";
-import { formatDusd, formatDusd4, formatTs } from "@/lib/format";
-import { useNowSec } from "@/lib/now";
-import { map2, map3, mapLive, valueOrForLogic, type Live } from "@/lib/live";
-import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
-import { ChartUnavailable, Unavailable, Val } from "@/components/live";
-import { ExitFlow } from "@/components/exit-flow";
+import { useState } from "react";
+import { useBook } from "@/lib/book/context";
+import { SERIES_LABEL, canCancelDeposit, depositLabel } from "@/lib/book/plan";
+import type { DepositRequest, Series } from "@/lib/book/types";
+import { formatBps, formatDusd, formatDusd4, formatShares, formatTs } from "@/lib/format";
+import { map2, mapLive, type Live } from "@/lib/live";
+import { Button, Card, EmptyState, Skeleton, StatBlock } from "@/components/ui";
+import { Unavailable, Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
-
-/** A read older than this renders dim with an age label. One crank interval. */
-const STALE_AFTER_SEC = 300;
+import { MockNotice, PageHead, SectionLabel, TrancheTag, useNow } from "@/components/book-ui";
 
 export function PortfolioScreen() {
-  const v = useVessel();
-  const nowSec = useNowSec();
-
-  const hullSharesN = valueOrForLogic(v.hullShares, 0n);
-  const balSharesN = valueOrForLogic(v.balShares, 0n);
-  const empty = hullSharesN === 0n && balSharesN === 0n;
-
-  const lastSettleN = valueOrForLogic(v.deck.lastSettle, 0n);
-  const recent = lastSettleN > 0n && nowSec - Number(lastSettleN) < 60;
+  const v = useBook();
+  const now = useNow();
 
   if (v.loading) {
     return (
-      <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="mt-4 h-10 w-48" />
-        <Skeleton className="mt-8 h-48 w-full" />
+      <div className="mx-auto max-w-[960px] px-4 py-10 sm:px-5 md:py-14">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-4 h-10 w-56" />
+        <Skeleton className="mt-8 h-28 w-full" />
+        <Skeleton className="mt-6 h-48 w-full" />
       </div>
     );
   }
-
   if (!v.connected) {
     return (
-      <div className="mx-auto max-w-[1080px] px-4 py-16 sm:px-5">
-        <EmptyState title="Connect to see your decks" action={<ConnectButton />} />
+      <div className="mx-auto max-w-[720px] px-4 py-16 sm:px-5">
+        <EmptyState title="Connect to see your position" action={<ConnectButton />} />
       </div>
     );
   }
 
-  if (empty) {
-    return (
-      <div className="mx-auto max-w-[1080px] px-4 py-16 sm:px-5">
-        <EmptyState
-          title="No position yet — board a deck"
-          action={
-            <Link href="/deposit">
-              <Button>Board a deck</Button>
-            </Link>
-          }
-        />
-      </div>
-    );
-  }
-
-  const tvl = map2(v.deck.hullTvl, v.deck.balTvl, (h, b) => h + b);
-  const reservePct = map3(v.deck.reserve, v.deck.hullTvl, v.deck.balTvl, (r, h, b) => {
-    const sum = h + b;
-    return sum === 0n ? 0 : Number((r * 10_000n) / sum) / 100;
-  });
-  const targetPct = mapLive(v.deck.reserveTargetBps, (t) => Number(t) / 100);
+  const hullHeld = mapLive(v.series, (xs) => xs.filter((s) => s.myUnits > 0n || s.myClaimable > 0n));
+  const hullPrincipal = mapLive(v.series, (xs) =>
+    xs.filter((s) => s.state === "ACTIVE" || s.state === "SUBSCRIPTION_OPEN" || s.state === "MATURED_UNWINDING").reduce((a, s) => a + s.myUnits, 0n),
+  );
+  const claimable = map2(
+    map2(v.series, v.myExits, (xs, es) => xs.reduce((a, s) => a + s.myClaimable, 0n) + es.reduce((a, e) => a + e.claimable, 0n)),
+    v.myDeposits,
+    (sum, ds) => sum + ds.filter((d) => d.status === "REFUNDABLE").reduce((a, d) => a + d.assets, 0n),
+  );
+  const pending = mapLive(v.wallet, (w) => w.reserved);
 
   return (
-    <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-      <p className="num text-[10.5px] tracking-[0.18em] text-steel">PORTFOLIO</p>
-      <h1 className="display mt-3 text-[32px] font-bold tracking-[-0.02em] sm:text-[40px]">
-        Your decks
-      </h1>
+    <div className="mx-auto max-w-[960px] px-4 py-10 sm:px-5 md:py-14">
+      <PageHead eyebrow="PORTFOLIO" title="Your position">
+        Everything below is read from the chain for this wallet at one block.
+      </PageHead>
+      <MockNotice />
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <PositionCard
-          deck="hull"
-          name="HULL"
-          steel
-          shares={hullSharesN}
-          tvl={v.deck.hullTvl}
-          supply={v.deck.hullSupply}
-          meta={v.hullMeta}
-          nowSec={nowSec}
-        />
-        <PositionCard
-          deck="ballast"
-          name="BALLAST"
-          steel={false}
-          shares={balSharesN}
-          tvl={v.deck.balTvl}
-          supply={v.deck.balSupply}
-          meta={v.balMeta}
-          nowSec={nowSec}
-        />
-      </div>
+      <Card className="mt-8 grid grid-cols-2 gap-px overflow-hidden md:grid-cols-4">
+        <Stat label="WALLET dUSD" of={mapLive(v.wallet, (w) => formatDusd(w.dusd))} />
+        <Stat label="BALLAST VALUE" of={mapLive(v.wallet, (w) => formatDusd(w.ballastValue))} tone="brass" />
+        <Stat label="HULL PRINCIPAL" of={mapLive(hullPrincipal, (x) => formatDusd(x))} tone="steel" />
+        <Stat label="READY TO CLAIM" of={mapLive(claimable, (x) => formatDusd(x))} tone="phosphor" />
+      </Card>
+      <p className="num mt-3 text-[12px] text-dim">
+        Waiting for admission: <Val of={pending}>{(x) => `${formatDusd(x)} dUSD`}</Val>
+      </p>
 
-      <div className="mt-8 grid gap-px overflow-hidden rounded-2xl border border-line sm:grid-cols-3">
-        <div className="bg-bg2 px-5 py-4">
-          <p className="num text-[10px] tracking-[0.16em] text-steel">PROTOCOL TVL</p>
-          <p className="num mt-1 text-lg">
-            <Val of={tvl} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-              {(x) => `${formatDusd(x)} dUSD`}
-            </Val>
-          </p>
+      <section className="mt-10">
+        <div className="flex items-center justify-between">
+          <h2 className="display text-xl">Ballast</h2>
+          <Link href="/withdraw" className="text-sm text-purple hover:underline">
+            Withdraw →
+          </Link>
         </div>
-        <div className="bg-bg2 px-5 py-4">
-          <p className="num text-[10px] tracking-[0.16em] text-steel">RESERVE vs TARGET</p>
-          <p className="num mt-1 text-lg">
-            <Val of={map2(reservePct, targetPct, (r, t) => ({ r, t }))}>
-              {({ r, t }) => `${r.toFixed(1)}% of ${t.toFixed(1)}% target`}
-            </Val>
-          </p>
-          <div className="mt-2 h-px bg-white/10">
-            <Val of={map2(reservePct, targetPct, (r, t) => ({ r, t }))}>
-              {({ r, t }) => (
-                <span
-                  className="block h-px bg-phosphor"
-                  style={{ width: `${Math.min(100, (r / Math.max(t, 0.01)) * 100)}%` }}
-                />
-              )}
-            </Val>
-          </div>
-        </div>
-        <div className="bg-bg2 px-5 py-4">
-          <p className="num text-[10px] tracking-[0.16em] text-steel">LAST CRANK</p>
-          <p className="num mt-1 flex flex-wrap items-center gap-2 text-lg">
-            <Val of={v.deck.lastSettle}>{(t) => formatTs(t)}</Val>
-            {recent ? <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-phosphor" /> : null}
-          </p>
-        </div>
-      </div>
+        <Card accent="brass" className="mt-4 p-5">
+          <Val of={v.wallet}>
+            {(w) =>
+              w.ballastUnits + w.ballastLocked === 0n ? (
+                <p className="text-sm text-dim">No Ballast units yet.</p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="UNITS">{formatShares(w.ballastUnits + w.ballastLocked)}</Field>
+                  <Field label="LOCKED IN EXITS">{formatShares(w.ballastLocked)}</Field>
+                  <Field label="VALUE NOW">{formatDusd4(w.ballastValue)} dUSD</Field>
+                </div>
+              )
+            }
+          </Val>
+        </Card>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="display text-xl">Hull series</h2>
+        <Val of={hullHeld}>
+          {(xs) =>
+            xs.length === 0 ? (
+              <Card className="mt-4 p-5">
+                <p className="text-sm text-dim">
+                  No Hull positions. <Link href="/series" className="text-purple hover:underline">See series</Link>
+                </p>
+              </Card>
+            ) : (
+              <div className="mt-4 grid gap-4">
+                {xs.map((s) => (
+                  <HullRow key={s.id.toString()} s={s} />
+                ))}
+              </div>
+            )
+          }
+        </Val>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="display text-xl">Requests</h2>
+        <Val of={map2(v.myDeposits, v.series, (ds, xs) => ({ ds, xs }))}>
+          {({ ds, xs }) =>
+            ds.length === 0 ? (
+              <Card className="mt-4 p-5">
+                <p className="text-sm text-dim">
+                  No deposit requests. <Link href="/deposit" className="text-purple hover:underline">Board a deck</Link>
+                </p>
+              </Card>
+            ) : (
+              <Card className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line">
+                      {["#", "DECK", "AMOUNT", "STATUS", "DEADLINE", ""].map((h) => (
+                        <th key={h} className="num px-4 py-3 text-[10px] font-normal tracking-[0.14em] text-steel">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ds.map((d) => (
+                      <RequestRow key={d.id.toString()} d={d} canCancel={canCancelDeposit(d, xs, now)} />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )
+          }
+        </Val>
+      </section>
     </div>
   );
 }
 
-function Spark({ points }: { points: number[] }) {
-  const path = useMemo(() => {
-    if (points.length < 2) return "";
-    const min = Math.min(...points);
-    const max = Math.max(...points);
-    const span = max - min || 1;
-    return points
-      .map((p, i) => {
-        const x = (i / (points.length - 1)) * 120;
-        const y = 28 - ((p - min) / span) * 24;
-        return `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(" ");
-  }, [points]);
-  if (!path) return null;
+function Stat({ label, of, tone = "ink" }: { label: string; of: Live<string>; tone?: "ink" | "phosphor" | "brass" | "steel" }) {
+  if (of.status !== "ok") {
+    return (
+      <div className="flex flex-col gap-1.5 bg-bg2 px-5 py-4">
+        <span className="num text-[10px] uppercase tracking-[0.16em] text-steel">{label}</span>
+        <Unavailable reason={of.reason} className="text-lg" />
+      </div>
+    );
+  }
+  return <StatBlock label={label} value={of.value} tone={tone} />;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 120 32" className="h-8 w-full" aria-hidden>
-      <path d={path} fill="none" stroke="currentColor" strokeWidth="1" />
-    </svg>
+    <div>
+      <SectionLabel>{label}</SectionLabel>
+      <p className="num mt-1 text-[15px]">{children}</p>
+    </div>
   );
 }
 
-function PositionCard({
-  deck,
-  name,
-  steel,
-  shares,
-  tvl,
-  supply,
-  meta,
-  nowSec,
-}: {
-  deck: DeckKind;
-  name: string;
-  steel: boolean;
-  shares: bigint;
-  tvl: Live<bigint>;
-  supply: Live<bigint>;
-  meta: PositionMeta;
-  nowSec: number;
-}) {
-  const [open, setOpen] = useState(false);
-  if (shares === 0n) return null;
-
-  const value = map2(tvl, supply, (t, s) => (s === 0n ? 0n : (shares * t) / s));
-  const accrued = map2(value, meta.principal, (val, p) => (val > p ? val - p : 0n));
-
+function HullRow({ s }: { s: Series }) {
+  const v = useBook();
+  const [busy, setBusy] = useState(false);
   return (
-    <Card accent={steel ? "steel" : "brass"} className="p-5 sm:p-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <h2 className={`display text-xl tracking-[0.04em] ${steel ? "text-[#C2D2E0]" : "text-brass"}`}>
-          {name}
-        </h2>
-        <p className="num text-[11px] leading-snug text-steel">
-          {meta.boardedAt.status === "ok" && meta.boardedAt.value > 0
-            ? `Boarded ${formatTs(meta.boardedAt.value)}`
-            : "On-chain position"}
-        </p>
+    <Card accent="steel" className="flex flex-wrap items-center justify-between gap-4 p-5">
+      <div className="grid flex-1 gap-4 sm:grid-cols-4">
+        <Field label="SERIES">#{s.id.toString()} · {formatBps(s.rateBps)}</Field>
+        <Field label="STATE">{SERIES_LABEL[s.state]}</Field>
+        <Field label="YOUR PRINCIPAL">{formatDusd(s.myUnits)}</Field>
+        <Field label="MATURITY">{s.maturity ? formatTs(s.maturity) : "at activation + 28d"}</Field>
       </div>
-
-      <div className="mt-5">
-        <p className="num text-[10px] tracking-[0.14em] text-steel">VALUE</p>
-        <p className="num mt-1 text-lg">
-          <Val of={value} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-            {(x) => `${formatDusd(x)} dUSD`}
-          </Val>
-        </p>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div>
-          <p className="num text-[10px] tracking-[0.14em] text-steel">PRINCIPAL</p>
-          <p className="num mt-1 text-lg">
-            <Val of={meta.principal}>{(p) => formatDusd(p)}</Val>
-          </p>
-        </div>
-        <div>
-          <p className="num text-[10px] tracking-[0.14em] text-steel">ACCRUED</p>
-          <p className="num mt-1 text-lg text-phosphor">
-            <Val of={accrued}>{(a) => formatDusd4(a)}</Val>
-          </p>
-        </div>
-      </div>
-
-      <div className={`mt-4 ${steel ? "text-steel" : "text-brass"}`}>
-        {meta.spark.status === "ok" ? (
-          <Spark points={meta.spark.value} />
-        ) : (
-          <ChartUnavailable reason={meta.spark.reason} />
-        )}
-      </div>
-
-      <Button variant="ghost" className="mt-5 w-full" onClick={() => setOpen(true)}>
-        Exit deck
-      </Button>
-
-      <ExitFlow open={open} onClose={() => setOpen(false)} deck={deck} shares={shares} />
+      {s.myClaimable > 0n ? (
+        <Button
+          loading={busy}
+          onClick={() => {
+            setBusy(true);
+            void v.claimHull(s.id).finally(() => setBusy(false));
+          }}
+        >
+          Claim {formatDusd(s.myClaimable)}
+        </Button>
+      ) : null}
     </Card>
   );
 }
 
-export { Unavailable };
+function RequestRow({ d, canCancel }: { d: DepositRequest; canCancel: boolean }) {
+  const v = useBook();
+  const [busy, setBusy] = useState(false);
+  const run = (fn: () => Promise<boolean>) => {
+    setBusy(true);
+    void fn().finally(() => setBusy(false));
+  };
+  const tone = d.status === "ADMITTED" ? "text-phosphor" : d.status === "REFUNDABLE" ? "text-amber" : "text-ink";
+  return (
+    <tr className="border-b border-line/60 last:border-0">
+      <td className="num px-4 py-3 text-steel">{d.id.toString()}</td>
+      <td className="px-4 py-3">
+        <TrancheTag kind={d.tranche} />
+        {d.tranche === "hull" ? <span className="num ml-2 text-[11px] text-steel">#{d.seriesId.toString()}</span> : null}
+      </td>
+      <td className="num px-4 py-3">{formatDusd4(d.assets)}</td>
+      <td className={`px-4 py-3 ${tone}`}>{depositLabel(d)}</td>
+      <td className="num px-4 py-3 text-dim">{d.status === "ESCROWED" ? formatTs(d.deadline) : "—"}</td>
+      <td className="px-4 py-2 text-right">
+        {d.status === "REFUNDABLE" ? (
+          <Button variant="ghost" loading={busy} onClick={() => run(() => v.claimRefund(d.id))}>
+            Claim refund
+          </Button>
+        ) : canCancel ? (
+          <Button variant="ghost" loading={busy} onClick={() => run(() => v.cancelDeposit(d.id))}>
+            Cancel
+          </Button>
+        ) : null}
+      </td>
+    </tr>
+  );
+}
+

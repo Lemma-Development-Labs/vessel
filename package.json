@@ -11,7 +11,8 @@
     "test:fuzz": "forge test --root contracts --fuzz-runs 10000",
     "test:ci": "FOUNDRY_PROFILE=ci forge test --root contracts --fuzz-runs 25000",
     "secrets": "node scripts/check-secrets.mjs",
-    "sync:packages": "node scripts/sync-packages.mjs"
+    "sync:packages": "node scripts/sync-packages.mjs",
+    "sync:v2": "node scripts/sync-v2-app.mjs"
   },
   "devDependencies": {
     "tsx": "^4.20.0",

@@ -23,16 +23,23 @@ export type VerificationEntry = {
 };
 
 export const VERIFICATION: Record<string, VerificationEntry> = {
+  "AssetCustody": { state: "verified", checkedAt: "2026-10-01T04:38:46Z", address: "0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5" },
   "Ballast": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0xCD694B5C79D12708F11FB1adF1594e8e71de650D", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xCD694B5C79D12708F11FB1adF1594e8e71de650D" },
+  "BallastToken": { state: "verified", checkedAt: "2026-10-01T04:38:57Z", address: "0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd" },
   "BlitzVault": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d" },
+  "ClaimEscrow": { state: "verified", checkedAt: "2026-10-01T04:38:52Z", address: "0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF" },
   "DemoUSD": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x959E54DcF8576856F7A9424190a9751c68739495", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x959E54DcF8576856F7A9424190a9751c68739495" },
   "EngineLite": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x60eC904955CA843285B24E3F6e7e2034F8f96140", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x60eC904955CA843285B24E3F6e7e2034F8f96140" },
   "Guardian": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x75Bf4C326f054e655C7C138cD847154fEB3bAC19", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x75Bf4C326f054e655C7C138cD847154fEB3bAC19" },
   "Hull": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x9638da84aA4b30fB9350bb2cA33DCf0b81Ab3Bd2", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x9638da84aA4b30fB9350bb2cA33DCf0b81Ab3Bd2" },
   "MockRouter": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x68A1Ad5FB46c3Eb804F3375Cba702d806E1890B6", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x68A1Ad5FB46c3Eb804F3375Cba702d806E1890B6" },
   "MockWMON": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0xEf6Cc6228A39cF8433754dcBe863275AC6Dc5DB5", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xEf6Cc6228A39cF8433754dcBe863275AC6Dc5DB5" },
+  "PauseGuardian": { state: "verified", checkedAt: "2026-10-01T04:38:18Z", address: "0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1" },
   "PerplVenue": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x59fc4C09eF7Dc0b754B74d7AEe21EeAC1c94aD6C", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x59fc4C09eF7Dc0b754B74d7AEe21EeAC1c94aD6C" },
   "SimVenue": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d" },
+  "SimulatedEngine": { state: "verified", checkedAt: "2026-10-01T04:39:03Z", address: "0x0137903a9308cC675c13E5aB935c27707eE4Be6A", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x0137903a9308cC675c13E5aB935c27707eE4Be6A" },
+  "TimelockController": { state: "verified", checkedAt: "2026-10-01T04:38:15Z", address: "0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097" },
+  "TrancheController": { state: "verified", checkedAt: "2026-10-01T04:38:42Z", address: "0x33EC27A870debF8D8565256A972448530589d37F", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x33EC27A870debF8D8565256A972448530589d37F" },
   "Tranches": { state: "verified", checkedAt: "2026-09-30T10:50:35Z", address: "0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373", url: "https://sourcify-api-monad.blockvision.org/v2/contract/10143/0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373" },
 };
 

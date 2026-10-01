@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { useVessel } from "@/lib/context";
+import { useBook } from "@/lib/book/context";
 import { MONAD_FAUCET_URL, WC_ENABLED, isMobileUA } from "@/lib/wagmi";
 import { Button, Card, Modal } from "@/components/ui";
 
@@ -30,7 +30,7 @@ function useIsMobile(): boolean {
 }
 
 export function ConnectButton({ className = "" }: { className?: string }) {
-  const v = useVessel();
+  const v = useBook();
   const [open, setOpen] = useState(false);
   const mobile = useIsMobile();
 
@@ -61,7 +61,7 @@ function WalletPicker({
   onClose: () => void;
   mobile: boolean;
 }) {
-  const v = useVessel();
+  const v = useBook();
 
   // On a phone, WalletConnect is the option that actually works; put it first.
   // On desktop the injected wallet is one click, so it leads.
@@ -128,12 +128,12 @@ function WalletPicker({
  * a tooltip.
  */
 export function GasFirstCard({ className = "" }: { className?: string }) {
-  const v = useVessel();
+  const v = useBook();
   if (!v.connected) return null;
 
   // Only shown when we know the user has no dUSD — if the read failed we do
   // not guess at their state.
-  const noDusd = v.dusdBalance.status === "ok" && v.dusdBalance.value === 0n;
+  const noDusd = v.wallet.status === "ok" && v.wallet.value.dusd === 0n;
   if (!noDusd) return null;
 
   return (
