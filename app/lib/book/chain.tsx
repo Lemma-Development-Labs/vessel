@@ -39,6 +39,7 @@ import ballastJson from "./abis/BallastToken.json";
 import pausesJson from "./abis/PauseGuardian.json";
 import engineJson from "./abis/SimulatedEngine.json";
 import dusdJson from "./abis/DemoUSD.json";
+import custodyJson from "./abis/AssetCustody.json";
 
 const controllerAbi = controllerJson as Abi;
 const escrowAbi = escrowJson as Abi;
@@ -46,6 +47,7 @@ const ballastAbi = ballastJson as Abi;
 const pausesAbi = pausesJson as Abi;
 const engineAbi = engineJson as Abi;
 const dusdAbi = dusdJson as Abi;
+const custodyAbi = custodyJson as Abi;
 
 const C = V2.TrancheController as `0x${string}`;
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -130,12 +132,15 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       const BOOK = [
         "hullNav", "ballastNav", "reserveNav", "treasuryLiability", "lastActive", "lossCarry", "epoch", "impaired",
         "juniorCoverBps", "stageCap", "lifetimeAdmitted", "pendingReserved", "activeSeries", "seriesCount", "engine",
-        "queueLengths", "virtualUnits", "virtualAssets", "nextDepositId", "nextExitId",
+        "queueLengths", "virtualUnits", "virtualAssets", "nextDepositId", "nextExitId", "closeCost", "maxValuationAge",
       ] as const;
       const first = await mc([
         ...BOOK.map((f) => ctl(f)),
         { address: V2.BallastToken, abi: ballastAbi, functionName: "totalSupply" },
         { address: V2.PauseGuardian, abi: pausesAbi, functionName: "pausedMask" },
+        { address: V2.AssetCustody, abi: custodyAbi, functionName: "pending" },
+        { address: V2.AssetCustody, abi: custodyAbi, functionName: "activeIdle" },
+        { address: V2.ClaimEscrow, abi: escrowAbi, functionName: "totalFunded" },
         ...(address
           ? [
               { address: V2.DemoUSD, abi: dusdAbi, functionName: "balanceOf", args: [address] },
@@ -187,6 +192,11 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
             virtualAssets: need(at("virtualAssets"), "virtual assets"),
             ballastSupply: need(first[BOOK.length], "Ballast supply"),
             pausedMask: Number(need<number | bigint>(first[BOOK.length + 1], "pause state")),
+            custodyPending: need(first[BOOK.length + 2], "custody pending"),
+            activeIdle: need(first[BOOK.length + 3], "idle cash"),
+            escrowFunded: need(first[BOOK.length + 4], "escrow funded"),
+            closeCost: need(at("closeCost"), "close cost"),
+            maxValuationAge: need(at("maxValuationAge"), "max valuation age"),
           },
           "chain",
           asOf,
@@ -195,7 +205,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         book = unavailable(err instanceof Error ? err.message : "book read failed");
       }
 
-      const w0 = BOOK.length + 2;
+      const w0 = BOOK.length + 5;
       let walletBase: Omit<Wallet, "ballastValue"> | null = null;
       let wallet: Live<Wallet> = unavailable(address ? "wallet read failed" : "connect a wallet to see your position");
       if (address) {
@@ -283,7 +293,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         try {
           const v = need<readonly [bigint, bigint]>(eng[1], "engine value");
           engine = ok(
-            { simulated: need<boolean>(eng[0], "engine simulation flag"), value: v[0], fundingRateBps: need<bigint>(eng[2], "funding rate") },
+            { simulated: need<boolean>(eng[0], "engine simulation flag"), value: v[0], observedAt: v[1], fundingRateBps: need<bigint>(eng[2], "funding rate") },
             "chain",
             asOf,
           );

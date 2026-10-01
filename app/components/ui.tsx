@@ -137,7 +137,7 @@ export function Badge({
   }
   if (kind === "sim") {
     return (
-      <span className="num inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
+      <span className="num inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
         {compact ? (
           "SIM"
         ) : (

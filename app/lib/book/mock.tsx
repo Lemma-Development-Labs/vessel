@@ -54,6 +54,7 @@ function seed(demo: string | null): Raw {
         hullNav: 0n, ballastNav: 0n, reserveNav: 0n, treasuryLiability: 0n, recordedActive: 0n, lossCarry: 0n, epoch: 0n,
         impaired: false, coverBps: 10_000n, stageCap: 0n, lifetimeAdmitted: 0n, pendingReserved: 0n, activeSeries: 0n,
         seriesCount: 0n, ballastSupply: 0n, virtualUnits: 10n ** 12n, virtualAssets: 1n, pausedMask: 0, engine: null,
+        custodyPending: 0n, activeIdle: 0n, escrowFunded: 0n, closeCost: 0n, maxValuationAge: 60n,
         ballastQueue: 0n, exitQueue: 0n,
       }
     : {
@@ -62,6 +63,7 @@ function seed(demo: string | null): Raw {
         lifetimeAdmitted: d(6_600), pendingReserved: d(450), activeSeries: 2n, seriesCount: 2n,
         ballastSupply: d(2_540) * 10n ** 12n, virtualUnits: 10n ** 12n, virtualAssets: 1n,
         pausedMask: demo === "paused" ? 1 : 0, engine: "0x0137903a9308cC675c13E5aB935c27707eE4Be6A",
+        custodyPending: d(450), activeIdle: d(1_035.1), escrowFunded: d(544.27), closeCost: d(1), maxValuationAge: 60n,
         ballastQueue: 9n, exitQueue: 3n,
       };
   const series: Series[] = unwired
@@ -111,7 +113,7 @@ function seed(demo: string | null): Raw {
         { blockNumber: "67171003", txHash: `0x${"c3".repeat(32)}`, logIndex: 0, event: "SeriesOpened", args: { seriesId: "2", rateBps: "800" }, finalized: true },
       ];
   return {
-    now: NOW0, block: 67_180_020n, book, engine: unwired ? null : { simulated: true, value: d(5_700), fundingRateBps: 1_200n },
+    now: NOW0, block: 67_180_020n, book, engine: unwired ? null : { simulated: true, value: d(5_700), observedAt: NOW0 - 12n, fundingRateBps: 1_200n },
     series, wallet, deposits, exits, history, nextDeposit: 15n, nextExit: 4n,
   };
 }

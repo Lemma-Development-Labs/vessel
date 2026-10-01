@@ -66,6 +66,15 @@ export type BookState = {
   pausedMask: number;
   /** Address of the wired engine; null before governance wires one. */
   engine: `0x${string}` | null;
+  /** Custody cash: deposits awaiting admission, and idle book cash. */
+  custodyPending: bigint;
+  activeIdle: bigint;
+  /** dUSD funded into claim escrow and not yet paid out. */
+  escrowFunded: bigint;
+  /** Stressed close-cost estimate charged to Ballast in cover checks. */
+  closeCost: bigint;
+  /** Maximum engine valuation age (seconds) a settlement accepts. */
+  maxValuationAge: bigint;
   /** Unit queue lengths, for "your place in line" context. */
   ballastQueue: bigint;
   exitQueue: bigint;
@@ -74,6 +83,8 @@ export type BookState = {
 export type EngineState = {
   simulated: boolean;
   value: bigint;
+  /** Timestamp the engine's valuation refers to. */
+  observedAt: bigint;
   fundingRateBps: bigint;
 };
 

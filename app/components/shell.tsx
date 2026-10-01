@@ -37,6 +37,7 @@ const NAV = [
   { href: "/withdraw", label: "Withdraw", short: "Withdraw", mobile: true },
   { href: "/series", label: "Series", short: "Series", mobile: true },
   { href: "/transparency", label: "Transparency", short: "Proof", mobile: true },
+  { href: "/terminal", label: "Terminal", short: "Terminal", mobile: false },
   { href: "/onboarding", label: "Onboarding", short: "Onboarding", mobile: false },
 ] as const;
 
@@ -71,14 +72,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[rgba(7,11,16,0.88)] backdrop-blur-[14px]">
         <div className="mx-auto flex h-[56px] max-w-[1280px] items-center gap-3 px-4 sm:h-[60px] sm:gap-6 sm:px-5 md:px-7">
           <Wordmark />
-          <nav className="hidden h-full items-stretch gap-1 sm:flex" aria-label="Primary">
+          <nav className="hidden h-full items-stretch gap-1 lg:flex" aria-label="Primary">
             {NAV.map((n) => {
               const on = path === n.href || (n.href === "/deposit" && path === "/");
               return (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className={`relative px-4 text-sm font-medium ${on ? "text-ink" : "text-steel hover:text-ink"}`}
+                  className={`relative whitespace-nowrap px-3 text-sm font-medium lg:px-4 ${n.href === "/onboarding" ? "hidden 2xl:block" : n.href === "/terminal" ? "hidden lg:block" : ""} ${on ? "text-ink" : "text-steel hover:text-ink"}`}
                 >
                   <span className="flex h-full items-center">{n.label}</span>
                   {on ? <span className="absolute inset-x-3 bottom-0 h-0.5 bg-ink" /> : null}
@@ -86,12 +87,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
             <a
               href="https://docs.vessel.wtf"
               target="_blank"
               rel="noreferrer"
-              className="hidden text-sm text-steel hover:text-purple sm:inline"
+              className="hidden text-sm text-steel hover:text-purple xl:inline"
             >
               Docs↗
             </a>
@@ -163,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="mx-auto w-full flex-1">{children}</main>
 
-      <footer className="mt-12 border-t border-white/8 px-4 py-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-xs text-steel sm:mt-16 sm:px-5 sm:pb-8 md:px-7">
+      <footer className="mt-12 border-t border-white/8 px-4 py-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-xs text-steel sm:mt-16 sm:px-5 lg:pb-8 md:px-7">
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-4">
             <Link href="/transparency#contracts" className="hover:text-purple">
@@ -182,7 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </footer>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] lg:hidden"
         aria-label="Primary"
       >
         <div className="grid grid-cols-5">
@@ -210,7 +211,7 @@ function NetworkPill() {
   const v = useBook();
   if (USE_MOCK) {
     return (
-      <span className="num hidden items-center gap-1.5 rounded-full border border-amber/40 px-3 py-1 text-[11px] text-amber sm:inline-flex">
+      <span className="num hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-amber/40 px-3 py-1 text-[11px] text-amber xl:inline-flex">
         <span className="h-1.5 w-1.5 rounded-full bg-amber" />
         mock · stage
       </span>
@@ -229,7 +230,7 @@ function NetworkPill() {
   }
   const ok = v.connected;
   return (
-    <span className="num hidden items-center gap-1.5 rounded-full border border-phosphor/40 px-3 py-1 text-[11px] text-phosphor sm:inline-flex">
+    <span className="num hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-phosphor/40 px-3 py-1 text-[11px] text-phosphor xl:inline-flex">
       <span className={`h-1.5 w-1.5 rounded-full bg-phosphor ${ok ? "pulse-dot" : ""}`} />
       Monad Testnet
     </span>

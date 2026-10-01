@@ -21,6 +21,7 @@ const book = (over: Partial<BookState> = {}): Live<BookState> =>
       lossCarry: 0n, epoch: 3n, impaired: false, coverBps: 3_333n, stageCap: d(25_000), lifetimeAdmitted: d(6_000),
       pendingReserved: 0n, activeSeries: 1n, seriesCount: 1n, ballastSupply: d(2_000) * 10n ** 12n,
       virtualUnits: 10n ** 12n, virtualAssets: 1n, pausedMask: 0, engine: null, ballastQueue: 0n, exitQueue: 0n,
+      custodyPending: 0n, activeIdle: d(900), escrowFunded: 0n, closeCost: d(1), maxValuationAge: 60n,
       ...over,
     },
     "chain",

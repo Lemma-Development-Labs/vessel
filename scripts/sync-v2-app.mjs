@@ -12,7 +12,7 @@ const env = process.env.V2_ENV ?? "testnet";
 const check = process.argv.includes("--check");
 const outDir = join(root, "app/lib/book/abis");
 
-const CONTRACTS = ["TrancheController", "ClaimEscrow", "BallastToken", "PauseGuardian", "SimulatedEngine", "DemoUSD"];
+const CONTRACTS = ["TrancheController", "AssetCustody", "ClaimEscrow", "BallastToken", "PauseGuardian", "SimulatedEngine", "DemoUSD"];
 
 const files = [];
 for (const name of CONTRACTS) {
