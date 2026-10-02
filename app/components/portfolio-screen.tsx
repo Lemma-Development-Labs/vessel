@@ -72,11 +72,11 @@ export function PortfolioScreen() {
         <Card accent="brass" className="mt-4 p-5">
           <Val of={v.wallet}>
             {(w) =>
-              w.ballastUnits + w.ballastLocked === 0n ? (
+              w.ballastUnits === 0n ? (
                 <p className="text-sm text-dim">No Ballast units yet.</p>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="UNITS">{formatShares(w.ballastUnits + w.ballastLocked)}</Field>
+                  <Field label="UNITS">{formatShares(w.ballastUnits)}</Field>
                   <Field label="LOCKED IN EXITS">{formatShares(w.ballastLocked)}</Field>
                   <Field label="VALUE NOW">{formatDusd4(w.ballastValue)} dUSD</Field>
                 </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useBook } from "@/lib/book/context";
-import { exitPhase, previewAssets, previewUnits, withSlippage } from "@/lib/book/plan";
+import { exitPhase, freeBallastUnits, previewAssets, previewUnits, withSlippage } from "@/lib/book/plan";
 import { PAUSE, RULES, type ExitRequest } from "@/lib/book/types";
 import { COPY } from "@/lib/copy";
 import { formatDusd, formatDusd4, formatShares, formatTs, parseDusd } from "@/lib/format";
@@ -42,8 +42,9 @@ export function WithdrawScreen() {
   const assets = validShape ? parseDusd(amt) : 0n;
   // Units to lock: everything free when MAX was chosen, else the units this dUSD amount buys back.
   let units = 0n;
-  if (w && b) units = all ? w.ballastUnits : assets > 0n ? previewUnits(assets, b) : 0n;
-  if (w && units > w.ballastUnits) units = w.ballastUnits;
+  const free = w ? freeBallastUnits(w) : 0n;
+  if (w && b) units = all ? free : assets > 0n ? previewUnits(assets, b) : 0n;
+  if (units > free) units = free;
   const expected = b ? previewAssets(units, b) : 0n;
 
   const blocked = !w || !b
@@ -69,7 +70,7 @@ export function WithdrawScreen() {
         <div>
           <SectionLabel>FREE UNITS</SectionLabel>
           <p className="num mt-1 text-lg">
-            <Val of={mapLive(v.wallet, (x) => x.ballastUnits)}>{(u) => formatShares(u)}</Val>
+            <Val of={mapLive(v.wallet, freeBallastUnits)}>{(u) => formatShares(u)}</Val>
           </p>
         </div>
         <div>
@@ -92,10 +93,10 @@ export function WithdrawScreen() {
           <button
             type="button"
             className="num min-h-11 text-[11px] text-purple disabled:opacity-40"
-            disabled={!w || w.ballastUnits === 0n}
+            disabled={free === 0n}
             onClick={() => {
               setAll(true);
-              if (w && b) setAmt(formatDusd(previewAssets(w.ballastUnits, b)).replace(/,/g, ""));
+              if (b) setAmt(formatDusd(previewAssets(free, b)).replace(/,/g, ""));
             }}
           >
             MAX

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ok, unavailable, type Live } from "../live";
 import {
   canCancelDeposit,
+  freeBallastUnits,
   depositDeadline,
   exitPhase,
   planDeposit,
@@ -155,5 +156,13 @@ describe("request helpers", () => {
   it("a Hull deadline outlives activation", () => {
     expect(depositDeadline("hull", NOW, openSeries)).toBeGreaterThan(openSeries.subscriptionEnd);
     expect(depositDeadline("ballast", NOW)).toBe(NOW + 86_400n);
+  });
+});
+
+describe("Ballast units", () => {
+  it("balanceOf already includes locked units: free = balance − locked, never double-counted", () => {
+    expect(freeBallastUnits({ ballastUnits: 300n, ballastLocked: 60n })).toBe(240n);
+    expect(freeBallastUnits({ ballastUnits: 60n, ballastLocked: 60n })).toBe(0n);
+    expect(freeBallastUnits({ ballastUnits: 0n, ballastLocked: 0n })).toBe(0n);
   });
 });

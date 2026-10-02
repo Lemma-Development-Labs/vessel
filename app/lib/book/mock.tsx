@@ -85,13 +85,13 @@ function seed(demo: string | null): Raw {
     betaAllowance: demo === "notinvited" ? 0n : d(2_000),
     admitted: empty ? 0n : d(800),
     reserved: empty ? 0n : d(150),
-    ballastUnits: empty ? 0n : d(240) * 10n ** 12n,
+    ballastUnits: empty ? 0n : d(300) * 10n ** 12n,
     ballastLocked: empty ? 0n : d(60) * 10n ** 12n,
     ballastValue: 0n,
     faucetCooldownSec: 0,
     faucetRemaining: d(empty ? 900 : 600),
   };
-  wallet.ballastValue = previewAssets(wallet.ballastUnits + wallet.ballastLocked, book);
+  wallet.ballastValue = previewAssets(wallet.ballastUnits, book);
   const deposits: DepositRequest[] = empty
     ? []
     : [
@@ -223,7 +223,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
         tx("Request Ballast exit", (r) => ({
           ...r,
           nextExit: r.nextExit + 1n,
-          wallet: { ...r.wallet, ballastUnits: r.wallet.ballastUnits - units, ballastLocked: r.wallet.ballastLocked + units },
+          wallet: { ...r.wallet, ballastLocked: r.wallet.ballastLocked + units },
           exits: [{ id: r.nextExit, owner: ME, receiver: ME, requestedAt: r.now, status: "COOLING", units, funded: 0n, claimable: 0n }, ...r.exits],
         })),
       cancelRedeem: (id) =>
@@ -232,7 +232,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           if (!e) return r;
           return {
             ...r,
-            wallet: { ...r.wallet, ballastUnits: r.wallet.ballastUnits + e.units, ballastLocked: r.wallet.ballastLocked - e.units },
+            wallet: { ...r.wallet, ballastLocked: r.wallet.ballastLocked - e.units },
             exits: r.exits.map((x) => (x.id === id ? { ...x, status: "CANCELLED", units: 0n } : x)),
           };
         }),

@@ -26,6 +26,11 @@ export function previewAssets(units: bigint, b: Pick<BookState, "ballastNav" | "
   return (units * (b.ballastNav + b.virtualAssets)) / (b.ballastSupply + b.virtualUnits);
 }
 
+/** Units that can still be put into a new exit: balanceOf already includes the locked ones. */
+export function freeBallastUnits(w: Pick<Wallet, "ballastUnits" | "ballastLocked">): bigint {
+  return w.ballastUnits > w.ballastLocked ? w.ballastUnits - w.ballastLocked : 0n;
+}
+
 export function withSlippage(x: bigint, bps = BALLAST_SLIPPAGE_BPS): bigint {
   return (x * (10_000n - bps)) / 10_000n;
 }

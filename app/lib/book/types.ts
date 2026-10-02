@@ -140,9 +140,11 @@ export type Wallet = {
   betaAllowance: bigint;
   admitted: bigint;
   reserved: bigint;
+  /** BallastToken.balanceOf — ALL units held, including those locked in exits. */
   ballastUnits: bigint;
+  /** BallastToken.lockedOf — the part of ballastUnits locked in exit requests (still exposed). */
   ballastLocked: bigint;
-  /** ballastUnitValue(ballastUnits). */
+  /** ballastUnitValue(ballastUnits): what all held units are worth now. */
   ballastValue: bigint;
   faucetCooldownSec: number;
   faucetRemaining: bigint;
