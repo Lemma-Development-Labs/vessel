@@ -51,7 +51,10 @@ contract CreateSafe is Script {
                 require(owners[i] != owners[j], "CreateSafe: duplicate owner");
             }
         }
-        require(FACTORY.code.length > 0 && SAFE_L2.code.length > 0 && FALLBACK_HANDLER.code.length > 0, "CreateSafe: Safe v1.4.1 not deployed on this chain");
+        require(
+            FACTORY.code.length > 0 && SAFE_L2.code.length > 0 && FALLBACK_HANDLER.code.length > 0,
+            "CreateSafe: Safe v1.4.1 not deployed on this chain"
+        );
 
         bytes memory init = abi.encodeCall(
             ISafe.setup, (owners, threshold, address(0), "", FALLBACK_HANDLER, address(0), 0, payable(address(0)))

@@ -51,11 +51,26 @@ else
   echo "== REAL testnet broadcast"
 fi
 mkdir -p "$OUT"
+LOGS="$ROOT/contracts/out/switch-logs"
+mkdir -p "$LOGS"
+
+# Run a forge step; on failure show its log and stop, so no later step reads a stale output file.
+forge_step() {
+  local name="$1" pattern="$2"; shift 2
+  if ! (cd "$ROOT/contracts" && "$@") >"$LOGS/$name.log" 2>&1; then
+    echo "   FAILED: $name (log: contracts/out/switch-logs/$name.log)"
+    tail -15 "$LOGS/$name.log"
+    exit 1
+  fi
+  grep -E "$pattern" "$LOGS/$name.log" || true
+}
 
 echo "== 1/5 create Safe (threshold ${SAFE_THRESHOLD:-2}) for $OWNERS"
-(cd "$ROOT/contracts" && SAFE_OWNERS="$OWNERS" SAFE_OUT="$OUT/testnet-safe.json" \
-  "$FORGE" script script/CreateSafe.s.sol:CreateSafe --rpc-url "$RPC" "${BROADCAST[@]}" 2>&1 \
-  | grep -E "safe |written to|Error|revert" || true)
+SAFE_TMP="$ROOT/contracts/out/testnet-safe.new.json"
+rm -f "$SAFE_TMP"
+forge_step create-safe "^  safe " env SAFE_OWNERS="$OWNERS" SAFE_OUT="$SAFE_TMP" \
+  "$FORGE" script script/CreateSafe.s.sol:CreateSafe --rpc-url "$RPC" "${BROADCAST[@]}"
+mv "$SAFE_TMP" "$OUT/testnet-safe.json"
 SAFE="$(jq -r '.safe' "$OUT/testnet-safe.json")"
 echo "   safe $SAFE threshold $("$CAST" call "$SAFE" 'getThreshold()(uint256)' --rpc-url "$RPC")"
 
@@ -67,10 +82,12 @@ if [ "$MODE" != "--rehearse" ]; then
 fi
 
 echo "== 2/5 deploy v2 core governed by the new Safe"
-(cd "$ROOT/contracts" && V2_SAFE="$SAFE" V2_OPERATOR="$KEEPER" V2_ASSET="$ASSET" V2_TIMELOCK_DELAY=300 \
-  V2_MANIFEST_OUT="$OUT/testnet-v2.json" \
-  "$FORGE" script script/DeployV2.s.sol:DeployV2 --rpc-url "$RPC" "${BROADCAST[@]}" 2>&1 \
-  | grep -E "ONCHAIN EXECUTION|manifest written|Error|revert" || true)
+M_TMP="$ROOT/contracts/out/testnet-v2.new.json"
+rm -f "$M_TMP"
+forge_step deploy-v2 "ONCHAIN EXECUTION|SIMULATION COMPLETE" env V2_SAFE="$SAFE" V2_OPERATOR="$KEEPER" V2_ASSET="$ASSET" \
+  V2_TIMELOCK_DELAY=300 V2_MANIFEST_OUT="$M_TMP" \
+  "$FORGE" script script/DeployV2.s.sol:DeployV2 --rpc-url "$RPC" "${BROADCAST[@]}"
+mv "$M_TMP" "$OUT/testnet-v2.json"
 M="$OUT/testnet-v2.json"
 TL="$(jq -r '.contracts.TimelockController' "$M")"
 TC="$(jq -r '.contracts.TrancheController' "$M")"
