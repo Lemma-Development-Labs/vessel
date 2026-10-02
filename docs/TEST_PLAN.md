@@ -94,7 +94,7 @@ reference must not call the implementation under test.
 | Error/edge states per route (14 listed conditions) | v2 `/demo` states (unwired, empty, notinvited, disconnected, paused, impair, error, wrongnet); `app/lib/__tests__/book-plan.test.ts` mirrors each requestDeposit revert | PARTIAL (2026-10-01) — stale oracle/venue outage states await real venues (G01) |
 | Truthful banners (testnet vs mainnet) | `lib/banner.ts`; SIMULATED ENGINE chip; Rule 0 tests on the v2 provider | DONE (testnet) |
 | No fabricated zeros / unguarded reads | `app/lib/__tests__/rule0.test.ts` retargeted to `lib/book/chain.tsx` | DONE (2026-10-01) |
-| Tx states incl. `unknown → reconcile` | app actions resolve confirmed/failed; refetch from chain after each | PARTIAL — no persisted pending-tx recovery across reloads |
+| Tx states incl. `unknown → reconcile` | `app/lib/__tests__/pending.test.ts`; `lib/book/chain.tsx` remembers each hash before waiting, a receipt timeout keeps a pending toast ("do not send it again"), and a reload restores and reconciles from chain receipts | DONE (2026-10-02) — browser storage is a convenience; the chain is the record |
 | Terminal panels truthful when data is missing | `/terminal` HEDGE/CARRY/OPPORTUNITIES render reasons (G01), opportunity verdict refuses entry | DONE (2026-10-01) |
 
 ## Machine access (spec §17, R11)

@@ -1,8 +1,8 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { encodeAbiParameters, keccak256, type Abi } from "viem";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { WaitForTransactionReceiptTimeoutError, encodeAbiParameters, keccak256, type Abi } from "viem";
 import {
   useAccount,
   useConnect,
@@ -19,6 +19,7 @@ import { statsUrl } from "../stats";
 import { EXPLORER, TARGET_CHAIN_ID, vesselChain } from "../wagmi";
 import { BookContext } from "./context";
 import { V2 } from "./release";
+import { RECONCILE_GIVE_UP_SEC, forgetPending, pendingFor, rememberPending, type PendingTx } from "./pending";
 import {
   EXIT_STATUSES,
   REQ_STATUSES,
@@ -395,26 +396,88 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const explorerTx = (hash: string) => (EXPLORER ? `${EXPLORER}/tx/${hash}` : undefined);
+  /**
+   * Wait for a submitted transaction that has outlived the normal wait (or a
+   * reload). It keeps a pending toast — unknown is not failed, so nothing here
+   * invites a resend — and gives up with an explorer pointer after
+   * RECONCILE_GIVE_UP_SEC.
+   */
+  const watchPending = useCallback(
+    (tx: PendingTx, text: string) => {
+      const age = Math.floor(Date.now() / 1000) - tx.submittedAt;
+      if (age > RECONCILE_GIVE_UP_SEC) {
+        forgetPending(tx.hash);
+        push({ kind: "info", text: `${tx.label}: no receipt after ${Math.round(age / 60)} min — check the explorer before sending again`, href: explorerTx(tx.hash) });
+        return;
+      }
+      const toast = push({ kind: "pending", text });
+      void pc
+        ?.waitForTransactionReceipt({ hash: tx.hash, timeout: (RECONCILE_GIVE_UP_SEC - age) * 1000 })
+        .then(async (r) => {
+          forgetPending(tx.hash);
+          dismissToast(toast);
+          push(
+            r.status === "success"
+              ? { kind: "success", text: `${tx.label} confirmed`, href: explorerTx(tx.hash) }
+              : { kind: "error", text: `${tx.label} reverted`, href: explorerTx(tx.hash) },
+          );
+          await reads.refetch();
+        })
+        .catch(() => {
+          dismissToast(toast);
+          push({ kind: "info", text: `${tx.label}: still no receipt — check the explorer before sending again`, href: explorerTx(tx.hash) });
+        });
+    },
+    [dismissToast, pc, push, reads],
+  );
+
   const runTx = useCallback(
     async (label: string, fn: () => Promise<`0x${string}`>): Promise<boolean> => {
       const pending = push({ kind: "pending", text: `${label}…` });
+      let tx: PendingTx | undefined;
       try {
         const hash = await fn();
-        const receipt = await pc?.waitForTransactionReceipt({ hash });
+        tx = { hash, label, chainId: TARGET_CHAIN_ID, account: address ?? "", submittedAt: Math.floor(Date.now() / 1000) };
+        // Remembered before waiting, so a reload mid-confirmation reconciles instead of forgetting.
+        if (address) rememberPending(tx);
+        const receipt = await pc?.waitForTransactionReceipt({ hash, timeout: 120_000 });
+        forgetPending(hash);
         if (receipt && receipt.status !== "success") throw new Error("transaction reverted");
         dismissToast(pending);
-        push({ kind: "success", text: `${label} confirmed`, href: EXPLORER ? `${EXPLORER}/tx/${hash}` : undefined });
+        push({ kind: "success", text: `${label} confirmed`, href: explorerTx(hash) });
         await reads.refetch();
         return true;
       } catch (err) {
         dismissToast(pending);
+        if (tx && err instanceof WaitForTransactionReceiptTimeoutError) {
+          // Unknown is not failed: the transaction may still land. Keep watching; never invite a resend.
+          watchPending(tx, `${label} — still confirming; do not send it again`);
+          return false;
+        }
         const text = decodeVesselError(err);
         if (text) push({ kind: "error", text });
         return false;
       }
     },
-    [dismissToast, pc, push, reads],
+    [address, dismissToast, pc, push, reads, watchPending],
   );
+
+  // On load (and wallet change): reconcile transactions submitted before a reload.
+  const reconciling = useRef(new Set<string>());
+  useEffect(() => {
+    if (!pc || !address) return;
+    const restore = async () => {
+      await Promise.resolve(); // state updates run after the effect, not inside it
+      for (const tx of pendingFor(address, TARGET_CHAIN_ID)) {
+        if (reconciling.current.has(tx.hash)) continue;
+        reconciling.current.add(tx.hash);
+        watchPending(tx, `${tx.label} — confirming (restored after reload)…`);
+      }
+    };
+    void restore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pc, address]);
 
   /** Estimate against the connected account, +10%, ceiling-capped (lib/gas.ts). */
   const send = useCallback(
