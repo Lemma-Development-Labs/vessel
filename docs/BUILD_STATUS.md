@@ -48,7 +48,7 @@ requests, history); reorg-aware event indexer. Full rehearsal on Anvil:
 deploy → Safe batches → timelock delay enforced → keeper admitted, deployed
 and settled a deposit → `vessel-verify` OVERALL PASS.
 
-Testnet (2026-10-01): v2 core deployed at block 67163430, all 7 contracts
+Testnet: v2 core redeployed 2026-10-02 at block 67565062 under a new Safe `0x12B2…2Ee5` (first deploy at 67163430 superseded); all 7 contracts
 Sourcify exact-match, roles checked on chain, 20 dUSD reserve seed sent to
 the timelock, `vessel-verify` OVERALL PASS (empty book). Addresses:
 [ADDRESSES.md](ADDRESSES.md#v2-core--monad-testnet-2026-10-01). Wiring waits
@@ -73,7 +73,7 @@ gates evaluated.
 | Safe signers: import and sign batch 01 schedule → (after 5 min) execute; then 03, then 02 | Safe signers | v2 testnet wiring and series 1 |
 | Set `V2_KEEPER_PK` (keeper `0xd158…f16f`, funded 5 MON) and the v2 manifest on Railway; `NEXT_PUBLIC_STATS_URL` on Vercel | Priya | v2 keeper + app evidence panels |
 | Confirm the 2026-08-29 transactions from compromised key `0x4307…` | Kunal | incident record |
-| Evidence Safe `0xe4f2…0279` signer independence | Kunal | G07, R07 |
+| New Safe `0x12B2…2Ee5` signers share one phrase during the build — swap in team-held signers at handover | Priya / team | G07, R07 |
 | Evidence OPS.md §0 Railway/Vercel token rotation | Kunal | R05 |
 | Split keeper key from the public API process | Daksh | any venue-authority key (S3) |
 | Set `VESSEL_ENV=testnet` on Railway before deploying this branch | Kunal | service start |

@@ -14,7 +14,7 @@ files generated from these specs → schedule → execute refused before the del
 
    ```bash
    cd contracts && set -a && source .env && set +a
-   V2_SAFE=0xe4f24B16CFF9171f555E4643262991023b5C0279 \
+   V2_SAFE=0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5 \
    V2_OPERATOR=<keeper address> \
    V2_ASSET=0x959E54DcF8576856F7A9424190a9751c68739495 \
    V2_TIMELOCK_DELAY=300 V2_MANIFEST_OUT=../deployments/testnet-v2.json \

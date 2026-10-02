@@ -25,27 +25,37 @@ Verified explorer URLs:
 
 Verify runsheet: [docs.monad.xyz/guides/verify-smart-contract](https://docs.monad.xyz/guides/verify-smart-contract). Match `solc 0.8.24` and `optimizer_runs = 200` from `contracts/foundry.toml`. Constructor args via `cast abi-encode`.
 
-## v2 core — Monad testnet (2026-10-01)
+## v2 core — Monad testnet (2026-10-02)
 
 Source of truth: [`deployments/testnet-v2.json`](../deployments/testnet-v2.json)
-(release manifest, schema v1). Block 67163430. Deployer
-`0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86` (no role after deploy). Governance: Safe
-`0xe4f24B16CFF9171f555E4643262991023b5C0279` → TimelockController (300 s; proposer,
-executor and canceller = Safe; deployer holds no timelock role). Guardian =
-Safe (pause only). Operator (v2 keeper) `0xd1588b68d6beac5328E61166b952619b63dbf16f`. Asset =
-DemoUSD above. Engine is **SIMULATED**; G01–G04 BLOCKED; not audited.
+(release manifest, schema v1). Block 67565062. Deployer
+`0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86` (no role after deploy).
+
+Governance: Safe [`0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5`](https://testnet.monadvision.com/address/0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5)
+(v1.4.1 SafeL2, 2 of 3: `0x8824E59f75A09852f5d17A48d973F89E9299f254`, `0x70d6D2dfccE6888E1f22939A81Cd1d38AfcC2019`, `0x8370F0d005dD380Be21C60048a87f8de519eD0c7`;
+[created](https://testnet.monadvision.com/tx/0x5587381869d1f0734d0c5e7851a6efe22c0347224fa23c000f23ef3c37e250d0) by the deployer from signer
+addresses — [`deployments/testnet-safe.json`](../deployments/testnet-safe.json))
+→ TimelockController (300 s; proposer, executor and canceller = Safe). Guardian = Safe
+(pause only). Operator (v2 keeper) `0xd1588b68d6beac5328E61166b952619b63dbf16f`. Asset = DemoUSD above.
+Engine is **SIMULATED**; G01–G04 BLOCKED; not audited.
+
+The three signers currently share one MetaMask recovery phrase (build phase); control
+passes to the team by replacing signers on the Safe — tracked under G07.
 
 | Contract | Testnet (10143) | Deploy | Verified |
 | --- | --- | --- | --- |
-| TimelockController | [`0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097`](https://testnet.monadvision.com/address/0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097) | [tx](https://testnet.monadvision.com/tx/0xe73e385b8f4426093c98c62b7cbf48c1d440267f9393f008c3a78de4e3c18b92) | Sourcify exact |
-| PauseGuardian | [`0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1`](https://testnet.monadvision.com/address/0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1) | [tx](https://testnet.monadvision.com/tx/0x53eb4a7d21dedb3d79ce23501ac9dc56dadd4135e4d88ca209059a0184ab1770) | Sourcify exact |
-| TrancheController | [`0x33EC27A870debF8D8565256A972448530589d37F`](https://testnet.monadvision.com/address/0x33EC27A870debF8D8565256A972448530589d37F) | [tx](https://testnet.monadvision.com/tx/0x2a20d7e6950140795755470f80819be8f93a7c5ad000ced4ca90c66c4017766d) | Sourcify exact |
-| AssetCustody | [`0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5`](https://testnet.monadvision.com/address/0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5) | created by TrancheController | Sourcify exact |
-| ClaimEscrow | [`0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF`](https://testnet.monadvision.com/address/0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF) | created by TrancheController | Sourcify exact |
-| BallastToken | [`0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd`](https://testnet.monadvision.com/address/0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd) | created by TrancheController | Sourcify exact |
-| SimulatedEngine | [`0x0137903a9308cC675c13E5aB935c27707eE4Be6A`](https://testnet.monadvision.com/address/0x0137903a9308cC675c13E5aB935c27707eE4Be6A) | [tx](https://testnet.monadvision.com/tx/0x06e3ed434bbc612e1c0688b466e6bfece9f04fd7e172f769cf67a31c7a26ed19) | Sourcify exact |
+| TimelockController | [`0xA75526e97f0b0f5d2f9B06f0eD0C7DB9545A9f80`](https://testnet.monadvision.com/address/0xA75526e97f0b0f5d2f9B06f0eD0C7DB9545A9f80) | [tx](https://testnet.monadvision.com/tx/0xb9e47e4d4e0ed0cbfd01be78147010161061fcaf08fe9be6af689e09589fbea0) | Sourcify exact |
+| PauseGuardian | [`0x6B12C7375FC96dc2f805Cd1e28999b711d1C3e17`](https://testnet.monadvision.com/address/0x6B12C7375FC96dc2f805Cd1e28999b711d1C3e17) | [tx](https://testnet.monadvision.com/tx/0x622868ada18f43c6db82f5bbc72a000620126efede98897cba21bd6b03325fd9) | Sourcify exact |
+| TrancheController | [`0x717147E566C42D8926c258fCe24B1746ceDB1740`](https://testnet.monadvision.com/address/0x717147E566C42D8926c258fCe24B1746ceDB1740) | [tx](https://testnet.monadvision.com/tx/0x55832c0d17255963e61e83bb5c91c0bbf02a0df19044179ef850bc08ea64e20b) | Sourcify exact |
+| AssetCustody | [`0x800b830A3B6C63bcAABAa9128A217a03aaD7377d`](https://testnet.monadvision.com/address/0x800b830A3B6C63bcAABAa9128A217a03aaD7377d) | created by TrancheController | Sourcify exact |
+| ClaimEscrow | [`0x6B60BcdF3a2DB8762Ade4b05D590aB0aCf0FDF3d`](https://testnet.monadvision.com/address/0x6B60BcdF3a2DB8762Ade4b05D590aB0aCf0FDF3d) | created by TrancheController | Sourcify exact |
+| BallastToken | [`0x278E531dBc080Fa4C0314da9c1592bA6f148926d`](https://testnet.monadvision.com/address/0x278E531dBc080Fa4C0314da9c1592bA6f148926d) | created by TrancheController | Sourcify exact |
+| SimulatedEngine | [`0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED`](https://testnet.monadvision.com/address/0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED) | [tx](https://testnet.monadvision.com/tx/0x6d4088c05e54f891617cab4b72e5af13e50164751230da4b337a9157e743735c) | Sourcify exact |
 
-Reserve seed: 20 dUSD sent to the timelock
-([tx](https://testnet.monadvision.com/tx/0x375b264f42e07dd71dde48b1b8b6b31aac39b63100b31de984a68b31938c80de)).
-Wiring (engine, caps, reserve, funding rate) is pending Safe batch 01 —
-see [`deployments/README.md`](../deployments/README.md).
+Reserve seed: 20 dUSD sent to the timelock. Wiring (engine, caps, reserve, funding
+rate) is pending Safe batch 01 — see [`deployments/README.md`](../deployments/README.md).
+
+Superseded 2026-10-02: the first v2 deployment (block 67163430, governed by the
+previous Safe `0xe4f2…0279`, whose keys the team retired) — manifest kept at
+[`deployments/superseded/testnet-v2-block67163430.json`](../deployments/superseded/testnet-v2-block67163430.json).
+Nothing points at it.

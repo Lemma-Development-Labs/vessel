@@ -5,29 +5,36 @@
   "branch": "p-development",
   "environment": "testnet",
   "chainId": 10143,
-  "deployedBlock": 67163430,
+  "deployedBlock": 67565062,
   "manifest": "deployments/testnet-v2.json",
   "contracts": {
-    "AssetCustody": "0xfd7F4687890aDC7463f6b94b2DCdCcBD19f588c5",
-    "BallastToken": "0x86A5Bb9eD956069c79D24CC51A60f68DC1EAaAFd",
-    "ClaimEscrow": "0xf34A3F1bDb949361faF11c5a2A2063A832AdC1cF",
+    "AssetCustody": "0x800b830A3B6C63bcAABAa9128A217a03aaD7377d",
+    "BallastToken": "0x278E531dBc080Fa4C0314da9c1592bA6f148926d",
+    "ClaimEscrow": "0x6B60BcdF3a2DB8762Ade4b05D590aB0aCf0FDF3d",
     "DemoUSD": "0x959E54DcF8576856F7A9424190a9751c68739495",
-    "PauseGuardian": "0x7bB3eaAdbc82114A9EA4533577D6fb7f3Fad58A1",
-    "SimulatedEngine": "0x0137903a9308cC675c13E5aB935c27707eE4Be6A",
-    "TimelockController": "0xe687b7e1C2F346f2Ad6ebA9C58c3e71C24430097",
-    "TrancheController": "0x33EC27A870debF8D8565256A972448530589d37F"
+    "PauseGuardian": "0x6B12C7375FC96dc2f805Cd1e28999b711d1C3e17",
+    "SimulatedEngine": "0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED",
+    "TimelockController": "0xA75526e97f0b0f5d2f9B06f0eD0C7DB9545A9f80",
+    "TrancheController": "0x717147E566C42D8926c258fCe24B1746ceDB1740"
   },
   "roles": {
     "deployer": "0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86",
-    "governanceSafe": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
-    "guardian": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
+    "governanceSafe": "0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5",
+    "guardian": "0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5",
     "operator": "0xd1588b68d6beac5328E61166b952619b63dbf16f"
   },
   "governance": {
-    "safe": "0xe4f24B16CFF9171f555E4643262991023b5C0279",
-    "safeThreshold": "2 of 3 (read on chain 2026-10-01)",
+    "safe": "0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5",
+    "safeOwners": [
+      "0x8824E59f75A09852f5d17A48d973F89E9299f254",
+      "0x70d6D2dfccE6888E1f22939A81Cd1d38AfcC2019",
+      "0x8370F0d005dD380Be21C60048a87f8de519eD0c7"
+    ],
+    "safeThreshold": "2 of 3 (read on chain 2026-10-02)",
     "timelockDelaySeconds": 300,
-    "deployerRoles": "none (hasRole checked on chain)"
+    "deployerRoles": "none (hasRole checked on chain)",
+    "previousSafe": "0xe4f24B16CFF9171f555E4643262991023b5C0279 \u2014 no role in this deployment (checked on chain)",
+    "knownWeakness": "the three signers share one recovery phrase during the build; replaced by team-held signers via Safe owner swaps (G07)"
   },
   "sourceVerification": "Sourcify exact_match for all 7 v2 contracts (app/lib/verification.ts, verifiedAt from Sourcify)",
   "engine": {
@@ -37,7 +44,7 @@
   "onchainState": {
     "engineWired": false,
     "stageCap": "0",
-    "note": "wiring waits on Safe batch 01 (deployments/governance/testnet-v2-01-wire.*.safe.json)"
+    "note": "wiring waits on Safe batch 01 signed by the new Safe"
   },
   "tests": {
     "contracts": "155 passed, 1 skipped (fork, by design)",
@@ -113,7 +120,8 @@
       "owner": "Kunal + Daksh",
       "evidence": [
         "G07 OPEN \u2014 two-person coverage",
-        "keeper journal with fencing (vessel-service/test/keeper-v2.test.ts)"
+        "keeper journal with fencing (vessel-service/test/keeper-v2.test.ts)",
+        "new Safe signers share one phrase during the build \u2014 not two-person control yet"
       ],
       "checkedAt": "2026-10-01",
       "note": "monitoring, restore and incident drills not run"
@@ -123,7 +131,7 @@
       "owner": "Priya",
       "evidence": [
         "Anvil rehearsal + DeployV2Rehearsal tests",
-        "testnet deploy block 67163430, all txs status 1",
+        "testnet deploys at blocks 67163430 and 67565062 (Safe switch), each rehearsed on a fork first; all txs status 1",
         "Sourcify exact_match x7",
         "roles verified on chain (docs/ADDRESSES.md)"
       ],
@@ -169,5 +177,11 @@
       ],
       "checkedAt": "2026-10-01"
     }
-  }
+  },
+  "superseded": [
+    {
+      "manifest": "deployments/superseded/testnet-v2-block67163430.json",
+      "reason": "governance moved to a new Safe; the old Safe's keys were retired"
+    }
+  ]
 }

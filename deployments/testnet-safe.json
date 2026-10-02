@@ -1,0 +1,13 @@
+{
+  "chainId": 10143,
+  "createdBlock": 67564984,
+  "fallbackHandler": "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
+  "owners": [
+    "0x8824E59f75A09852f5d17A48d973F89E9299f254",
+    "0x70d6D2dfccE6888E1f22939A81Cd1d38AfcC2019",
+    "0x8370F0d005dD380Be21C60048a87f8de519eD0c7"
+  ],
+  "safe": "0x12B2A61ac4108C722A6Dd1530fb7142cE9BD2Ee5",
+  "singleton": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+  "threshold": 2
+}
