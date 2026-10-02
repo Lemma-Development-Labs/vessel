@@ -8,6 +8,8 @@ class FakeChain implements LogSource {
   chainId = 10143;
   blocks = new Map<bigint, { hash: `0x${string}`; logs: DecodedLog[] }>();
   fin = 0n;
+  /** runs inside logs(): lets a test reorg the chain while a pass is reading it */
+  duringLogs?: () => void;
   add(n: bigint, fork: string, events: string[]) {
     const hash = `0x${fork}${n.toString(16).padStart(8, "0")}` as `0x${string}`;
     this.blocks.set(n, {
@@ -24,6 +26,8 @@ class FakeChain implements LogSource {
   async logs(from: bigint, to: bigint) {
     const out: DecodedLog[] = [];
     for (let n = from; n <= to; n++) out.push(...(this.blocks.get(n)?.logs ?? []));
+    this.duringLogs?.(); // the chain moves after the node answered
+    this.duringLogs = undefined;
     return out;
   }
 }
@@ -75,5 +79,19 @@ describe("v2 indexer", () => {
     chain.fin = 110n;
     await indexPass(sql, chain, opts);
     expect((await history(sql, 10143, 50)).every((r) => r.finalized)).toBe(true);
+  });
+
+  it("a reorg while logs are being read does not store the orphaned events", async () => {
+    // Logs come from fork "aa", then the tip is replaced before the pass records its cursor.
+    chain.duringLogs = () => {
+      for (let n = 106n; n <= 110n; n++) chain.add(n, "cc", n === 107n ? ["EpochSettled"] : []);
+    };
+    await indexPass(sql, chain, opts);
+    // Nothing recorded from the inconsistent read; the next pass indexes fork "cc".
+    await indexPass(sql, chain, opts);
+    const rows = await history(sql, 10143, 50);
+    expect(rows.filter((r) => r.event === "EpochSettled").map((r) => r.blockNumber)).toEqual(["107"]);
+    const [orphans] = await sql.query<{ n: string }>("SELECT count(*)::text AS n FROM v2_events WHERE block_hash LIKE '0xaa%' AND block_number >= 106 AND status = 'CANONICAL'");
+    expect(orphans?.n).toBe("0");
   });
 });

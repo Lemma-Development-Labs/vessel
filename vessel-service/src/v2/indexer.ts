@@ -1,12 +1,16 @@
 import { decodeEventLog, type Address, type Hex, type PublicClient } from "viem";
+import { applyMigrations } from "../auth/migrations.ts";
 import type { Sql } from "../auth/sql.ts";
 import { trancheControllerEvents } from "./abi/trancheControllerEvents.ts";
 
 /**
  * v2 event indexer (spec §12). A rebuildable projection of chain events:
  * - identity is (chainId, blockHash, txHash, logIndex) — never the tx hash alone;
- * - on a reorg (the chain's hash at the cursor changed) it walks back to the
- *   common ancestor and marks orphaned rows REVERTED instead of deleting them;
+ * - on a reorg (the chain's hash at the cursor changed) it rewinds up to
+ *   maxReorgDepth blocks (never below finality), marks the non-final rows above
+ *   the rewind point REVERTED instead of deleting them, and re-scans;
+ * - a range is recorded only if its end block kept the same hash while its logs
+ *   were read, so a reorg mid-read cannot store orphaned events;
  * - rows at or below the finalized block are flagged finalized.
  * It holds no financial authority: current balances come from chain reads.
  */
@@ -57,15 +61,7 @@ export interface LogSource {
 }
 
 export async function migrateV2Indexer(sql: Sql): Promise<void> {
-  await sql.query(`CREATE TABLE IF NOT EXISTS auth_schema_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`);
-  const done = new Set((await sql.query<{ id: string }>("SELECT id FROM auth_schema_migrations")).map((r) => r.id));
-  for (const m of V2_INDEXER_MIGRATIONS) {
-    if (done.has(m.id)) continue;
-    await sql.transaction(async (q) => {
-      for (const s of m.statements) await q.query(s);
-      await q.query("INSERT INTO auth_schema_migrations (id) VALUES ($1)", [m.id]);
-    });
-  }
+  await applyMigrations(sql, V2_INDEXER_MIGRATIONS);
 }
 
 const jsonArgs = (a: Record<string, unknown>) =>
@@ -73,8 +69,8 @@ const jsonArgs = (a: Record<string, unknown>) =>
 
 /**
  * One indexing pass. Returns the new cursor block. `startBlock` is the
- * deployment block from the release manifest; `maxReorgDepth` bounds the
- * walk back to a common ancestor.
+ * deployment block from the release manifest; `maxReorgDepth` bounds how far
+ * a detected reorg rewinds.
  */
 export async function indexPass(
   sql: Sql,
@@ -109,8 +105,10 @@ export async function indexPass(
     return cursor;
   }
   const to = head < cursor + opts.chunk ? head : cursor + opts.chunk;
-  const logs = await src.logs(cursor + 1n, to);
   const toHash = await src.blockHash(to);
+  const logs = await src.logs(cursor + 1n, to);
+  // A block hash commits to its ancestry: if the range end is unchanged, every log came from one chain.
+  if ((await src.blockHash(to)) !== toHash) return cursor;
   const fin = await src.finalized();
   await sql.transaction(async (q) => {
     for (const l of logs) {

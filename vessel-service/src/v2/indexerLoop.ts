@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import type { Address, PublicClient } from "viem";
 import type { Sql } from "../auth/sql.ts";
+import { envInt } from "../addresses.ts";
 import type { Manifest } from "../vendor/verify/read.ts";
 import { indexPass, migrateV2Indexer, viemLogSource } from "./indexer.ts";
 
@@ -10,7 +11,7 @@ export async function startV2Indexer(opts: { manifest: Manifest; pc: PublicClien
   const m = opts.manifest as Manifest & { deployedBlock?: number };
   const startBlock = BigInt(m.deployedBlock ?? 0);
   const src = viemLogSource(opts.pc, m.chainId, m.contracts.TrancheController as Address);
-  const intervalMs = Number(process.env.V2_INDEXER_POLL_MS ?? "3000");
+  const intervalMs = envInt("V2_INDEXER_POLL_MS", 3_000, 250, 600_000);
   let running = true;
   const loop = async () => {
     while (running) {
