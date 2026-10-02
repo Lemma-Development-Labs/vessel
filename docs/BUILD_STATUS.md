@@ -51,8 +51,9 @@ and settled a deposit → `vessel-verify` OVERALL PASS.
 Testnet: v2 core redeployed 2026-10-02 at block 67565062 under a new Safe `0x12B2…2Ee5` (first deploy at 67163430 superseded); all 7 contracts
 Sourcify exact-match, roles checked on chain, 20 dUSD reserve seed sent to
 the timelock, `vessel-verify` OVERALL PASS (empty book). Addresses:
-[ADDRESSES.md](ADDRESSES.md#v2-core--monad-testnet-2026-10-01). Wiring waits
-on Safe batch 01 (files generated in `deployments/governance/`).
+[ADDRESSES.md](ADDRESSES.md#v2-core--monad-testnet-2026-10-02). Safe batch 01
+executed 2026-10-02: engine wired, 25,000 dUSD stage cap, 20 dUSD reserve;
+`vessel-verify` PASS at latest and finalized blocks.
 
 ## Day 3 — app, Terminal, SDK/MCP, release · 2026-10-01 · `testnet GO (conditional)`, mainnet NO-GO
 
