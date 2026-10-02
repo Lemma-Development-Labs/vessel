@@ -98,7 +98,7 @@ async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string)
     rc<Address>("engine"),
     pc.getBlock({ blockTag: "latest" }),
   ]);
-  const info = sid > 0n ? await rc<readonly [number, bigint, Hex, bigint, bigint, bigint, bigint, bigint, bigint, bigint]>("seriesInfo", [sid]) : null;
+  const series = sid > 0n ? await rc<readonly [number, bigint, Hex, bigint, bigint, bigint, bigint, bigint, bigint, bigint]>("seriesInfo", [sid]) : null;
   const activeIdle = await pc.readContract({ address: m.contracts.AssetCustody as Address, abi: custodyAbi, functionName: "activeIdle" });
   const engineValue =
     engineAddr === "0x0000000000000000000000000000000000000000"
@@ -113,9 +113,9 @@ async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string)
     pendingBallastDeposits: depLen - bHead,
     pendingExits: exitLen - eHead,
     activeSeries: sid,
-    seriesState: info ? info[0] : 0,
-    subscriptionEnd: info ? info[3] : 0n,
-    maturity: info ? info[5] : 0n,
+    seriesState: series ? series[0] : 0,
+    subscriptionEnd: series ? series[3] : 0n,
+    maturity: series ? series[5] : 0n,
     hullNav,
     impaired,
     activeIdle,

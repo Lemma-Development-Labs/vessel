@@ -43,9 +43,7 @@ export class ConfigError extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Addresses
-// ---------------------------------------------------------------------------
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -72,9 +70,7 @@ function checkAddress(name: string, value: unknown): string {
   return value;
 }
 
-// ---------------------------------------------------------------------------
 // Mainnet exclusions
-// ---------------------------------------------------------------------------
 
 /** Contract names that mean "simulated or mock" (never on mainnet). */
 const MOCK_NAME_RE = /^(mock|sim|demo)/i;
@@ -99,9 +95,7 @@ export const TESTNET_ONLY_ADDRESSES: ReadonlySet<string> = new Set(
 /** Perpl testnet MON market ID; never a mainnet default (gotcha 5). */
 export const PERPL_TESTNET_MON_MARKET_ID = "64";
 
-// ---------------------------------------------------------------------------
 // Manifest
-// ---------------------------------------------------------------------------
 
 export interface Manifest {
   schemaVersion: number | "legacy-v0";
@@ -127,38 +121,38 @@ function asRecord(value: unknown, what: string): Record<string, unknown> {
  * current schema version.
  */
 export function parseManifest(raw: unknown, environment: Environment): Manifest {
-  const obj = asRecord(raw, "manifest");
+  const fields = asRecord(raw, "manifest");
 
   let schemaVersion: Manifest["schemaVersion"];
-  if (!("schemaVersion" in obj)) {
+  if (!("schemaVersion" in fields)) {
     if (environment === "mainnet") {
       throw new ConfigError("SCHEMA_VERSION", "mainnet manifest must declare schemaVersion");
     }
     schemaVersion = "legacy-v0";
-  } else if (obj.schemaVersion === MANIFEST_SCHEMA_VERSION) {
+  } else if (fields.schemaVersion === MANIFEST_SCHEMA_VERSION) {
     schemaVersion = MANIFEST_SCHEMA_VERSION;
   } else {
     throw new ConfigError(
       "SCHEMA_VERSION",
-      `manifest schemaVersion ${JSON.stringify(obj.schemaVersion)} != ${MANIFEST_SCHEMA_VERSION}`,
+      `manifest schemaVersion ${JSON.stringify(fields.schemaVersion)} != ${MANIFEST_SCHEMA_VERSION}`,
     );
   }
 
   const expected = EXPECTED_CHAIN_ID[environment];
-  if (obj.chainId !== expected) {
+  if (fields.chainId !== expected) {
     throw new ConfigError(
       "WRONG_CHAIN",
-      `manifest chainId ${JSON.stringify(obj.chainId)} does not match ${environment} (${expected})`,
+      `manifest chainId ${JSON.stringify(fields.chainId)} does not match ${environment} (${expected})`,
     );
   }
-  if ("environment" in obj && obj.environment !== environment) {
+  if ("environment" in fields && fields.environment !== environment) {
     throw new ConfigError(
       "BAD_MANIFEST",
-      `manifest environment ${JSON.stringify(obj.environment)} loaded as ${environment}`,
+      `manifest environment ${JSON.stringify(fields.environment)} loaded as ${environment}`,
     );
   }
 
-  const contractsRaw = asRecord(obj.contracts, "manifest.contracts");
+  const contractsRaw = asRecord(fields.contracts, "manifest.contracts");
   if (Object.keys(contractsRaw).length === 0) {
     throw new ConfigError("BAD_MANIFEST", "manifest.contracts is empty");
   }
@@ -167,12 +161,12 @@ export function parseManifest(raw: unknown, environment: Environment): Manifest 
     contracts[name] = checkAddress(`contracts.${name}`, addr);
   }
 
-  const venue = typeof obj.venue === "string" ? obj.venue : "";
+  const venue = typeof fields.venue === "string" ? fields.venue : "";
   const perplMarketId =
-    obj.perplMarketId === undefined || obj.perplMarketId === null ? null : String(obj.perplMarketId);
+    fields.perplMarketId === undefined || fields.perplMarketId === null ? null : String(fields.perplMarketId);
 
   if (environment === "mainnet") {
-    const lab = obj.lab === undefined ? {} : asRecord(obj.lab, "manifest.lab");
+    const lab = fields.lab === undefined ? {} : asRecord(fields.lab, "manifest.lab");
     if (Object.keys(lab).length > 0) {
       throw new ConfigError("LAB_ON_MAINNET", "mainnet manifest declares lab contracts");
     }
@@ -198,9 +192,7 @@ export function parseManifest(raw: unknown, environment: Environment): Manifest 
   return { schemaVersion, environment, chainId: expected, contracts, venue, perplMarketId };
 }
 
-// ---------------------------------------------------------------------------
 // Runtime environment
-// ---------------------------------------------------------------------------
 
 export interface RuntimeConfig {
   configSchemaVersion: typeof CONFIG_SCHEMA_VERSION;

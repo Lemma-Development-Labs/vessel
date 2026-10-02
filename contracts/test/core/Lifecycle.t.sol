@@ -56,7 +56,6 @@ contract LifecycleTest is Test {
         }
     }
 
-    // ------------------------------------------------------------------ helpers
     function _ballast(address who, uint256 assets) internal returns (uint256 id) {
         vm.prank(who);
         id = c.requestDeposit(BALLAST, 0, assets, who, 0, vm.getBlockTimestamp() + 1 days);
@@ -85,7 +84,6 @@ contract LifecycleTest is Test {
         assertEq(c.lastActive(), c.activeAssets(), "lastActive tracks A");
     }
 
-    // ------------------------------------------------------------------ full lifecycle
     function test_full_hull_and_ballast_lifecycle() public {
         uint256 sid = _book();
         assertEq(c.hullNav(), 6_000e6);
@@ -137,7 +135,6 @@ contract LifecycleTest is Test {
         assertApproxEqAbs(custody.activeIdle(), c.reserveNav() + c.treasuryLiability(), 2);
     }
 
-    // ------------------------------------------------------------------ Hull
     function test_subscription_escrow_not_deployed() public {
         vm.prank(gov);
         uint256 sid = c.openSeries(800, bytes32(0));
@@ -258,7 +255,6 @@ contract LifecycleTest is Test {
         );
     }
 
-    // ------------------------------------------------------------------ Ballast
     function test_forward_price_after_loss() public {
         _ballast(bob, 3_000e6);
         c.processDepositBatch(10);
@@ -346,7 +342,6 @@ contract LifecycleTest is Test {
         assertGt(bal.balanceOf(bob), 0, "the rest waits");
     }
 
-    // ------------------------------------------------------------------ admission and flows
     function test_lifetime_cap_across_all_paths_and_withdrawal_does_not_refill() public {
         vm.prank(gov);
         c.setStageCap(1_000e6);
@@ -407,7 +402,6 @@ contract LifecycleTest is Test {
         c.requestDeposit(BALLAST, 0, 100e6, mallory, 0, vm.getBlockTimestamp() + 1 days);
     }
 
-    // ------------------------------------------------------------------ pause and access
     function test_guardian_cannot_resume_and_funded_claims_survive_risk_pause() public {
         _ballast(bob, 1_000e6);
         c.processDepositBatch(10);
@@ -494,7 +488,6 @@ contract LifecycleTest is Test {
         c.cancelDeposit(id);
     }
 
-    // ------------------------------------------------------------------ valuation
     function test_stale_valuation_blocks_settlement() public {
         _ballast(bob, 1_000e6);
         c.processDepositBatch(10);
@@ -511,7 +504,6 @@ contract LifecycleTest is Test {
         new TestUSDC();
     }
 
-    // ------------------------------------------------------------------ coverage of remaining paths
     function test_pay_treasury_only_from_liability_and_not_while_unwinding() public {
         uint256 sid = _book();
         vm.prank(op);
@@ -629,7 +621,6 @@ contract LifecycleTest is Test {
         c.requestDeposit(BALLAST, 0, 1e6, address(0), 0, vm.getBlockTimestamp() + 1 days);
     }
 
-    // ------------------------------------------------------------------ view helpers
     function _withCoupon(uint256 principal, uint256 rateBps, uint256 secs) internal pure returns (uint256) {
         return principal + (principal * rateBps * secs) / (10_000 * uint256(365 days));
     }

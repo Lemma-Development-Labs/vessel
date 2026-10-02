@@ -35,8 +35,8 @@ function parseAddresses(raw: string, source: string): VesselAddresses {
   if (!parsed || typeof parsed !== "object") {
     throw new Error(`${source} must be an object`);
   }
-  const obj = parsed as Record<string, unknown>;
-  const contractsRaw = obj.contracts;
+  const fields = parsed as Record<string, unknown>;
+  const contractsRaw = fields.contracts;
   if (!contractsRaw || typeof contractsRaw !== "object") {
     throw new Error(`${source} missing contracts`);
   }
@@ -49,14 +49,14 @@ function parseAddresses(raw: string, source: string): VesselAddresses {
   }
 
   const deployed =
-    typeof obj.deployedBlock === "number" || typeof obj.deployedBlock === "string"
-      ? BigInt(obj.deployedBlock)
+    typeof fields.deployedBlock === "number" || typeof fields.deployedBlock === "string"
+      ? BigInt(fields.deployedBlock)
       : 0n;
 
   const out: VesselAddresses = {
-    chainId: typeof obj.chainId === "number" ? obj.chainId : getChainId(),
+    chainId: typeof fields.chainId === "number" ? fields.chainId : getChainId(),
     deployedBlock: deployed < 0n ? 0n : deployed,
-    venue: asVenue(obj.venue),
+    venue: asVenue(fields.venue),
     contracts: {
       EngineLite: contracts.EngineLite,
       Tranches: contracts.Tranches,

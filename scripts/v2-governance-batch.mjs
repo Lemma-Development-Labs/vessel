@@ -49,10 +49,10 @@ const payloads = [];
 for (const call of spec.calls) {
   const to = resolve(call.to.startsWith("@") ? call.to : `@${call.to}`);
   const args = (call.args ?? []).map(resolve);
-  const data = cast("calldata", call.sig, ...args);
-  cast("calldata-decode", call.sig, data); // round-trip check: throws if malformed
+  const calldata = cast("calldata", call.sig, ...args);
+  cast("calldata-decode", call.sig, calldata); // round-trip check: throws if malformed
   targets.push(to);
-  payloads.push(data);
+  payloads.push(calldata);
   console.log(`  ${call.sig.padEnd(34)} -> ${to}`);
 }
 const values = targets.map(() => "0");
