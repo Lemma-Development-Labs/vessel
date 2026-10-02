@@ -126,8 +126,10 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       const block = await pc.getBlock({ blockTag: "latest" });
       const blockNumber = block.number;
       const asOf = Number(block.timestamp);
+      // viem's default 1 KB chunks would turn a 400-request scan into 30+ RPC calls per refresh,
+      // past the public RPC's per-second cap; ~8 KB (~220 reads, a few M gas) keeps it to a handful.
       const mc = (contracts: readonly unknown[]) =>
-        pc.multicall({ contracts: contracts as never, allowFailure: true, blockNumber }) as Promise<Entry[]>;
+        pc.multicall({ contracts: contracts as never, allowFailure: true, blockNumber, batchSize: 8_192 }) as Promise<Entry[]>;
       const ctl = (functionName: string, args: readonly unknown[] = []) => ({ address: C, abi: controllerAbi, functionName, args });
 
       const BOOK = [
@@ -247,7 +249,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
               { address: engineAddr, abi: engineAbi, functionName: "fundingRateBps" },
             ]
           : []),
-        ...(address ? [ctl("ballastUnitValue", [units + (walletBase?.ballastLocked ?? 0n)])] : []), // rule0-ok: call argument
+        ...(address ? [ctl("ballastUnitValue", [units])] : []),
       ]);
       let k = 0;
       const take = (n: number) => second.slice(k, (k += n));
