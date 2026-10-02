@@ -92,6 +92,14 @@ export const MIGRATIONS: ReadonlyArray<{ id: string; statements: string[] }> = [
 ];
 
 export async function migrate(sql: Sql): Promise<string[]> {
+  return applyMigrations(sql, MIGRATIONS);
+}
+
+/** Apply each not-yet-recorded migration in its own transaction. Shared by every service schema. */
+export async function applyMigrations(
+  sql: Sql,
+  migrations: ReadonlyArray<{ id: string; statements: readonly string[] }>,
+): Promise<string[]> {
   await sql.query(
     `CREATE TABLE IF NOT EXISTS auth_schema_migrations (
        id          text PRIMARY KEY,
@@ -102,13 +110,13 @@ export async function migrate(sql: Sql): Promise<string[]> {
     (await sql.query<{ id: string }>("SELECT id FROM auth_schema_migrations")).map((r) => r.id),
   );
   const ran: string[] = [];
-  for (const m of MIGRATIONS) {
-    if (applied.has(m.id)) continue;
+  for (const mig of migrations) {
+    if (applied.has(mig.id)) continue;
     await sql.transaction(async (q) => {
-      for (const s of m.statements) await q.query(s);
-      await q.query("INSERT INTO auth_schema_migrations (id) VALUES ($1)", [m.id]);
+      for (const st of mig.statements) await q.query(st);
+      await q.query("INSERT INTO auth_schema_migrations (id) VALUES ($1)", [mig.id]);
     });
-    ran.push(m.id);
+    ran.push(mig.id);
   }
   return ran;
 }

@@ -12,10 +12,11 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { pgSql, pgliteSql, type Sql } from "../auth/sql.ts";
+import { envInt } from "../addresses.ts";
 import { pgSsl } from "../db.ts";
 import type { Manifest } from "../vendor/verify/read.ts";
 import { migrateJournal } from "./journal.ts";
-import { TimeoutError, tick, type ChainPort, type KeeperDeps } from "./keeper.ts";
+import { RejectedError, TimeoutError, tick, type ChainPort, type KeeperDeps } from "./keeper.ts";
 import { POLICY_VERSION, allowlist, decide, type Observed, type PolicyConfig } from "./policy.ts";
 
 /** Monad bills the gas LIMIT: estimate + 10%, hard cap (see OPS.md gas notes). */
@@ -36,23 +37,33 @@ const viewAbi = parseAbi([
 const custodyAbi = parseAbi(["function activeIdle() view returns (uint256)"]);
 const engineAbi = parseAbi(["function value() view returns (uint256, uint256)"]);
 
+const firstLine = (err: unknown) => (err instanceof Error ? err.message : String(err)).split("\n")[0]!;
+
 export function viemChainPort(pc: PublicClient, chain: Chain, rpcUrl: string, pk: Hex): ChainPort {
   const account = privateKeyToAccount(pk);
   const wallet = createWalletClient({ account, chain, transport: http(rpcUrl) });
   return {
     address: account.address,
     minedNonce: async () => BigInt(await pc.getTransactionCount({ address: account.address, blockTag: "latest" })),
+    pendingNonce: async () => BigInt(await pc.getTransactionCount({ address: account.address, blockTag: "pending" })),
     async send(tx) {
-      const est = await pc.estimateGas({ account: account.address, to: tx.to as Address, data: tx.data as Hex });
+      // Nothing below the sendTransaction call can have broadcast anything: those failures are refusals.
+      let est: bigint;
+      try {
+        est = await pc.estimateGas({ account: account.address, to: tx.to as Address, data: tx.data as Hex });
+      } catch (err) {
+        throw new RejectedError(`estimate failed: ${firstLine(err)}`);
+      }
       const gas = (est * 11n) / 10n;
-      if (gas > GAS_CAP) throw new Error(`gas ${gas} above cap ${GAS_CAP}`);
+      if (gas > GAS_CAP) throw new RejectedError(`gas ${gas} above cap ${GAS_CAP}`);
       let hash: Hex;
       try {
         hash = await wallet.sendTransaction({ to: tx.to as Address, data: tx.data as Hex, nonce: Number(tx.nonce), gas, chain });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/timeout|timed out|ECONNRESET|fetch failed/i.test(msg)) throw new TimeoutError(msg);
-        throw err;
+        const msg = firstLine(err);
+        if (/insufficient funds/i.test(msg)) throw new RejectedError(msg);
+        // Timeouts, "already known", "nonce too low", replacements: the tx may exist. Reconcile decides.
+        throw new TimeoutError(msg);
       }
       try {
         await pc.waitForTransactionReceipt({ hash, timeout: RECEIPT_TIMEOUT_MS });
@@ -167,7 +178,7 @@ export async function startV2Keeper(opts: {
     now: () => new Date(),
     leaseStaleAfterMs: 5 * 60_000,
   };
-  const intervalMs = Number(process.env.V2_KEEPER_INTERVAL_MS ?? "30000");
+  const intervalMs = envInt("V2_KEEPER_INTERVAL_MS", 30_000, 1_000, 3_600_000);
   let running = true;
   const loop = async () => {
     while (running) {
@@ -175,7 +186,11 @@ export async function startV2Keeper(opts: {
         const entry = await tick(deps, async () =>
           decide(await observe(opts.pc, opts.manifest, sql, chainPort.address), cfg, controller),
         );
-        if (entry) opts.log.info({ action: entry.action, id: entry.client_request_id, nonce: entry.planned_nonce }, "v2 keeper action dispatched");
+        if (entry) {
+          const fields = { action: entry.action, id: entry.client_request_id, nonce: entry.planned_nonce, state: entry.state };
+          if (entry.state === "REJECTED") opts.log.warn(fields, "v2 keeper action refused by node");
+          else opts.log.info(fields, "v2 keeper action sent");
+        }
       } catch (err) {
         opts.log.error({ err }, "v2 keeper tick failed");
       }

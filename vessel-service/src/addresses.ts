@@ -99,7 +99,7 @@ export function getPort(): number {
 }
 
 /** Bounded integer env parse. Falls back to `def` on missing/garbage input. */
-function envInt(name: string, def: number, min: number, max: number): number {
+export function envInt(name: string, def: number, min: number, max: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return def;
   const n = Number(raw);

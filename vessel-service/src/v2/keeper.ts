@@ -22,6 +22,11 @@ export class TimeoutError extends Error {
   override name = "TimeoutError";
 }
 
+/** The node refused the transaction before broadcast (estimate revert, gas cap, no funds): its nonce is still free. */
+export class RejectedError extends Error {
+  override name = "RejectedError";
+}
+
 export interface Tx {
   to: string;
   data: string;
@@ -33,7 +38,12 @@ export interface ChainPort {
   readonly address: string;
   /** transactions mined from this address (the next nonce the chain expects) */
   minedNonce(): Promise<bigint>;
-  /** Submit a signed tx. Resolves with the hash; throws TimeoutError when the outcome is unknown. */
+  /** mined plus mempool: anything at or above minedNonce and below this may still land */
+  pendingNonce(): Promise<bigint>;
+  /**
+   * Submit a signed tx. Resolves with the hash. Throws TimeoutError when the outcome is
+   * unknown, RejectedError when the transaction certainly never left this process.
+   */
   send(tx: Tx): Promise<string>;
   /** null while unknown/pending */
   receipt(hash: string): Promise<{ status: "success" | "reverted" } | null>;
@@ -68,6 +78,23 @@ export async function guardedSend(
   if (!ok) throw new NotAllowedError(`${entry.action} to ${entry.target} is not allowlisted`);
   await assertCurrentToken(sql, chain.address, token);
   return chain.send({ to: entry.target, data: entry.calldata, nonce: BigInt(entry.planned_nonce) });
+}
+
+/**
+ * A refusal releases the entry only when nothing is in flight at its nonce: an earlier
+ * attempt that timed out may still be in the mempool, and freeing its nonce would let a
+ * second transaction compete with it.
+ */
+async function releaseIfRefused(d: KeeperDeps, e: JournalEntry, err: RejectedError): Promise<boolean> {
+  let inFlight = true;
+  try {
+    inFlight = (await d.chain.pendingNonce()) > BigInt(e.planned_nonce);
+  } catch {
+    // Cannot see the mempool: keep the nonce reserved rather than guess.
+  }
+  if (inFlight) return false;
+  await markState(d.sql, e.id, "REJECTED", { result: { reason: err.message } });
+  return true;
 }
 
 export interface KeeperDeps {
@@ -114,7 +141,9 @@ export async function reconcile(d: KeeperDeps, token: bigint): Promise<boolean> 
       const hash = await guardedSend(d.sql, d.chain, d.allow, token, e);
       await markState(d.sql, e.id, "DISPATCHED", { txHash: hash });
     } catch (err) {
-      if (err instanceof TimeoutError) await markState(d.sql, e.id, "UNKNOWN");
+      if (err instanceof RejectedError) {
+        if (await releaseIfRefused(d, e, err)) continue;
+      } else if (err instanceof TimeoutError) await markState(d.sql, e.id, "UNKNOWN");
       else throw err;
     }
     clear = false;
@@ -157,6 +186,11 @@ export async function tick(d: KeeperDeps, plan: () => Promise<PlannedAction | nu
     const hash = await guardedSend(d.sql, d.chain, d.allow, token, entry);
     await markState(d.sql, entry.id, "DISPATCHED", { txHash: hash });
   } catch (err) {
+    if (err instanceof RejectedError) {
+      if (await releaseIfRefused(d, entry, err)) return { ...entry, state: "REJECTED" };
+      await markState(d.sql, entry.id, "UNKNOWN");
+      return entry;
+    }
     if (err instanceof TimeoutError) {
       await markState(d.sql, entry.id, "UNKNOWN");
     } else if (err instanceof FencedError || err instanceof NotAllowedError) {

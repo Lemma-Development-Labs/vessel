@@ -1,3 +1,4 @@
+import { applyMigrations } from "../auth/migrations.ts";
 import type { Sql } from "../auth/sql.ts";
 
 /**
@@ -12,6 +13,9 @@ import type { Sql } from "../auth/sql.ts";
  *   UNKNOWN, not failed: recovery reconciles against the chain by nonce and
  *   hash before anything is resent, so a crash or redelivery can never create
  *   a duplicate transaction.
+ * - An entry that provably never reached the chain (REJECTED by the node, or
+ *   SUPERSEDED before signing) releases its nonce and its decision id, so a
+ *   refused call cannot jam the account and the decision can be retried.
  */
 
 export const JOURNAL_MIGRATIONS: ReadonlyArray<{ id: string; statements: string[] }> = [
@@ -47,9 +51,25 @@ export const JOURNAL_MIGRATIONS: ReadonlyArray<{ id: string; statements: string[
       `CREATE INDEX action_journal_open ON action_journal (account, state)`,
     ],
   },
+  {
+    // Uniqueness only binds entries that hold (or may hold) their nonce. Without this, an
+    // entry the node refused kept its nonce reserved and every later decision collided on it.
+    id: "004_keeper_journal_release_unsent",
+    statements: [
+      `ALTER TABLE action_journal DROP CONSTRAINT IF EXISTS action_journal_state_check`,
+      `ALTER TABLE action_journal ADD CONSTRAINT action_journal_state_check CHECK (state IN
+         ('PERSISTED','DISPATCHED','UNKNOWN','CONFIRMED','REVERTED','SUPERSEDED','REJECTED'))`,
+      `ALTER TABLE action_journal DROP CONSTRAINT IF EXISTS action_journal_client_request_id_key`,
+      `ALTER TABLE action_journal DROP CONSTRAINT IF EXISTS action_journal_account_planned_nonce_key`,
+      `CREATE UNIQUE INDEX action_journal_live_request ON action_journal (client_request_id)
+         WHERE state NOT IN ('SUPERSEDED','REJECTED')`,
+      `CREATE UNIQUE INDEX action_journal_live_nonce ON action_journal (account, planned_nonce)
+         WHERE state NOT IN ('SUPERSEDED','REJECTED')`,
+    ],
+  },
 ];
 
-export type JournalState = "PERSISTED" | "DISPATCHED" | "UNKNOWN" | "CONFIRMED" | "REVERTED" | "SUPERSEDED";
+export type JournalState = "PERSISTED" | "DISPATCHED" | "UNKNOWN" | "CONFIRMED" | "REVERTED" | "SUPERSEDED" | "REJECTED";
 
 export type JournalEntry = {
   id: string;
@@ -69,15 +89,7 @@ export class FencedError extends Error {
 }
 
 export async function migrateJournal(sql: Sql): Promise<void> {
-  await sql.query(`CREATE TABLE IF NOT EXISTS auth_schema_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`);
-  const applied = new Set((await sql.query<{ id: string }>("SELECT id FROM auth_schema_migrations")).map((r) => r.id));
-  for (const m of JOURNAL_MIGRATIONS) {
-    if (applied.has(m.id)) continue;
-    await sql.transaction(async (q) => {
-      for (const s of m.statements) await q.query(s);
-      await q.query("INSERT INTO auth_schema_migrations (id) VALUES ($1)", [m.id]);
-    });
-  }
+  await applyMigrations(sql, JOURNAL_MIGRATIONS);
 }
 
 /**
@@ -128,7 +140,7 @@ export async function assertCurrentToken(sql: Sql, account: string, token: bigin
   }
 }
 
-/** Persist a decision BEFORE dispatch. Idempotent on clientRequestId. */
+/** Persist a decision BEFORE dispatch. Idempotent on clientRequestId while the earlier entry is live. */
 export async function persistAction(
   sql: Sql,
   e: {
@@ -145,7 +157,10 @@ export async function persistAction(
 ): Promise<JournalEntry> {
   return sql.transaction(async (q) => {
     await assertCurrentToken(q, e.account, e.token);
-    const [existing] = await q.query<JournalEntry>("SELECT * FROM action_journal WHERE client_request_id = $1", [e.clientRequestId]);
+    const [existing] = await q.query<JournalEntry>(
+      "SELECT * FROM action_journal WHERE client_request_id = $1 AND state NOT IN ('SUPERSEDED','REJECTED')",
+      [e.clientRequestId],
+    );
     if (existing) return existing;
     const [row] = await q.query<JournalEntry>(
       `INSERT INTO action_journal

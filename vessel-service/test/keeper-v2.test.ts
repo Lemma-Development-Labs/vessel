@@ -2,26 +2,37 @@ import { PGlite } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { pgliteSql, type Sql } from "../src/auth/sql.ts";
 import { FencedError, acquireLease, migrateJournal, openEntries } from "../src/v2/journal.ts";
-import { NotAllowedError, TimeoutError, reconcile, tick, type ChainPort, type KeeperDeps, type Tx } from "../src/v2/keeper.ts";
+import { NotAllowedError, RejectedError, TimeoutError, reconcile, tick, type ChainPort, type KeeperDeps, type Tx } from "../src/v2/keeper.ts";
 
 const ACCOUNT = "0x000000000000000000000000000000000000beef";
 const CONTROLLER = "0x00000000000000000000000000000000000c0de1";
 const SETTLE = "0x11da60b4"; // settle()
+const ACTIVATE = "0x7c0c2a4c"; // stands in for a call the node refuses (e.g. someone else already activated)
 
 /** Deterministic chain: mines what it accepts, can drop acks, can time out after or before accepting. */
 class FakeChain implements ChainPort {
   readonly address = ACCOUNT;
   mined: Tx[] = [];
   pending: Tx[] = [];
-  mode: "normal" | "timeout-after-accept" | "timeout-before-accept" | "hold" = "normal";
+  mode: "normal" | "timeout-after-accept" | "timeout-before-accept" | "timeout-into-mempool" | "hold" = "normal";
+  /** calldata the node refuses before broadcast (estimate revert), whatever the mode */
+  refuse?: string;
   async minedNonce() {
     return BigInt(this.mined.length);
+  }
+  async pendingNonce() {
+    return BigInt(this.mined.length + this.pending.length);
   }
   async send(tx: Tx): Promise<string> {
     if (tx.nonce !== BigInt(this.mined.length + this.pending.length) && tx.nonce < BigInt(this.mined.length)) {
       throw new Error("nonce too low");
     }
+    if (this.refuse && tx.data.startsWith(this.refuse)) throw new RejectedError("execution reverted: BadSeries");
     if (this.mode === "timeout-before-accept") throw new TimeoutError("rpc timeout");
+    if (this.mode === "timeout-into-mempool") {
+      this.pending.push(tx);
+      throw new TimeoutError("ack lost, tx in mempool");
+    }
     if (this.mode === "hold") {
       this.pending.push(tx);
       return this.hash(tx);
@@ -50,7 +61,10 @@ const deps = (holderId = "worker-a", c: ChainPort = chain): KeeperDeps => ({
   sql,
   chain: c,
   holderId,
-  allow: [{ target: CONTROLLER, selector: SETTLE, action: "settle" }],
+  allow: [
+    { target: CONTROLLER, selector: SETTLE, action: "settle" },
+    { target: CONTROLLER, selector: ACTIVATE, action: "activateSeries" },
+  ],
   policyVersion: "test-1",
   now: () => clock,
   leaseStaleAfterMs: 60_000,
@@ -166,5 +180,70 @@ describe("durable keeper journal", () => {
     await reconcile(deps(), 1n);
     const [row] = await sql.query<{ state: string }>("SELECT state FROM action_journal");
     expect(row?.state).toBe("SUPERSEDED");
+  });
+
+  it("a call the node refuses before broadcast frees its nonce and does not jam the keeper", async () => {
+    chain.refuse = ACTIVATE;
+    const refused = await tick(deps(), async () => ({ clientRequestId: "activate:1", action: "activateSeries", target: CONTROLLER, calldata: ACTIVATE, inputs: {} }));
+    expect(refused?.state).toBe("REJECTED");
+    expect(chain.mined).toHaveLength(0);
+    // The keeper moves on and reuses nonce 0 for the next decision.
+    await tick(deps(), settlePlan("settle:1"));
+    expect(chain.mined.map((t) => t.nonce)).toEqual([0n]);
+    await reconcile(deps(), 1n);
+    const states = await sql.query<{ client_request_id: string; state: string }>("SELECT client_request_id, state FROM action_journal ORDER BY id");
+    expect(states).toEqual([
+      { client_request_id: "activate:1", state: "REJECTED" },
+      { client_request_id: "settle:1", state: "CONFIRMED" },
+    ]);
+  });
+
+  it("a refused decision can be decided again once the node accepts it", async () => {
+    chain.refuse = ACTIVATE;
+    const plan = async () => ({ clientRequestId: "activate:1", action: "activateSeries", target: CONTROLLER, calldata: ACTIVATE, inputs: {} });
+    await tick(deps(), plan);
+    chain.refuse = undefined;
+    await tick(deps(), plan);
+    expect(chain.mined).toHaveLength(1);
+  });
+
+  it("an entry that was never sent (fenced) does not hold its nonce", async () => {
+    await acquireLease(sql, ACCOUNT, "worker-a", clock, 60_000);
+    await sql.query(
+      `INSERT INTO action_journal (client_request_id, account, fencing_token, policy_version, action, target, calldata, planned_nonce, state)
+       VALUES ('settle:old', $1, 1, 'test-1', 'settle', $2, $3, 0, 'SUPERSEDED')`,
+      [ACCOUNT, CONTROLLER, SETTLE],
+    );
+    await tick(deps(), settlePlan("settle:new"));
+    expect(chain.mined.map((t) => t.nonce)).toEqual([0n]);
+  });
+
+  it("a superseded decision can be decided again", async () => {
+    chain.mode = "hold";
+    await tick(deps(), settlePlan("settle:1"));
+    chain.pending = [];
+    chain.mined.push({ to: CONTROLLER, data: "0xother", nonce: 0n });
+    chain.mode = "normal";
+    await reconcile(deps(), 1n);
+    await tick(deps(), settlePlan("settle:1"));
+    expect(chain.mined.map((t) => [t.nonce, t.data])).toEqual([
+      [0n, "0xother"],
+      [1n, SETTLE],
+    ]);
+  });
+
+  it("a refused resend does not free a nonce whose first attempt is still in the mempool", async () => {
+    chain.mode = "timeout-into-mempool";
+    await tick(deps(), settlePlan("settle:1")); // UNKNOWN, no hash, tx waiting in the mempool
+    chain.mode = "normal";
+    chain.refuse = SETTLE; // the resend is refused (e.g. "already known")
+    expect(await reconcile(deps(), 1n)).toBe(false);
+    let [row] = await sql.query<{ state: string }>("SELECT state FROM action_journal");
+    expect(row?.state).toBe("UNKNOWN");
+    chain.mineHeld(); // the original lands
+    await reconcile(deps(), 1n);
+    [row] = await sql.query<{ state: string }>("SELECT state FROM action_journal");
+    expect(row?.state).toBe("UNKNOWN"); // nonce consumed, hash unknown: kept for inspection, never released
+    expect(chain.mined).toHaveLength(1);
   });
 });
