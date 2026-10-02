@@ -26,6 +26,12 @@ export interface V1Deps {
   sourceLabel: string;
   /** v2 event index for /v1/history; omitted → history reports UNAVAILABLE */
   historySql?: Sql;
+  /**
+   * Per-client limit for every /v1 route (needs @fastify/rate-limit registered).
+   * Each request reads the chain, so an unlimited route would let one client
+   * exhaust the RPC's per-second cap for everyone.
+   */
+  rateLimit?: { max: number; timeWindow: number };
 }
 
 const controllerAbi = parseAbi([
@@ -60,13 +66,14 @@ export function bookStatus(snap: Snapshot): V1Status {
 
 export function v1Routes(d: V1Deps): FastifyPluginAsync {
   const read = d.read ?? (() => readSnapshot(d.client, d.manifest, "finalized"));
+  const route = d.rateLimit ? { config: { rateLimit: d.rateLimit } } : {};
   return async (app) => {
     app.addHook("onSend", async (_req, reply, payload) => {
       reply.header("Cache-Control", "no-store");
       return payload;
     });
 
-    app.get("/v1/book", async (_req, reply) => {
+    app.get("/v1/book", route, async (_req, reply) => {
       let snap: Snapshot;
       try {
         snap = await read();
@@ -104,7 +111,7 @@ export function v1Routes(d: V1Deps): FastifyPluginAsync {
       };
     });
 
-    app.get<{ Querystring: { limit?: string } }>("/v1/history", async (req, reply) => {
+    app.get<{ Querystring: { limit?: string } }>("/v1/history", route, async (req, reply) => {
       const limit = Math.min(Math.max(Number.parseInt(req.query.limit ?? "50", 10) || 50, 1), 200);
       if (!d.historySql) {
         return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: "event index not configured" });
@@ -130,7 +137,7 @@ export function v1Routes(d: V1Deps): FastifyPluginAsync {
       }
     });
 
-    app.get<{ Params: { id: string } }>("/v1/series/:id", async (req, reply) => {
+    app.get<{ Params: { id: string } }>("/v1/series/:id", route, async (req, reply) => {
       if (!/^\d{1,9}$/.test(req.params.id)) return reply.code(400).send({ error: "BAD_REQUEST" });
       try {
         const block = await d.client.getBlock({ blockTag: "finalized" });
@@ -166,7 +173,7 @@ export function v1Routes(d: V1Deps): FastifyPluginAsync {
       }
     });
 
-    app.get<{ Params: { id: string } }>("/v1/requests/:id", async (req, reply) => {
+    app.get<{ Params: { id: string } }>("/v1/requests/:id", route, async (req, reply) => {
       if (!/^\d{1,12}$/.test(req.params.id)) return reply.code(400).send({ error: "BAD_REQUEST" });
       try {
         const block = await d.client.getBlock({ blockTag: "finalized" });

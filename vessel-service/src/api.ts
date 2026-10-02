@@ -133,7 +133,7 @@ export async function startApi(opts: {
   );
 
   if (opts.v1) {
-    await app.register(v1Routes(opts.v1));
+    await app.register(v1Routes({ ...opts.v1, rateLimit: { max: rlMax, timeWindow: rlWindowSec * 1000 } }));
     log.info({ environment: opts.v1.manifest.environment, controller: opts.v1.manifest.contracts.TrancheController }, "v1 evidence routes registered");
   }
 

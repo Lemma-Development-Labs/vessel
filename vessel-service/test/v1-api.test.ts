@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import type { PublicClient } from "viem";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
@@ -150,5 +151,16 @@ describe("/v1 evidence API", () => {
     ]);
     expect(r.headers["cache-control"]).toBe("no-store");
     await sql.close();
+  });
+
+  it("every /v1 route is rate-limited per client when a limit is configured", async () => {
+    const a = Fastify();
+    await a.register(rateLimit, { global: false });
+    await a.register(v1Routes({ manifest, client: stubClient(), read: async () => snap(), sourceLabel: "x", rateLimit: { max: 2, timeWindow: 60_000 } }));
+    for (const url of ["/v1/book", "/v1/series/1", "/v1/requests/1", "/v1/history"]) {
+      const codes: number[] = [];
+      for (let i = 0; i < 3; i++) codes.push((await a.inject({ method: "GET", url })).statusCode);
+      expect(codes[2], url).toBe(429);
+    }
   });
 });
