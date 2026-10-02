@@ -53,3 +53,25 @@ shorter (Session 8).
 | `testnet-v2.json` | Release manifest written by `DeployV2` (after the testnet deploy) |
 | `governance/*.json` | Batch specs (human-readable intent) |
 | `governance/*.safe.json` | Generated Safe Transaction Builder files — regenerate, never hand-edit |
+
+## Switching to a new governance Safe
+
+The v2 contracts bind their Safe immutably (timelock proposer/executor,
+guardian, fee treasury), so a new Safe means a new deployment. One command
+does it from the signer **addresses** — no signer key is ever needed:
+
+```bash
+# 1. rehearse on a local fork of testnet (nothing sent, repo untouched)
+scripts/v2-switch-safe.sh 0xSigner1,0xSigner2,0xSigner3 --rehearse
+# 2. real run
+scripts/v2-switch-safe.sh 0xSigner1,0xSigner2,0xSigner3
+```
+
+It creates a 2-of-3 Safe (v1.4.1 SafeL2, same configuration as before; the
+deployer is refused as a signer), archives the old manifest to
+`deployments/superseded/`, deploys the v2 core governed by the new Safe with
+the same keeper, sends the 20 dUSD reserve seed, regenerates batches 01/02
+and every app/SDK/MCP binding, verifies sources on Sourcify, refreshes the
+verification badges from Sourcify's records, and runs `vessel-verify`.
+The rehearsal additionally plays the Safe through batch 01 (schedule →
+refused before the delay → execute) and checks the wired state.
