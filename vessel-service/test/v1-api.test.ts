@@ -3,7 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import type { PublicClient } from "viem";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
-import { pgliteSql } from "../src/auth/sql.ts";
+import { pgliteSql, type Sql } from "../src/auth/sql.ts";
 import { indexPass, migrateV2Indexer, type LogSource } from "../src/v2/indexer.ts";
 import { v1Routes, type V1Deps } from "../src/v2/api.ts";
 import type { Snapshot } from "../src/vendor/verify/checks.ts";
@@ -162,5 +162,15 @@ describe("/v1 evidence API", () => {
       for (let i = 0; i < 3; i++) codes.push((await a.inject({ method: "GET", url })).statusCode);
       expect(codes[2], url).toBe(429);
     }
+  });
+
+  it("history failures do not leak internal error text", async () => {
+    const broken = { query: async () => { throw new Error("connect ECONNREFUSED 10.0.4.17:5432"); } } as unknown as Sql;
+    const a = Fastify();
+    await a.register(v1Routes({ manifest, client: stubClient(), read: async () => snap(), sourceLabel: "x", historySql: broken }));
+    const r = await a.inject({ method: "GET", url: "/v1/history" });
+    expect(r.statusCode).toBe(503);
+    expect(r.body).not.toMatch(/10\.0\.4\.17|ECONNREFUSED/);
+    expect(r.json().reason).toBe("event index read failed");
   });
 });

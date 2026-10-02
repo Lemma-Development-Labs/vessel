@@ -133,7 +133,9 @@ export function v1Routes(d: V1Deps): FastifyPluginAsync {
           data: rows,
         };
       } catch (err) {
-        return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: err instanceof Error ? err.message : "index read failed" });
+        // Database errors can name internal hosts; log them, return a generic reason.
+        req.log.warn({ err }, "v1 history read failed");
+        return reply.code(503).send({ ...envelope(d, null, "UNAVAILABLE"), error: "STALE_DATA", reason: "event index read failed" });
       }
     });
 
