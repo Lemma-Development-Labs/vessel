@@ -70,7 +70,7 @@ gates evaluated.
 | Item | Owner | Blocks |
 |---|---|---|
 | Fund the testnet keeper | Kunal | v0 demo settlement |
-| Safe signers: import and sign batch 01 schedule → (after 5 min) execute; then 03, then 02 | Safe signers | v2 testnet wiring and series 1 |
+| Safe batch 01 executed 2026-10-02. Next: tester wallet list for batch 03 (allowances), then batch 02 (Hull series 1) | Priya / Safe signers | first deposits; Hull series |
 | Set `V2_KEEPER_PK` (keeper `0xd158…f16f`, funded 5 MON) and the v2 manifest on Railway; `NEXT_PUBLIC_STATS_URL` on Vercel | Priya | v2 keeper + app evidence panels |
 | Confirm the 2026-08-29 transactions from compromised key `0x4307…` | Kunal | incident record |
 | New Safe `0x12B2…2Ee5` signers share one phrase during the build — swap in team-held signers at handover | Priya / team | G07, R07 |

@@ -42,9 +42,12 @@
     "status": "SIMULATED \u2014 labelled in contract (isSimulated), manifest, API, SDK, MCP and app"
   },
   "onchainState": {
-    "engineWired": false,
-    "stageCap": "0",
-    "note": "wiring waits on Safe batch 01 signed by the new Safe"
+    "engineWired": true,
+    "engine": "0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED (SIMULATED, funding 1200 bps)",
+    "stageCap": "25000000000",
+    "closeCost": "1000000",
+    "reserveNav": "20000000",
+    "note": "Safe batch 01 executed 2026-10-02 (schedule + execute after the 300 s delay); vessel-verify OVERALL PASS at latest and finalized blocks"
   },
   "tests": {
     "contracts": "155 passed, 1 skipped (fork, by design)",

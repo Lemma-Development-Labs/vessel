@@ -13,15 +13,15 @@ Release record: [testnet-v2-release.json](testnet-v2-release.json) · commit
 
 ### Conditions for the testnet GO
 
-1. **Safe batch 01 executed** (engine, stage cap 25,000, close cost, 20 dUSD
-   reserve, simulated funding rate). Until then the book reads stage cap 0 and
-   deposits are closed — the app shows this correctly.
+1. ~~**Safe batch 01 executed**~~ — **met 2026-10-02**: engine wired
+   (SIMULATED, 12% funding), stage cap 25,000, close cost 1, 20 dUSD reserve;
+   `vessel-verify` PASS at latest and finalized blocks.
 2. **v2 keeper running** with `V2_KEEPER_PK` (funded: 5 MON) and the v2
    manifest on the service host; `NEXT_PUBLIC_STATS_URL` set for the app's
    evidence panels.
 
-Then batch 03 (tester allowances), and batch 02 (Hull series 1) once Ballast
-and the reserve can cover it.
+Then batch 03 (tester allowances — no wallet can deposit until it has one),
+and batch 02 (Hull series 1) once Ballast and the reserve can cover it.
 
 ## Gates
 

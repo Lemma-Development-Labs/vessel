@@ -52,8 +52,10 @@ passes to the team by replacing signers on the Safe — tracked under G07.
 | BallastToken | [`0x278E531dBc080Fa4C0314da9c1592bA6f148926d`](https://testnet.monadvision.com/address/0x278E531dBc080Fa4C0314da9c1592bA6f148926d) | created by TrancheController | Sourcify exact |
 | SimulatedEngine | [`0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED`](https://testnet.monadvision.com/address/0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED) | [tx](https://testnet.monadvision.com/tx/0x6d4088c05e54f891617cab4b72e5af13e50164751230da4b337a9157e743735c) | Sourcify exact |
 
-Reserve seed: 20 dUSD sent to the timelock. Wiring (engine, caps, reserve, funding
-rate) is pending Safe batch 01 — see [`deployments/README.md`](../deployments/README.md).
+Reserve seed: 20 dUSD, contributed by Safe batch 01 (executed 2026-10-02), which also
+wired the SIMULATED engine `0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED` (12% funding),
+set the stage cap to 25,000 dUSD and the close cost to 1 dUSD. Next: batch 03
+(tester allowances) and batch 02 (Hull series 1) — see [`deployments/README.md`](../deployments/README.md).
 
 Superseded 2026-10-02: the first v2 deployment (block 67163430, governed by the
 previous Safe `0xe4f2…0279`, whose keys the team retired) — manifest kept at
