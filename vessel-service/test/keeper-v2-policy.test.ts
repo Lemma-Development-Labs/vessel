@@ -8,6 +8,7 @@ const base = (): Observed => ({
   now: 1_800_000_000n,
   pendingBallastDeposits: 0n,
   pendingExits: 0n,
+  headExitReadyAt: 0n,
   activeSeries: 0n,
   seriesState: 0,
   subscriptionEnd: 0n,
@@ -17,6 +18,7 @@ const base = (): Observed => ({
   activeIdle: 150_000_000n,
   engineValue: 850_000_000n,
   treasuryLiability: 0n,
+  engineWired: true,
   lastSettleAt: 1_800_000_000n,
 });
 const fn = (o: Observed) => {
@@ -70,5 +72,19 @@ describe("v2 keeper policy", () => {
       decide({ ...base(), activeIdle: 500_000_000n, engineValue: 500_000_000n }, cfg, C),
     ];
     for (const p of plans) expect(allow.some((a) => p!.calldata.startsWith(a.selector))).toBe(true);
+  });
+
+  it("does not process exits that are still cooling down (a no-op call would still cost gas)", () => {
+    const cooling = { ...base(), pendingExits: 1n, headExitReadyAt: 1_800_003_600n };
+    expect(fn(cooling)).toBeNull();
+    expect(fn({ ...cooling, headExitReadyAt: 1_800_000_000n })?.functionName).toBe("processExitBatch");
+  });
+
+  it("never deploys when the book holds less than it owes the treasury", () => {
+    expect(fn({ ...base(), activeIdle: 5_000_000n, engineValue: 0n, treasuryLiability: 9_000_000n })).toBeNull();
+  });
+
+  it("does not deploy before an engine is wired", () => {
+    expect(fn({ ...base(), engineWired: false, activeIdle: 1_000_000_000n, engineValue: 0n })).toBeNull();
   });
 });

@@ -33,6 +33,8 @@ const viewAbi = parseAbi([
   "function impaired() view returns (bool)",
   "function treasuryLiability() view returns (uint256)",
   "function engine() view returns (address)",
+  "function exits(uint256) view returns (address, address, uint64, uint8, uint256, uint256, uint256)",
+  "function EXIT_COOLDOWN() view returns (uint256)",
 ]);
 const custodyAbi = parseAbi(["function activeIdle() view returns (uint256)"]);
 const engineAbi = parseAbi(["function value() view returns (uint256, uint256)"]);
@@ -83,7 +85,7 @@ export function viemChainPort(pc: PublicClient, chain: Chain, rpcUrl: string, pk
   };
 }
 
-async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string): Promise<Observed> {
+export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string): Promise<Observed> {
   const C = m.contracts.TrancheController as Address;
   const rc = <T>(fn: string, args: readonly unknown[] = []) =>
     pc.readContract({ address: C, abi: viewAbi, functionName: fn as never, args: args as never }) as Promise<T>;
@@ -100,6 +102,16 @@ async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string)
   ]);
   const series = sid > 0n ? await rc<readonly [number, bigint, Hex, bigint, bigint, bigint, bigint, bigint, bigint, bigint]>("seriesInfo", [sid]) : null;
   const activeIdle = await pc.readContract({ address: m.contracts.AssetCustody as Address, abi: custodyAbi, functionName: "activeIdle" });
+  let headExitReadyAt = 0n;
+  if (exitLen > eHead) {
+    // exitHead is a queue position; exits() is keyed by id. requestBallastRedeem pushes ids in
+    // creation order starting at 1, so position i always holds id i + 1.
+    const [head, cooldown] = await Promise.all([
+      rc<readonly [Address, Address, bigint, number, bigint, bigint, bigint]>("exits", [eHead + 1n]),
+      rc<bigint>("EXIT_COOLDOWN"),
+    ]);
+    headExitReadyAt = head[2] + cooldown;
+  }
   const engineValue =
     engineAddr === "0x0000000000000000000000000000000000000000"
       ? 0n
@@ -112,6 +124,7 @@ async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string)
     now: block.timestamp,
     pendingBallastDeposits: depLen - bHead,
     pendingExits: exitLen - eHead,
+    headExitReadyAt,
     activeSeries: sid,
     seriesState: series ? series[0] : 0,
     subscriptionEnd: series ? series[3] : 0n,
@@ -121,6 +134,7 @@ async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: string)
     activeIdle,
     engineValue,
     treasuryLiability,
+    engineWired: engineAddr !== "0x0000000000000000000000000000000000000000",
     lastSettleAt: last?.at ? BigInt(Math.floor(last.at.getTime() / 1000)) : 0n,
   };
 }

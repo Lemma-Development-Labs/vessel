@@ -40,6 +40,8 @@ export interface Observed {
   /** controller state */
   pendingBallastDeposits: bigint; // queue length − head
   pendingExits: bigint; // exit queue length − head
+  /** requestedAt + EXIT_COOLDOWN of the exit at the head of the queue (0 when none) */
+  headExitReadyAt: bigint;
   activeSeries: bigint;
   seriesState: number; // SeriesState enum
   subscriptionEnd: bigint;
@@ -50,6 +52,7 @@ export interface Observed {
   activeIdle: bigint;
   engineValue: bigint;
   treasuryLiability: bigint;
+  engineWired: boolean;
   /** keeper memory (from the journal) */
   lastSettleAt: bigint;
 }
@@ -101,14 +104,16 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
       pending: o.pendingBallastDeposits.toString(),
     });
   }
-  if (o.pendingExits > 0n && !o.impaired) {
+  // Exits fill only after their cooldown, in order: calling earlier settles and stops at the head,
+  // which costs gas every time and moves nobody's money.
+  if (o.pendingExits > 0n && !o.impaired && o.now >= o.headExitReadyAt) {
     return plan(`exits:${o.now / 900n}`, "processExitBatch", call("processExitBatch", [cfg.batchSize]), {
       pending: o.pendingExits.toString(),
     });
   }
 
   // 3. Keep the idle buffer near target (never below the on-chain 10% floor).
-  if (!o.impaired && o.seriesState !== MATURED_UNWINDING) {
+  if (o.engineWired && !o.impaired && o.seriesState !== MATURED_UNWINDING) {
     const a = o.activeIdle + o.engineValue - o.treasuryLiability;
     const target = (a * cfg.idleTargetBps) / 10_000n + o.treasuryLiability;
     if (o.activeIdle > target + cfg.minMove) {
