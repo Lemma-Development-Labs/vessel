@@ -182,23 +182,24 @@ export async function tick(d: KeeperDeps, plan: () => Promise<PlannedAction | nu
     inputs: next.inputs,
   });
   if (entry.state !== "PERSISTED") return entry; // idempotent replay of an old decision
+  // The returned entry carries the state after this tick, so callers log what actually happened.
   try {
     const hash = await guardedSend(d.sql, d.chain, d.allow, token, entry);
     await markState(d.sql, entry.id, "DISPATCHED", { txHash: hash });
+    return { ...entry, state: "DISPATCHED", tx_hash: hash };
   } catch (err) {
     if (err instanceof RejectedError) {
       if (await releaseIfRefused(d, entry, err)) return { ...entry, state: "REJECTED" };
       await markState(d.sql, entry.id, "UNKNOWN");
-      return entry;
+      return { ...entry, state: "UNKNOWN" };
     }
     if (err instanceof TimeoutError) {
       await markState(d.sql, entry.id, "UNKNOWN");
-    } else if (err instanceof FencedError || err instanceof NotAllowedError) {
-      await markState(d.sql, entry.id, "SUPERSEDED", { result: { reason: err.message } });
-      throw err;
-    } else {
-      throw err;
+      return { ...entry, state: "UNKNOWN" };
     }
+    if (err instanceof FencedError || err instanceof NotAllowedError) {
+      await markState(d.sql, entry.id, "SUPERSEDED", { result: { reason: err.message } });
+    }
+    throw err;
   }
-  return entry;
 }

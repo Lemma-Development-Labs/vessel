@@ -106,7 +106,12 @@ async function main(): Promise<void> {
   // Indexer first: startKeeper() awaits its first crank, which can block for a
   // whole receipt timeout (~2 crank intervals). Starting the keeper first would
   // delay the indexer by that long on every boot that begins with a slow tx.
-  indexer = await startIndexer({ store, publicClient, addrs });
+  // A v2-only deployment does not need the v0 history; its backfill would spend the RPC budget for days.
+  if (process.env.V0_INDEXER === "off") {
+    log.info("V0_INDEXER=off — v0 indexer not started");
+  } else {
+    indexer = await startIndexer({ store, publicClient, addrs });
+  }
 
   if (getKeeperPk()) {
     keeper = await startKeeper({ publicClient, addrs });

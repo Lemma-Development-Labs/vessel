@@ -90,7 +90,8 @@ afterEach(async () => {
 
 describe("durable keeper journal", () => {
   it("persists before dispatch and replaying a decision never duplicates it", async () => {
-    await tick(deps(), settlePlan("settle:1"));
+    const sent = await tick(deps(), settlePlan("settle:1"));
+    expect(sent?.state).toBe("DISPATCHED"); // the outcome of this tick, not the pre-send state
     await tick(deps(), settlePlan("settle:1")); // same decision again
     expect(chain.mined).toHaveLength(1);
     await reconcile(deps(), 1n);
@@ -110,7 +111,7 @@ describe("durable keeper journal", () => {
 
   it("timeout_is_unknown_not_failed: a lost ack is reconciled, not resent", async () => {
     chain.mode = "timeout-after-accept";
-    await tick(deps(), settlePlan("settle:1"));
+    expect((await tick(deps(), settlePlan("settle:1")))?.state).toBe("UNKNOWN");
     expect(chain.mined).toHaveLength(1);
     const [row] = await sql.query<{ state: string }>("SELECT state FROM action_journal");
     expect(row?.state).toBe("UNKNOWN");
