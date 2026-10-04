@@ -13,7 +13,14 @@ jobs:
         working-directory: contracts
     steps:
       - uses: actions/checkout@v4
+      # Pinned, not `stable`. Gas accounting changes between Foundry releases,
+      # so an unpinned toolchain silently moves the baseline that
+      # `forge snapshot --check` measures against — the snapshot gate then fails
+      # on a release nobody asked for, with no contract change behind it.
+      # Bump this deliberately, regenerating .gas-snapshot in the same commit.
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.3
       # foundry.toml pins solc 0.8.24. On a cold runner svm must fetch it, so
       # --offline cannot be used; cache the download instead so runs stay fast.
       - name: cache solc (svm)
@@ -66,6 +73,85 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
 
+  packages:
+    # Shared schema source and environment guards (docs/ARCHITECTURE.md
+    # decision 2). Each package is standalone with its own lockfile.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [packages/domain, packages/config, packages/math, packages/sdk, tools/verify-cli, tools/vessel-mcp]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # config's lint imports the shared money rules from packages/domain.
+      - name: install domain (shared lint rules)
+        if: matrix.dir != 'packages/domain'
+        working-directory: packages/domain
+        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - name: lint (bans JavaScript Number in economic code)
+        run: pnpm lint
+
+  service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: vendored packages match their source
+        run: node scripts/sync-packages.mjs --check
+      - name: install
+        working-directory: vessel-service
+        run: pnpm install --frozen-lockfile
+      - name: typecheck
+        working-directory: vessel-service
+        run: pnpm typecheck
+      - name: auth tests (SIWE, sessions, invitations; real Postgres via PGlite)
+        working-directory: vessel-service
+        run: pnpm test
+
+  e2e:
+    # Real browser (Chromium) against the real app and vessel-service. Needs
+    # the public Monad testnet RPC: the service checks its chain ID at startup.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: install service
+        working-directory: vessel-service
+        run: pnpm install --frozen-lockfile
+      - name: install app
+        working-directory: app
+        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: onboarding journey (desktop + 360 px)
+        working-directory: app
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: app/test-results
+          retention-days: 7
+
   secrets:
     runs-on: ubuntu-latest
     steps:
@@ -75,4 +161,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: scanner self-test (must catch a planted key)
+        run: node scripts/check-secrets.test.mjs
       - run: node scripts/check-secrets.mjs

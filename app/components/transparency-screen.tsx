@@ -1,220 +1,227 @@
 "use client";
 
-import { useState } from "react";
-import { useVessel } from "@/lib/context";
-import { ADDRESSES } from "@/lib/addresses";
-import { formatDusd, formatDusd4, formatTs, formatWmon } from "@/lib/format";
-import { useNowSec } from "@/lib/now";
-import { map2, mapLive, valueOrForLogic } from "@/lib/live";
+import { useBook } from "@/lib/book/context";
+import { RELEASE, ROLES, V2 } from "@/lib/book/release";
+import { RULES, type BookState } from "@/lib/book/types";
+import { formatBlock, formatBps, formatDusd, formatDusd4 } from "@/lib/format";
+import { mapLive, type Live } from "@/lib/live";
 import { verificationOf } from "@/lib/verification";
-import { AddressChip, Badge, Button, Card, Gauge, Skeleton } from "@/components/ui";
-import { ChartUnavailable, SourceChip, Unavailable, Val } from "@/components/live";
-import { DeployHedgeCta } from "@/components/hedge-cta";
-import { UnwindCard } from "@/components/exit-flow";
-import type { WaterfallEvent } from "@/lib/provider";
-
-const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER ?? "https://testnet.monadvision.com";
-
-/** One crank interval. Older reads render dim with an age label. */
-const STALE_AFTER_SEC = 300;
+import { EXPLORER } from "@/lib/wagmi";
+import { AddressChip, Badge, Card } from "@/components/ui";
+import { Val } from "@/components/live";
+import { MockNotice, PageHead, SectionLabel, TxLink, formatDuration } from "@/components/book-ui";
 
 export function TransparencyScreen() {
-  const v = useVessel();
-  const nowSec = useNowSec();
-  const [freeze, setFreeze] = useState(false);
-
-  const shortId = valueOrForLogic(v.engine.shortId, 0n);
-  const undeployed = shortId === 0n;
-  const simulated = valueOrForLogic(v.engine.simulated, true);
-
-  if (v.loading) {
-    return (
-      <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-        <Skeleton className="h-3 w-32" />
-        <Skeleton className="mt-4 h-12 w-full max-w-xl" />
-        <Skeleton className="mt-8 h-56 w-full" />
-      </div>
-    );
-  }
-
+  const v = useBook();
   return (
     <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-      <p className="num text-[10.5px] tracking-[0.18em] text-steel">TRANSPARENCY</p>
-      <h1 className="display mt-3 text-[28px] font-bold leading-[1.04] tracking-[-0.02em] sm:text-[36px] md:text-[44px]">
-        The hedge is public, every block.
-      </h1>
-      <p className="mt-3 max-w-xl text-base text-dim">
-        Everything the engine does, visible and live. Demo dollars. Unaudited.
-      </p>
-      <p className="mt-3 text-sm text-dim">
-        Every number on this page is a chain read. Anything we could not read shows as{" "}
-        <span className="num text-steel/60">—</span>, never as a zero.
+      <PageHead eyebrow="05 — TRANSPARENCY" title="Don't trust it." accent="Watch the book.">
+        Every number on this page is read from the chain at one block. An independent checker
+        recomputes the same book without our API — and you can run it yourself.
+      </PageHead>
+      <MockNotice />
+      <p className="num mt-4 text-[12px] text-steel">
+        block <Val of={mapLive(v.clock, (c) => c.number)}>{(n) => formatBlock(n)}</Val> · release{" "}
+        {RELEASE.environment} · {RELEASE.status}
       </p>
 
-      <Card className="mt-10 p-5 md:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="display text-lg">{undeployed ? "The hedge, pending" : "The hedge, live"}</h2>
-            <p className="num mt-1 text-[11.5px] text-steel">
-              last update: block{" "}
-              <Val of={v.engine.lastBlock}>{(b) => b.toLocaleString()}</Val> ·{" "}
-              <Val of={v.engine.lastCrankTs}>
-                {(t) => (t > 0n ? `${Math.max(0, nowSec - Number(t))}s ago` : "no crank yet")}
-              </Val>
+      <section className="mt-10">
+        <h2 className="display text-lg">Book</h2>
+        <Card className="mt-4 grid grid-cols-2 gap-px overflow-hidden md:grid-cols-4">
+          <Cell label="HULL" tone="text-hull" of={mapLive(v.book, (b) => formatDusd4(b.hullNav))} />
+          <Cell label="BALLAST" tone="text-ballast" of={mapLive(v.book, (b) => formatDusd4(b.ballastNav))} />
+          <Cell label="RESERVE" of={mapLive(v.book, (b) => formatDusd4(b.reserveNav))} />
+          <Cell label="TREASURY OWED" of={mapLive(v.book, (b) => formatDusd4(b.treasuryLiability))} />
+          <Cell label="RECORDED ASSETS (A)" of={mapLive(v.book, (b) => formatDusd4(b.recordedActive))} />
+          <Cell label="LOSS CARRYFORWARD" of={mapLive(v.book, (b) => formatDusd4(b.lossCarry))} />
+          <Cell label="EPOCH" of={mapLive(v.book, (b) => b.epoch.toString())} />
+          <Cell
+            label="STATE"
+            of={mapLive(v.book, (b) => (b.impaired ? "IMPAIRED" : "normal"))}
+            tone={v.book.status === "ok" && v.book.value.impaired ? "text-red" : undefined}
+          />
+        </Card>
+        <Val of={v.book}>{(b) => <Cover b={b} />}</Val>
+      </section>
+
+      <section className="mt-10 grid gap-6 md:grid-cols-2">
+        <div>
+          <h2 className="display text-lg">Strategy engine</h2>
+          <Card className="mt-4 p-5">
+            <Val of={v.engine}>
+              {(e) =>
+                e === null ? (
+                  <p className="text-sm text-dim">
+                    No engine is wired yet. Governance wires it through the Safe and the{" "}
+                    {formatDuration(RELEASE.timelockDelaySeconds)} timelock.
+                  </p>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <SectionLabel>MODE</SectionLabel>
+                      <div className="mt-1.5">{e.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}</div>
+                    </div>
+                    <div>
+                      <SectionLabel>VALUE</SectionLabel>
+                      <p className="num mt-1">{formatDusd4(e.value)}</p>
+                    </div>
+                    <div>
+                      <SectionLabel>FUNDING RATE</SectionLabel>
+                      <p className={`num mt-1 ${e.fundingRateBps < 0n ? "text-red" : ""}`}>{formatBps(e.fundingRateBps)} APR</p>
+                    </div>
+                  </div>
+                )
+              }
+            </Val>
+            <p className="mt-4 text-[12.5px] text-dim">
+              On testnet the short leg is a labelled simulation: its funding rate is set by governance, not
+              earned on a venue. Real venue custody is not live (gate G01).
             </p>
-          </div>
-          {simulated ? (
-            <Badge kind="sim" />
-          ) : (
-            <Badge kind="hedged" venue={valueOrForLogic(v.engine.venueName, "")} />
-          )}
+          </Card>
         </div>
-
-        <div className="mt-6 overflow-hidden rounded-xl border border-white/8">
-          <HedgeRow
-            label="SPOT LEG"
-            a={
-              <Val of={v.engine.spotQty} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(q) => `WMON ${formatWmon(q)}`}
-              </Val>
-            }
-            b={
-              <Val of={v.engine.spotValue} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(x) => `value ${formatDusd(x)} dUSD`}
-              </Val>
-            }
-            c={simulated ? "MockRouter" : "DEX router"}
-          />
-          <HedgeRow
-            label="SHORT LEG"
-            a={
-              <Val of={v.engine.shortNotional} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(n) => `notional ${formatDusd(n)} dUSD`}
-              </Val>
-            }
-            b={<Val of={v.engine.venueName}>{(n) => n}</Val>}
-            c={
-              // SimVenue models no margin account, so we do not invent one.
-              // The old screen showed "margin = notional / 2", which was a
-              // guess presented in the same style as a reading.
-              <span className="text-steel/60" title="SimVenue does not expose a margin balance.">
-                margin not exposed by venue
-              </span>
-            }
-            amber={simulated}
-          />
-          <HedgeRow
-            label="FUNDING"
-            a={
-              <Val of={v.engine.fundingAccrued} nowSec={nowSec} staleAfterSec={STALE_AFTER_SEC}>
-                {(f) => `accrued ${f >= 0n ? "+" : ""}${formatDusd4(f)} dUSD`}
-              </Val>
-            }
-            b={
-              <Val of={v.engine.fundingRateBps}>
-                {(r) => `rate ${(Number(r) / 100).toFixed(2)}% APR`}
-              </Val>
-            }
-            phosphor
-          />
+        <div>
+          <h2 className="display text-lg">Beta caps</h2>
+          <Card className="mt-4 p-5">
+            <Val of={v.book}>
+              {(b) => (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <SectionLabel>STAGE CAP</SectionLabel>
+                    <p className="num mt-1">{formatDusd(b.stageCap)}</p>
+                  </div>
+                  <div>
+                    <SectionLabel>ADMITTED</SectionLabel>
+                    <p className="num mt-1">{formatDusd(b.lifetimeAdmitted)}</p>
+                  </div>
+                  <div>
+                    <SectionLabel>PENDING</SectionLabel>
+                    <p className="num mt-1">{formatDusd(b.pendingReserved)}</p>
+                  </div>
+                </div>
+              )}
+            </Val>
+            <p className="mt-4 text-[12.5px] text-dim">
+              Hard ceiling {formatDusd(RULES.ABSOLUTE_LIFETIME_CAP)} dUSD for the whole beta, fixed in the contract.
+            </p>
+          </Card>
         </div>
+      </section>
 
-        <div className="mt-6">
-          {/* The gauge previously had ±0.03% of random jitter added to make it
-              look alive. On the screen whose argument is "watch the hedge",
-              synthetic movement on the risk metric is the worst possible
-              flourish. It renders the read, or nothing. */}
-          {v.engine.netDeltaBps.status === "ok" ? (
-            <Gauge pct={Number(v.engine.netDeltaBps.value) / 100} freeze={freeze} />
-          ) : (
-            <ChartUnavailable
-              className="min-h-[64px]"
-              reason={`net delta unavailable — ${v.engine.netDeltaBps.reason}`}
-            />
-          )}
-        </div>
-      </Card>
+      <section className="mt-10">
+        <h2 className="display text-lg">Independent check</h2>
+        <Card className="mt-4 p-5">
+          {v.evidence.status !== "ok" ? (
+            <p className="num text-[12.5px] text-steel" data-live="unavailable">
+              Not shown here: {v.evidence.reason}.
+            </p>
+          ) : null}
+          <Val of={v.evidence} className={v.evidence.status !== "ok" ? "hidden" : ""}>
+            {(ev) => (
+              <>
+                <p className="num text-sm">
+                  <span
+                    className={
+                      ev.status === "MISMATCH" ? "text-red" : ev.status === "SIMULATED" ? "text-amber" : ev.status === "LIVE" ? "text-phosphor" : "text-steel"
+                    }
+                  >
+                    {ev.status}
+                  </span>
+                  {ev.blockNumber ? <span className="text-steel"> · finalized block {formatBlock(BigInt(ev.blockNumber))}</span> : null}
+                </p>
+                <ul className="mt-4 grid gap-2">
+                  {ev.checks.map((c) => (
+                    <li key={c.id} className="flex flex-wrap items-baseline gap-3 text-sm">
+                      <span
+                        className={`num w-20 shrink-0 text-[11px] tracking-[0.1em] ${
+                          c.verdict === "PASS" ? "text-phosphor" : c.verdict === "MISMATCH" ? "text-red" : c.verdict === "SIMULATED" ? "text-amber" : "text-steel"
+                        }`}
+                      >
+                        {c.verdict}
+                      </span>
+                      <span className="num text-[12px] text-steel">{c.id}</span>
+                      <span className="text-dim">{c.summary}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Val>
+          <p className="mt-5 text-[12.5px] text-dim">Run the same checks yourself, against any RPC:</p>
+          <pre className="num mt-2 overflow-x-auto rounded-[2px] border border-line bg-bg px-3 py-2 text-[11.5px] text-ink">
+            {`cd tools/verify-cli && pnpm verify --manifest ../../deployments/${RELEASE.environment}-v2.json --rpc https://testnet-rpc.monad.xyz`}
+          </pre>
+        </Card>
+      </section>
 
-      <DeployHedgeCta className="mt-6" />
-      <UnwindCard className="mt-6" />
-
-      <Card className="mt-6 p-5 sm:p-6">
-        <Button
-          className="w-full py-5 text-[15px] tracking-[0.12em]"
-          loading={freeze}
-          onClick={() => {
-            setFreeze(true);
-            void v.crank().finally(() => setFreeze(false));
-          }}
-        >
-          CRANK — settle the waterfall
-        </Button>
-        <p className="mt-3 text-center text-sm text-dim">
-          Anyone can crank. Settlement is a public function.
+      <section className="mt-10">
+        <h2 className="display text-lg">Event history</h2>
+        <Card className="mt-4 overflow-x-auto">
+          {v.history.status !== "ok" ? (
+            <p className="num p-5 text-[12.5px] text-steel" data-live="unavailable">
+              Not shown here: {v.history.reason}.
+            </p>
+          ) : null}
+          <Val of={v.history} className={v.history.status !== "ok" ? "hidden" : ""}>
+            {(rows) =>
+              rows.length === 0 ? (
+                <p className="p-5 text-sm text-dim">No events yet.</p>
+              ) : (
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line">
+                      {["BLOCK", "EVENT", "TX", "FINALITY"].map((h) => (
+                        <th key={h} className="num px-4 py-3 text-[10px] font-normal tracking-[0.14em] text-steel">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={`${r.txHash}-${r.logIndex}`} className="border-b border-line/60 last:border-0">
+                        <td className="num px-4 py-2.5 text-steel">{formatBlock(BigInt(r.blockNumber))}</td>
+                        <td className="px-4 py-2.5">{r.event}</td>
+                        <td className="px-4 py-2.5">
+                          <TxLink hash={r.txHash} />
+                        </td>
+                        <td className={`num px-4 py-2.5 text-[12px] ${r.finalized ? "text-phosphor" : "text-steel"}`}>
+                          {r.finalized ? "finalized" : "pending"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            }
+          </Val>
+        </Card>
+        <p className="mt-3 text-[12.5px] text-dim">
+          History comes from an indexer that rebuilds from chain events and survives reorgs. It is a projection —
+          balances above are read from the contracts directly.
         </p>
-        <p className="num mt-2 text-center text-[11px] text-steel">
-          {v.engine.keeperActive.status === "ok" && v.engine.keeperActive.value ? (
-            <>Hosted keeper is configured — see the status page for its last run.</>
-          ) : (
-            <Unavailable reason={
-              v.engine.keeperActive.status === "unavailable"
-                ? v.engine.keeperActive.reason
-                : "no hosted keeper"
-            } />
-          )}
-        </p>
-      </Card>
+      </section>
 
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="display text-lg">Waterfall log</h2>
-          <SourceChip source={v.historySource} />
-        </div>
-        <div className="mt-4 flex flex-col gap-4">
-          {v.waterfall.length === 0 ? (
-            <Card className="px-4 py-10 text-center text-sm text-dim">
-              {v.historySource === "none"
-                ? "History unavailable — no stats service and the RPC returned no logs."
-                : "No settle yet. Crank to see the split."}
-            </Card>
-          ) : (
-            v.waterfall.map((ev, i) => (
-              <WaterfallPlay
-                key={ev.txHash}
-                ev={ev}
-                animate={i === 0 && !freeze}
-                hullRateLabel={
-                  v.deck.hullRateBps.status === "ok"
-                    ? `${(Number(v.deck.hullRateBps.value) / 100).toFixed(0)}% APR × TVL × dt`
-                    : null
-                }
-              />
-            ))
-          )}
-        </div>
-      </div>
+      <section className="mt-10">
+        <h2 className="display text-lg">Governance</h2>
+        <Card className="mt-4 divide-y divide-white/6">
+          <Role name="Governance Safe" addr={ROLES.governanceSafe} note="2-of-3 multisig; proposes and executes through the timelock" />
+          <Role
+            name="Timelock"
+            addr={V2.TimelockController}
+            note={`${formatDuration(RELEASE.timelockDelaySeconds)} delay on testnet (48h on mainnet) — every parameter change waits in public`}
+          />
+          <Role name="Guardian" addr={ROLES.guardian} note="can pause; only governance can resume" />
+          <Role name="Operator (keeper)" addr={ROLES.operator} note="admits queues, moves idle cash, settles — allowlisted calls only" />
+        </Card>
+      </section>
 
       <section id="contracts" className="mt-12">
         <h2 className="display text-lg">Contracts</h2>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-line">
-          {(
-            [
-              ["DemoUSD", ADDRESSES.DemoUSD],
-              ["Guardian", ADDRESSES.Guardian],
-              ["BlitzVault", ADDRESSES.BlitzVault],
-              ["Tranches", ADDRESSES.Tranches],
-              ["Hull", ADDRESSES.Hull],
-              ["Ballast", ADDRESSES.Ballast],
-              ["EngineLite", ADDRESSES.EngineLite],
-              ["SimVenue", ADDRESSES.SimVenue],
-              ["PerplVenue", ADDRESSES.PerplVenue],
-              ["MockRouter", ADDRESSES.MockRouter],
-              ["MockWMON", ADDRESSES.MockWMON],
-            ] as const
-          ).map(([name, addr]) => (
+        <div className="mt-4 overflow-hidden rounded-[2px] border border-line">
+          {(Object.entries(V2) as [string, string][]).map(([name, addr]) => (
             <div
               key={name}
-              className="flex flex-col gap-2 border-b border-white/6 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-ink/6 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="num text-[11px] tracking-[0.14em] text-steel">{name}</span>
               <div className="flex min-w-0 items-center gap-3">
@@ -225,42 +232,74 @@ export function TransparencyScreen() {
           ))}
         </div>
         <p className="mt-3 text-sm text-dim">
-          Verification status is per contract, read from a generated manifest — a row shows
-          VERIFIED only where a verification run confirmed it. Anything not checked says so.
-        </p>
-        <p className="mt-3 text-sm text-dim">
-          EngineLite is wired to SimVenue + MockRouter. PerplVenue is deployed but not connected.
-          Recompute the reads yourself →{" "}
-          <a href="https://github.com/Lemma-Development-Labs/vessel/blob/main/docs/proof-of-hedge.md" className="text-purple">
-            the proof-of-hedge runsheet
-          </a>
+          Verification status is per contract, read from a generated manifest — a row shows VERIFIED only where a
+          verification run confirmed it. Anything not checked says so.
         </p>
       </section>
     </div>
   );
 }
 
+function Cell({ label, of, tone }: { label: string; of: Live<string>; tone?: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 bg-bg2 px-5 py-4">
+      <span className="num text-[10px] tracking-[0.16em] text-steel">{label}</span>
+      <span className={`num text-lg ${tone ?? ""}`}>
+        <Val of={of}>{(x) => x}</Val>
+      </span>
+    </div>
+  );
+}
+
+/** Junior cover B / (H + B) against the 20% floor and the 30% projected target. */
+function Cover({ b }: { b: BookState }) {
+  const pct = Math.min(100, Number(b.coverBps) / 100);
+  const tone = b.coverBps >= RULES.COVER_TARGET_BPS ? "bg-phosphor" : b.coverBps >= RULES.COVER_FLOOR_BPS ? "bg-amber" : "bg-red";
+  const empty = b.hullNav + b.ballastNav === 0n;
+  return (
+    <Card className="mt-4 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <SectionLabel>JUNIOR COVER — BALLAST ÷ (HULL + BALLAST)</SectionLabel>
+        <span className="num text-sm">{empty ? "no capital yet" : formatBps(b.coverBps)}</span>
+      </div>
+      <div className="relative mt-3 h-3 overflow-hidden rounded-full border border-line bg-bg">
+        {!empty ? <div className={`absolute inset-y-0 left-0 ${tone}`} style={{ width: `${pct}%` }} /> : null}
+        <div className="absolute inset-y-0 w-px bg-red/70" style={{ left: "20%" }} title="20% floor" />
+        <div className="absolute inset-y-0 w-px bg-white/60" style={{ left: "30%" }} title="30% projected target" />
+      </div>
+      <p className="num mt-2 text-[11px] text-steel">floor 20% · new Hull and Ballast exits must keep 30% projected cover</p>
+    </Card>
+  );
+}
+
+function Role({ name, addr, note }: { name: string; addr: string; note: string }) {
+  return (
+    <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm">{name}</p>
+        <p className="text-[12.5px] text-dim">{note}</p>
+      </div>
+      <AddressChip address={addr} href={`${EXPLORER}/address/${addr}`} />
+    </div>
+  );
+}
+
 /**
- * Per-contract verification status.
- *
- * Every row used to carry a VERIFIED badge unconditionally, when only DemoUSD's
- * Sourcify verification had ever been confirmed. The badge is now a read of
- * lib/verification.ts (generated by `pnpm verify:manifest`): the `kind` passed
- * to Badge is the manifest's own state, never a literal, so a contract can only
- * be badged verified by a verification run that wrote that state and its
- * timestamp. Everything else renders dim and says which it is.
+ * Per-contract verification status, read from lib/verification.ts (generated
+ * by `pnpm verify:manifest`). The `kind` passed to Badge is the manifest's own
+ * state, never a literal, so a contract is badged verified only by a run that
+ * wrote that state with its timestamp.
  */
 function VerificationMark({ name, address }: { name: string; address: string }) {
   const entry = verificationOf(name);
   const explorerHref = `${EXPLORER}/address/${address}`;
-
-  if (entry.state === "verified") {
+  if (entry.state === "verified" && entry.address.toLowerCase() === address.toLowerCase()) {
     return (
       <span className="flex min-w-0 items-center gap-2.5">
         <Badge kind={entry.state} />
         <a
           href={entry.url ?? explorerHref}
-          className="num text-[11px] text-purple"
+          className="num text-[11px] text-hull"
           title={entry.checkedAt ? `source verified, checked ${entry.checkedAt}` : "source verified"}
         >
           source ↗
@@ -268,133 +307,16 @@ function VerificationMark({ name, address }: { name: string; address: string }) 
       </span>
     );
   }
-
   const label = entry.state === "unverified" ? "unverified" : "not checked";
-  const why =
-    entry.state === "unverified"
-      ? "A verification run reported this contract as not verified."
-      : "We have not checked this contract's source verification. Check the explorer.";
-
   return (
     <span className="flex min-w-0 items-center gap-2.5">
-      <span className="num text-[11px] text-steel/60" title={why}>
+      <span className="num text-[11px] text-steel/60" title="We have not confirmed this contract's source verification.">
         {label}
       </span>
-      <a
-        href={explorerHref}
-        className="num text-[11px] text-purple"
-        title="Check verification status on the explorer"
-      >
+      <a href={explorerHref} className="num text-[11px] text-hull" title="Check verification status on the explorer">
         explorer ↗
       </a>
     </span>
   );
 }
 
-function HedgeRow({
-  label,
-  a,
-  b,
-  c,
-  phosphor,
-  amber,
-}: {
-  label: string;
-  a: React.ReactNode;
-  b: React.ReactNode;
-  c?: React.ReactNode;
-  phosphor?: boolean;
-  amber?: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-1 border-b border-white/6 bg-bg px-4 py-3 last:border-b-0 sm:grid-cols-[7rem_1fr_1fr_1fr] sm:items-center">
-      <span className="num text-[11px] tracking-[0.14em] text-steel">{label}</span>
-      <span className={`num text-[12.5px] ${phosphor ? "text-phosphor" : "text-ink"}`}>{a}</span>
-      <span className={`num text-[12.5px] ${amber ? "text-amber" : "text-[#B9C6D4]"}`}>{b}</span>
-      <span className="num text-[12.5px] text-[#B9C6D4]">{c}</span>
-    </div>
-  );
-}
-
-function WaterfallPlay({
-  ev,
-  animate,
-  hullRateLabel,
-}: {
-  ev: WaterfallEvent;
-  animate: boolean;
-  hullRateLabel: string | null;
-}) {
-  const negative = ev.gross < 0n;
-  const mag = ev.gross < 0n ? -ev.gross : ev.gross;
-  const hullShare = mag === 0n ? 0 : Number((ev.hullAccrual * 100n) / mag);
-
-  if (negative) {
-    // Width is the real Ballast share of the loss, not a fixed 62% bar.
-    const absorbed = ev.fromBallast + ev.fromReserve;
-    const balPct = absorbed === 0n ? 0 : Number((ev.fromBallast * 100n) / absorbed);
-    return (
-      <Card className="overflow-hidden p-4">
-        <div className={`h-8 rounded-md bg-red/20 ${animate ? "waterfall-gross" : ""}`}>
-          <span className="num px-3 text-[12px] leading-8 text-red">GROSS −{formatDusd4(mag)} dUSD</span>
-        </div>
-        <div className="mt-3 h-6 overflow-hidden rounded-md bg-brass/40">
-          <div className="h-full bg-brass" style={{ width: `${Math.max(2, balPct)}%` }} />
-        </div>
-        <p className="num mt-2 text-[11px] text-brass">
-          absorbed by Ballast {formatDusd4(ev.fromBallast)}
-          {ev.fromReserve > 0n ? ` · reserve ${formatDusd4(ev.fromReserve)}` : ""}
-        </p>
-        <Row ev={ev} />
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden p-4">
-      <div className={`relative h-9 overflow-hidden rounded-md bg-phosphor/20 ${animate ? "waterfall-gross" : ""}`}>
-        <span className="num px-3 text-[12px] leading-9">GROSS +{formatDusd4(mag)} dUSD</span>
-      </div>
-      <div className={`mt-2 flex justify-end ${animate ? "waterfall-fee" : ""}`}>
-        <span className="num rounded-md border border-white/10 bg-bg px-2 py-1 text-[11px] text-steel">
-          FEE {formatDusd4(ev.fee)} · RESERVE {formatDusd4(ev.toReserve)}
-        </span>
-      </div>
-      <div className="mt-3 h-7 overflow-hidden rounded-md bg-white/5">
-        <div
-          className={`h-full bg-steel/80 ${animate ? "waterfall-hull" : ""}`}
-          style={{ width: `${Math.max(2, hullShare)}%` }}
-        />
-      </div>
-      <p className="num mt-1 text-[11px] text-steel">
-        HULL ACCRUAL +{formatDusd4(ev.hullAccrual)}
-        {hullRateLabel ? ` (${hullRateLabel})` : ""}
-      </p>
-      <div className={`mt-2 h-7 rounded-md bg-brass/80 ${animate ? "waterfall-ballast" : ""}`}>
-        <span className="num px-3 text-[12px] leading-7 text-[#0A0A14]">
-          TO BALLAST +{formatDusd4(ev.toBallast)}
-        </span>
-      </div>
-      <Row ev={ev} />
-    </Card>
-  );
-}
-
-function Row({ ev }: { ev: WaterfallEvent }) {
-  return (
-    <div className="num mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-steel">
-      <span>{formatTs(ev.ts)}</span>
-      <span>G {formatDusd4(ev.gross < 0n ? -ev.gross : ev.gross)}</span>
-      <span>fee {formatDusd4(ev.fee)}</span>
-      <span>hull {formatDusd4(ev.hullAccrual)}</span>
-      <span>bal {formatDusd4(ev.toBallast > 0n ? ev.toBallast : ev.fromBallast)}</span>
-      {ev.txHash ? (
-        <a href={`${EXPLORER}/tx/${ev.txHash}`} className="text-purple">
-          {ev.blockNumber !== undefined ? `#${ev.blockNumber.toString()}` : "tx"} ↗
-        </a>
-      ) : null}
-    </div>
-  );
-}
-
-export { map2, mapLive };

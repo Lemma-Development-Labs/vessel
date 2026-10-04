@@ -133,7 +133,7 @@ function Report({ url, status, h }: { url: string; status: number; h: Health }) 
       </Card>
 
       <h2 className="display mt-8 text-lg">Keeper</h2>
-      <div className="mt-3 grid gap-px overflow-hidden rounded-2xl border border-line sm:grid-cols-2">
+      <div className="mt-3 grid gap-px overflow-hidden rounded-[2px] border border-line sm:grid-cols-2">
         <Row
           label="LAST CRANK"
           v={fmtAgo(h.protocol?.secondsSinceLastCrank)}
@@ -167,7 +167,7 @@ function Report({ url, status, h }: { url: string; status: number; h: Health }) 
       ) : null}
 
       <h2 className="display mt-8 text-lg">Indexer &amp; chain</h2>
-      <div className="mt-3 grid gap-px overflow-hidden rounded-2xl border border-line sm:grid-cols-2">
+      <div className="mt-3 grid gap-px overflow-hidden rounded-[2px] border border-line sm:grid-cols-2">
         <Row
           label="INDEXER LAG"
           v={h.indexer?.lagBlocks != null ? `${h.indexer.lagBlocks} blocks` : null}

@@ -7,7 +7,7 @@ export default function NotFound() {
       <h1 className="display mt-3 text-3xl font-bold">No such deck</h1>
       <p className="mt-3 text-sm text-dim">That route is not on this testnet app.</p>
       <p className="mt-8">
-        <Link href="/deposit" className="text-purple">
+        <Link href="/deposit" className="text-hull">
           Board a deck
         </Link>
       </p>

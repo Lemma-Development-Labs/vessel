@@ -1,0 +1,11 @@
+
+Done in 5.9s using pnpm v12.8.1
+ ✓ test/cre-halt.test.ts (2 tests) 49ms
+ ✓ test/reconcile.test.ts (3 tests) 11ms
+
+ Test Files  7 passed (7)
+      Tests  27 passed (27)
+   Start at  15:29:40
+   Duration  834ms (transform 2.14s, setup 0ms, collect 2.67s, tests 157ms, environment 1ms, prepare 510ms)
+
+exit=0

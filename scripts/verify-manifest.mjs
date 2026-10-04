@@ -46,6 +46,20 @@ if (!existsSync(addressesPath)) {
   process.exit(1);
 }
 const addresses = JSON.parse(readFileSync(addressesPath, "utf8"));
+// The v2 release manifest's contracts are verified and badged the same way. A name in
+// both files must name the same address (DemoUSD is shared), or the run stops.
+const v2Path = join(root, "deployments", "testnet-v2.json");
+if (existsSync(v2Path)) {
+  const v2 = JSON.parse(readFileSync(v2Path, "utf8")).contracts;
+  for (const [name, addr] of Object.entries(v2)) {
+    const have = addresses.contracts[name];
+    if (have && have.toLowerCase() !== addr.toLowerCase()) {
+      console.error(`${name} differs between ADDRESSES.json (${have}) and deployments/testnet-v2.json (${addr})`);
+      process.exit(1);
+    }
+    addresses.contracts[name] = addr;
+  }
+}
 const names = Object.keys(addresses.contracts).sort();
 
 let results = {};
@@ -87,7 +101,7 @@ for (const name of names) {
 
 for (const name of Object.keys(results)) {
   if (!names.includes(name)) {
-    console.error(`result for ${name}, which is not in ADDRESSES.json`);
+    console.error(`result for ${name}, which is not in ADDRESSES.json or the v2 release manifest`);
     process.exit(1);
   }
 }

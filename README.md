@@ -31,12 +31,13 @@ cannot call it. This is the step that silently blocks newcomers.
 ```bash
 git clone https://github.com/Lemma-Development-Labs/vessel && cd vessel
 forge test --root contracts          # 100 tests
-cd app && pnpm i && pnpm test        # 37 tests
+cd app && pnpm i && pnpm test        # 48 tests (2026-09-30)
 pnpm dev                             # http://localhost:3000
 ```
 
-`app/.env.example` lists every variable. The app defaults to the **mock**
-provider; set `NEXT_PUBLIC_USE_MOCK=0` for live chain reads. Check which one a
+`app/.env.example` lists every variable. The app serves **mock** fixture data
+only when `NEXT_PUBLIC_USE_MOCK=1` exactly (as `.env.example` sets it); unset
+or any other value means live chain reads. Check which one a
 deployment is serving with `curl <url>/health` — it reports `provider`.
 
 The landing site lives in a **separate** repo (`vessel-landing`). This repository is the protocol, the testnet app, and the keeper/stats service.
@@ -153,7 +154,7 @@ Rounding always favors protocol + senior: mint/burn floor, Hull accrual floor, f
 
 ## Live testnet (10143)
 
-Broadcast **2026-08-29**, `deployedBlock` **57874280**. Deployer `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`. Sourcify (`solc 0.8.24`, optimizer 200, via-ir).
+Current deployment: `deployedBlock` **57923009** (manifest: [`ADDRESSES.json`](./ADDRESSES.json)). Deployer `0xFfae50A3Ecc660fFF2B83e0B75F52c0A5F4E0F78` (read from the immutable `deployer()` on Tranches, BlitzVault and EngineLite). Sourcify (`solc 0.8.24`, optimizer 200, via-ir).
 
 Explorer: [MonadVision testnet](https://testnet.monadvision.com). RPC: `https://testnet-rpc.monad.xyz`.
 
@@ -161,39 +162,54 @@ Explorer: [MonadVision testnet](https://testnet.monadvision.com). RPC: `https://
 
 | Contract | Address | Explorer |
 | --- | --- | --- |
-| DemoUSD | `0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05` | [link](https://testnet.monadvision.com/address/0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05) |
-| Guardian | `0x150e153D5aB4683EC576bC1F68b7839D86751208` | [link](https://testnet.monadvision.com/address/0x150e153D5aB4683EC576bC1F68b7839D86751208) |
-| BlitzVault | `0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5` | [link](https://testnet.monadvision.com/address/0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5) |
-| Tranches | `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842` | [link](https://testnet.monadvision.com/address/0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842) |
-| Hull | `0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12` | [link](https://testnet.monadvision.com/address/0xC053Fc6968BAd0FB03094E002a4F4EC74a746f12) |
-| Ballast | `0x074207acEf2f60a6B1B86a885D2fF893927109A1` | [link](https://testnet.monadvision.com/address/0x074207acEf2f60a6B1B86a885D2fF893927109A1) |
-| SimVenue | `0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7` | [link](https://testnet.monadvision.com/address/0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7) |
-| PerplVenue (stub) | `0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21` | [link](https://testnet.monadvision.com/address/0xaf1C0BdEaF91273E18a80bF80afD8A5C6d497C21) |
-| EngineLite | `0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85` | [link](https://testnet.monadvision.com/address/0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85) |
-| MockWMON | `0x17141F36c4401C6184143250827713b26c3E964F` | [link](https://testnet.monadvision.com/address/0x17141F36c4401C6184143250827713b26c3E964F) |
-| MockRouter | `0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C` | [link](https://testnet.monadvision.com/address/0x23389cA2fbf11f9D0159EF2F80A963E710c5F97C) |
+| DemoUSD | `0x959E54DcF8576856F7A9424190a9751c68739495` | [link](https://testnet.monadvision.com/address/0x959E54DcF8576856F7A9424190a9751c68739495) |
+| Guardian | `0x75Bf4C326f054e655C7C138cD847154fEB3bAC19` | [link](https://testnet.monadvision.com/address/0x75Bf4C326f054e655C7C138cD847154fEB3bAC19) |
+| BlitzVault | `0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d` | [link](https://testnet.monadvision.com/address/0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d) |
+| Tranches | `0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373` | [link](https://testnet.monadvision.com/address/0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373) |
+| Hull | `0x9638da84aA4b30fB9350bb2cA33DCf0b81Ab3Bd2` | [link](https://testnet.monadvision.com/address/0x9638da84aA4b30fB9350bb2cA33DCf0b81Ab3Bd2) |
+| Ballast | `0xCD694B5C79D12708F11FB1adF1594e8e71de650D` | [link](https://testnet.monadvision.com/address/0xCD694B5C79D12708F11FB1adF1594e8e71de650D) |
+| SimVenue | `0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d` | [link](https://testnet.monadvision.com/address/0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d) |
+| PerplVenue (stub) | `0x59fc4C09eF7Dc0b754B74d7AEe21EeAC1c94aD6C` | [link](https://testnet.monadvision.com/address/0x59fc4C09eF7Dc0b754B74d7AEe21EeAC1c94aD6C) |
+| EngineLite | `0x60eC904955CA843285B24E3F6e7e2034F8f96140` | [link](https://testnet.monadvision.com/address/0x60eC904955CA843285B24E3F6e7e2034F8f96140) |
+| MockWMON | `0xEf6Cc6228A39cF8433754dcBe863275AC6Dc5DB5` | [link](https://testnet.monadvision.com/address/0xEf6Cc6228A39cF8433754dcBe863275AC6Dc5DB5) |
+| MockRouter | `0x68A1Ad5FB46c3Eb804F3375Cba702d806E1890B6` | [link](https://testnet.monadvision.com/address/0x68A1Ad5FB46c3Eb804F3375Cba702d806E1890B6) |
 
-All eleven are **Sourcify-verified `exact_match`** on chain 10143, checked
-2026-08-29 — the app reads that state per contract from a generated manifest
-(`app/lib/verification.ts`) rather than asserting it.
-
-Deployed at block **57918591**.
+All eleven are **Sourcify-verified `exact_match`** on chain 10143 (verified
+2026-08-29, re-checked 2026-09-30 against the Sourcify API) — the app reads that
+state per contract from a generated manifest (`app/lib/verification.ts`) rather
+than asserting it. Code, wiring and roles re-read at finalized block 66,956,024
+on 2026-09-30: [docs/FACT_CHECKS.md](./docs/FACT_CHECKS.md).
 
 ### Roles (addresses, never keys)
 
 | Role | Address | Notes |
 | --- | --- | --- |
-| Protocol owner | [`0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738`](https://testnet.monadvision.com/address/0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738) | **2-of-3 Safe** (v1.4.1). Holds `Guardian.owner`, `Tranches.treasury`, `SimVenue.owner`. See the honesty note below. |
-| Deployer | `0x830C52EAda6fcE4D72Ca24F25D84d163aDCf581e` | Throwaway. Every power it had (`setEngine`, `setTranches`, `seedDeadShares`, `wire`) is single-use and already spent. |
-| Seeder | `0x94555bff001A4Eea5B488f3591df039Be5373e46` | Seeded the SimVenue funding pot. |
-| Keeper (gas only) | `0x60A7cF428BD62B127F5f2BA84301e6251C92964C` | Calls `crank()`, which is permissionless. Holds no dUSD and no approvals. |
+| Protocol owner | [`0xe4f24B16CFF9171f555E4643262991023b5C0279`](https://testnet.monadvision.com/address/0xe4f24B16CFF9171f555E4643262991023b5C0279) | **2-of-3 Safe** (v1.4.1), owners `0x56d7…2085`, `0x8d02…211d`, `0xbFFA…130C`. Holds `Guardian.owner`, `Tranches.treasury`, `SimVenue.owner`. |
+| Deployer | `0xFfae50A3Ecc660fFF2B83e0B75F52c0A5F4E0F78` | Its powers (`setEngine`, `setTranches`, `seedDeadShares`, `wire`) are single-use. |
+| Keeper (gas only) | `0x2A3fE0AD525d954D43C59E3Ee2907f9D2C17de65` | As reported by the service's `/health`. Calls `crank()`, which is permissionless. |
+| Seeder | `0x138114870DF3FB683862bd31b4b185aF4e979b8E` | Seeded the SimVenue funding pot: 100 dUSD, block 57,923,138. |
 
-> **On the Safe, honestly.** All three signer keys were generated on one machine,
-> so today it gives you a 1-of-1 with a multisig's shape — not the security
-> property "2-of-3" usually implies. It was still worth setting at deploy time:
-> `Tranches.treasury` and `SimVenue.owner` are `immutable`, so pointing them at a
-> Safe means the signers can be replaced later with one Safe transaction, while
-> pointing them at an EOA would have meant redeploying the whole protocol again.
+> **On the Safe, honestly.** Whether this Safe's three signer keys are
+> independently controlled is **not evidenced** anywhere in this repository (the
+> previous Safe's keys were all generated on one machine). Until it is, treat it
+> as a multisig's shape, not the security property "2-of-3" usually implies. It
+> was still worth setting at deploy time: `Tranches.treasury` and
+> `SimVenue.owner` are `immutable`, so the signers can be replaced later with
+> one Safe transaction instead of a protocol redeploy.
+
+### Superseded — Safe-owned deployment of 2026-08-29
+
+Replaced by the deployment above (repo commit `0bb7a17`); the repository does
+not record why. Still on chain, not paused, deck empty. Do not use.
+
+| Contract | Superseded address |
+| --- | --- |
+| DemoUSD | `0x66B5A41466b1Ab2dE34Bf3834b26F99bA4f52e05` |
+| Guardian | `0x150e153D5aB4683EC576bC1F68b7839D86751208` |
+| BlitzVault | `0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5` |
+| Tranches | `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842` |
+| EngineLite | `0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85` |
+| Owner / deployer | Safe `0x85Fe6D9399EA584Ba5344b8d21e27137adbB5738` / EOA `0x830C52EAda6fcE4D72Ca24F25D84d163aDCf581e` |
 
 ### Deprecated — compromised deployer key
 
@@ -247,7 +263,7 @@ More: [docs/ADDRESSES.md](./docs/ADDRESSES.md) · [FACTS.md](./FACTS.md) · [doc
 | **OpenZeppelin** | ERC-20, ERC-4626, Ownable, ReentrancyGuard, SafeERC20. |
 | **Sourcify** | `https://sourcify-api-monad.blockvision.org/` — verified bytecode ↔ this repo. |
 | **Next.js 16 / React 19 / Tailwind 4** | `app/` — Deposit, Portfolio, Transparency. |
-| **wagmi + viem** | Wallet + reads/writes when `NEXT_PUBLIC_USE_MOCK=0`. |
+| **wagmi + viem** | Wallet and SIWE sign-in in every mode; chain reads/writes unless `NEXT_PUBLIC_USE_MOCK=1`. |
 | **TanStack Query** | Polling deck stats, engine, waterfall. |
 | **Fastify + viem** | `vessel-service/` — permissionless crank loop, Waterfall indexer, GET `/stats` `/waterfall` `/health`. |
 | **GitHub Actions** | fmt, 25k fuzz, gas snapshot ±10%, sizes, coverage ≥95%, slither `--fail-none`, app build, secrets scan. |
@@ -290,7 +306,7 @@ cd vessel-service && pnpm install && cd ..
 | File | Vars |
 | --- | --- |
 | `contracts/.env` | `MONAD_TESTNET_RPC` · `MONAD_MAINNET_RPC` · `DEPLOYER_PK` · `SEEDER_PK` (**must ≠** deployer) |
-| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` stage (no wallet). `=0` against chain. RPC CSV + fallback. Chain 10143 or Anvil 31337. Optional `NEXT_PUBLIC_STATS_URL`. |
+| `app/.env.local` | copy `app/.env.example`. `NEXT_PUBLIC_USE_MOCK=1` stages fixture data; anything else reads the chain. RPC CSV + fallback. Chain 10143 or Anvil 31337. Optional `NEXT_PUBLIC_STATS_URL`. |
 | `.env` | `RPC_URL` · `KEEPER_PK` (gas only, ≠ deployer) · `E2E_PK` (burner, ≠ both) · `CRANK_INTERVAL_SEC=300` · `DEPLOYER_PK` (SetRate / e2e only) |
 
 ```bash
@@ -364,9 +380,9 @@ Stage UI without a wallet: `NEXT_PUBLIC_USE_MOCK=1` (default in `.env.example`).
 
 ```bash
 export RPC=https://testnet-rpc.monad.xyz
-export TRANCHES=0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842
-export VAULT=0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5
-export ENGINE=0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85
+export TRANCHES=0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373
+export VAULT=0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d
+export ENGINE=0x60eC904955CA843285B24E3F6e7e2034F8f96140
 cast call $TRANCHES "deckStats()" --rpc-url $RPC
 cast call $VAULT "totalAssets()(uint256)" --rpc-url $RPC
 cast call $ENGINE "netDeltaBps()(int256)" --rpc-url $RPC
@@ -435,7 +451,7 @@ Testnet UI: [testnet.vessel.wtf](https://testnet.vessel.wtf).
 | `/demo` | Stage states |
 | `/health` | Liveness |
 
-`NEXT_PUBLIC_USE_MOCK=1` — `MockVesselProvider` (1.8s fake txs). `=0` — `ChainVesselProvider` (wagmi). Production build uses `app/.env.production` (`USE_MOCK=0`, chain 10143).
+`NEXT_PUBLIC_USE_MOCK=1` — `MockVesselProvider` (1.8s fake txs). Otherwise — `ChainVesselProvider` (wagmi). Production build uses `app/.env.production` (`USE_MOCK=0`, chain 10143).
 
 Stats: if `NEXT_PUBLIC_STATS_URL` is set, the app prefers `GET /waterfall` then falls back to `getLogs` from `deployedBlock`.
 
@@ -486,7 +502,7 @@ Bad-day (Ballast takes the hit):
 
 ```bash
 cd contracts
-SIM_VENUE=0xAbE34e4919e7Ffd5C87D5B62d35f7E7Bb4e50FD7 RATE_BPS=-1200 \
+SIM_VENUE=0xD8730205Ab716Bc2FcA2FfF653e1390DFC4Fe85d RATE_BPS=-1200 \
   forge script script/SetRate.s.sol --rpc-url https://testnet-rpc.monad.xyz --broadcast --private-key $DEPLOYER_PK
 # then one crank
 ```

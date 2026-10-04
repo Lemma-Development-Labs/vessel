@@ -35,8 +35,8 @@ function parseAddresses(raw: string, source: string): VesselAddresses {
   if (!parsed || typeof parsed !== "object") {
     throw new Error(`${source} must be an object`);
   }
-  const obj = parsed as Record<string, unknown>;
-  const contractsRaw = obj.contracts;
+  const fields = parsed as Record<string, unknown>;
+  const contractsRaw = fields.contracts;
   if (!contractsRaw || typeof contractsRaw !== "object") {
     throw new Error(`${source} missing contracts`);
   }
@@ -49,14 +49,14 @@ function parseAddresses(raw: string, source: string): VesselAddresses {
   }
 
   const deployed =
-    typeof obj.deployedBlock === "number" || typeof obj.deployedBlock === "string"
-      ? BigInt(obj.deployedBlock)
+    typeof fields.deployedBlock === "number" || typeof fields.deployedBlock === "string"
+      ? BigInt(fields.deployedBlock)
       : 0n;
 
   const out: VesselAddresses = {
-    chainId: typeof obj.chainId === "number" ? obj.chainId : getChainId(),
+    chainId: typeof fields.chainId === "number" ? fields.chainId : getChainId(),
     deployedBlock: deployed < 0n ? 0n : deployed,
-    venue: asVenue(obj.venue),
+    venue: asVenue(fields.venue),
     contracts: {
       EngineLite: contracts.EngineLite,
       Tranches: contracts.Tranches,
@@ -99,7 +99,7 @@ export function getPort(): number {
 }
 
 /** Bounded integer env parse. Falls back to `def` on missing/garbage input. */
-function envInt(name: string, def: number, min: number, max: number): number {
+export function envInt(name: string, def: number, min: number, max: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return def;
   const n = Number(raw);
@@ -207,9 +207,10 @@ export function getKeeperPk(): Hex | undefined {
  * ADDRESSES_JSON env (full ADDRESSES.json blob) or ../ADDRESSES.json
  * relative to process.cwd() (vessel-service/ → repo root).
  */
-export function loadAddresses(): VesselAddresses {
+/** The raw manifest text and where it came from: ADDRESSES_JSON, else ../ADDRESSES.json. */
+export function readManifestSource(): { raw: string; source: string } {
   const blob = process.env.ADDRESSES_JSON?.trim();
-  if (blob) return parseAddresses(blob, "ADDRESSES_JSON");
+  if (blob) return { raw: blob, source: "ADDRESSES_JSON" };
 
   const file = resolve(process.cwd(), "..", "ADDRESSES.json");
   if (!existsSync(file)) {
@@ -217,7 +218,12 @@ export function loadAddresses(): VesselAddresses {
       `ADDRESSES.json not found at ${file} and ADDRESSES_JSON is unset`,
     );
   }
-  return parseAddresses(readFileSync(file, "utf8"), file);
+  return { raw: readFileSync(file, "utf8"), source: file };
+}
+
+export function loadAddresses(): VesselAddresses {
+  const { raw, source } = readManifestSource();
+  return parseAddresses(raw, source);
 }
 
 export function vesselChain(rpcUrl: string, chainId: number): Chain {

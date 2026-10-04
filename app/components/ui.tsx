@@ -1,8 +1,8 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
 
-type Variant = "primary" | "ghost" | "danger";
+type Variant = "primary" | "ghost" | "mint" | "danger";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -10,11 +10,14 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   tooltip?: string;
 };
 
+// The landing page's buttons: solid bone that turns signal on hover, and a hairline outline.
 const variants: Record<Variant, string> = {
   primary:
-    "border-none bg-purple text-[#0A0A14] hover:bg-[#957FFF] disabled:hover:bg-purple",
+    "border-none bg-ink text-bg hover:bg-ballast hover:text-white hover:shadow-[0_0_40px_rgba(255,91,41,0.45)] disabled:hover:bg-ink disabled:hover:text-bg disabled:hover:shadow-none",
   ghost:
-    "bg-transparent border border-white/20 text-ink hover:border-ink hover:bg-white/[0.04]",
+    "bg-transparent border border-ink/20 text-ink hover:border-ink hover:bg-ink/[0.06]",
+  // "Board the testnet": mint outline that fills on hover.
+  mint: "bg-transparent border border-hull text-hull hover:bg-hull hover:text-bg hover:shadow-[0_0_34px_rgba(107,242,192,0.45)]",
   danger: "bg-transparent border border-red/50 text-red hover:bg-red/10",
 };
 
@@ -28,12 +31,14 @@ export function Button({
   ...rest
 }: Props) {
   const isDisabled = disabled || loading;
+  const tipId = useId();
+  const showTip = Boolean(tooltip && isDisabled);
   const btn = (
     <button
       type="button"
       disabled={isDisabled}
-      title={tooltip}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
+      aria-describedby={showTip ? tipId : undefined}
+      className={`num inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] px-5 py-3 text-[12px] font-medium uppercase tracking-[0.14em] transition-[background-color,color,box-shadow] duration-300 disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
       {...rest}
     >
       {loading ? (
@@ -46,11 +51,16 @@ export function Button({
       )}
     </button>
   );
-  if (tooltip && isDisabled) {
+  if (showTip) {
     return (
-      <span className="group relative inline-flex w-full" title={tooltip}>
+      // Our own tooltip only: a native `title` here showed a second, browser-styled copy on top.
+      <span className={`group relative inline-flex ${className.includes("w-full") ? "w-full" : ""}`}>
         {btn}
-        <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block">
+        <span
+          id={tipId}
+          role="tooltip"
+          className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[2px] border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block"
+        >
           {tooltip}
         </span>
       </span>
@@ -66,19 +76,16 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
-  accent?: "steel" | "brass" | "line";
+  accent?: "hull" | "ballast" | "line";
 }) {
-  const ring =
-    accent === "steel"
-      ? "border-steel/30"
-      : accent === "brass"
-        ? "border-brass/30"
-        : "border-line";
-  return (
-    <div className={`rounded-[var(--radius-card)] border bg-bg2 ${ring} ${className}`}>
-      {children}
-    </div>
-  );
+  // Ballast gets the landing's warm junior panel; Hull a mint edge; everything else a hairline.
+  const skin =
+    accent === "hull"
+      ? "border-hull/30 bg-bg2"
+      : accent === "ballast"
+        ? "border-ballast/30 bg-[linear-gradient(180deg,rgba(255,91,41,0.10),rgba(255,91,41,0.02))]"
+        : "border-line bg-bg2";
+  return <div className={`rounded-[var(--radius-card)] border ${skin} ${className}`}>{children}</div>;
 }
 
 export function StatBlock({
@@ -90,22 +97,20 @@ export function StatBlock({
   label: string;
   value: string;
   delta?: string;
-  tone?: "ink" | "phosphor" | "brass" | "red" | "steel";
+  tone?: "ink" | "phosphor" | "ballast" | "hull" | "red" | "steel";
 }) {
-  const color =
-    tone === "phosphor"
-      ? "text-phosphor"
-      : tone === "brass"
-        ? "text-brass"
-        : tone === "red"
-          ? "text-red"
-          : tone === "steel"
-            ? "text-steel"
-            : "text-ink";
+  const color = {
+    ink: "text-ink",
+    phosphor: "text-phosphor",
+    ballast: "text-ballast",
+    hull: "text-hull",
+    red: "text-red",
+    steel: "text-steel",
+  }[tone];
   return (
-    <div className="flex min-w-[120px] flex-col gap-1.5 bg-bg2 px-5 py-4 sm:min-w-[150px]">
-      <span className="num text-[10px] uppercase tracking-[0.16em] text-steel">{label}</span>
-      <span className={`num text-lg ${color}`}>{value}</span>
+    <div className="flex min-w-[120px] flex-col gap-2 bg-bg2 px-5 py-4 sm:min-w-[150px]">
+      <span className="num text-[9.5px] uppercase tracking-[0.2em] text-steel">{label}</span>
+      <span className={`num text-xl ${color}`}>{value}</span>
       {delta ? <span className="num text-[11px] text-phosphor">{delta}</span> : null}
     </div>
   );
@@ -129,21 +134,21 @@ export function Badge({
 }) {
   if (kind === "testnet") {
     return (
-      <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-brass/35 px-2.5 py-1 text-[10.5px] tracking-[0.14em] text-brass">
-        <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-brass" />
+      <span className="num inline-flex items-center gap-1.5 rounded-[2px] border border-amber/40 px-2.5 py-1 text-[10.5px] tracking-[0.14em] text-amber">
+        <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-amber" />
         TESTNET
       </span>
     );
   }
   if (kind === "sim") {
     return (
-      <span className="num inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
+      <span className="num inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
         {compact ? (
           "SIM"
         ) : (
           <>
             <span className="sm:hidden">SIM</span>
-            <span className="hidden sm:inline">SIM VENUE — Perpl next</span>
+            <span className="hidden sm:inline">SIMULATED ENGINE</span>
           </>
         )}
       </span>
@@ -151,7 +156,7 @@ export function Badge({
   }
   if (kind === "hedged") {
     return (
-      <span className="num inline-flex items-center gap-1.5 rounded-[7px] border border-phosphor/40 px-2 py-1 text-[10.5px] tracking-[0.12em] text-phosphor sm:px-2.5">
+      <span className="num inline-flex items-center gap-1.5 rounded-[2px] border border-phosphor/40 px-2 py-1 text-[10.5px] tracking-[0.12em] text-phosphor sm:px-2.5">
         <span className="h-1.5 w-1.5 rounded-full bg-phosphor" />
         <span className="sm:hidden">HEDGED</span>
         <span className="hidden sm:inline">
@@ -184,12 +189,12 @@ export function AddressChip({
     }
   }
   return (
-    <span className="num inline-flex items-center gap-1.5 rounded-lg border border-white/14 px-3 py-1.5 text-[11.5px] text-[#B9C6D4]">
+    <span className="num inline-flex items-center gap-1.5 rounded-[2px] border border-ink/15 px-3 py-1.5 text-[11.5px] text-dim">
       <button type="button" onClick={() => void copy()} className="hover:text-ink">
         {short}
       </button>
       {href ? (
-        <a href={href} target="_blank" rel="noreferrer" className="text-purple" aria-label="Open in explorer">
+        <a href={href} target="_blank" rel="noreferrer" className="text-hull" aria-label="Open in explorer">
           ↗
         </a>
       ) : null}
@@ -205,7 +210,7 @@ export function Tooltip({ content, children }: { content: string; children: Reac
   return (
     <span className="group relative inline-flex">
       {children}
-      <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-dim group-hover:block group-focus-within:block">
+      <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[2px] border border-line bg-panel px-3 py-2 text-xs text-dim group-hover:block group-focus-within:block">
         {content}
       </span>
     </span>
@@ -303,7 +308,7 @@ export function Gauge({
     : `${pct.toFixed(2)}% — rebalance pending`;
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative h-[74px] w-full overflow-hidden rounded-xl border border-white/8 bg-bg">
+      <div className="relative h-[74px] w-full overflow-hidden rounded-[2px] border border-ink/8 bg-bg">
         <div
           className="absolute inset-y-0"
           style={{
@@ -314,8 +319,8 @@ export function Gauge({
             borderRight: "1px solid rgba(53,214,153,0.18)",
           }}
         />
-        <div className="absolute inset-x-0 top-1/2 h-px bg-white/14" />
-        <div className="absolute inset-y-3 left-1/2 w-px bg-white/35" />
+        <div className="absolute inset-x-0 top-1/2 h-px bg-ink/15" />
+        <div className="absolute inset-y-3 left-1/2 w-px bg-ink/35" />
         <div
           className={`gauge-needle absolute top-2 bottom-2 w-0.5 ${freeze ? "" : "transition-[left] duration-[2000ms] ease-in-out"}`}
           style={{ left: `${pos}%`, background: color }}

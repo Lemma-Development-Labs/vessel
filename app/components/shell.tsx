@@ -3,38 +3,59 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { useVessel } from "@/lib/context";
-import { COPY } from "@/lib/provider";
+import { useBook } from "@/lib/book/context";
+import { COPY } from "@/lib/copy";
+import { PAUSE } from "@/lib/book/types";
+import { V2 } from "@/lib/book/release";
 import { USE_MOCK } from "@/lib/providers";
 import { formatBlock, shorten } from "@/lib/format";
-import { ADDRESSES } from "@/lib/addresses";
 import { AddressChip, Badge } from "@/components/ui";
 import { Val } from "@/components/live";
+import { mapLive } from "@/lib/live";
 import { ConnectButton } from "@/components/connect";
+import { useSession } from "@/lib/auth";
+import { networkBanner } from "@/lib/banner";
+import { TARGET_CHAIN_ID } from "@/lib/wagmi";
 
 function Wordmark() {
   return (
-    <Link href="/deposit" className="flex min-w-0 items-center gap-2 text-ink sm:gap-2.5">
-      <svg width="18" height="18" viewBox="0 0 32 32" fill="none" aria-hidden>
-        <circle cx="16" cy="16" r="12" stroke="#8FA6BC" strokeWidth="2.5" />
-        <line x1="6" y1="16" x2="26" y2="16" stroke="#EAEEF3" strokeWidth="2.5" />
+    <Link href="/deposit" className="flex shrink-0 items-center gap-3 text-ink hover:text-ink">
+      {/* The Vessel mark: hull circle, waterline, and the plumb in signal. Same paths as vessel.wtf. */}
+      <svg width="24" height="24" viewBox="0 0 40 40" fill="none" aria-hidden className="shrink-0">
+        <circle cx="20" cy="20" r="14.4" stroke="#F4F1EA" strokeWidth="2.6" />
+        <path d="M3 20H37" stroke="#F4F1EA" strokeWidth="2.6" />
+        <path d="M20 20V34.4" stroke="#FF5B29" strokeWidth="2.6" />
       </svg>
-      <span className="display text-[14px] font-bold tracking-[0.16em] sm:text-[15px] sm:tracking-[0.22em]">
-        VESSEL
-      </span>
+      <span className="num text-[14px] font-semibold tracking-[0.26em] sm:text-[15px]">VESSEL</span>
     </Link>
   );
 }
 
 const NAV = [
-  { href: "/deposit", label: "Deposit" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/transparency", label: "Transparency" },
+  { href: "/deposit", label: "Deposit", short: "Deposit", mobile: true },
+  { href: "/portfolio", label: "Portfolio", short: "Portfolio", mobile: true },
+  { href: "/withdraw", label: "Withdraw", short: "Withdraw", mobile: true },
+  { href: "/series", label: "Series", short: "Series", mobile: true },
+  { href: "/transparency", label: "Transparency", short: "Proof", mobile: true },
+  { href: "/terminal", label: "Terminal", short: "Terminal", mobile: false },
+  { href: "/onboarding", label: "Onboarding", short: "Onboarding", mobile: false },
 ] as const;
 
+const PAUSE_NAMES: [number, string][] = [
+  [PAUSE.ADMISSION, "deposits"],
+  [PAUSE.RISK_INCREASE, "deployment"],
+  [PAUSE.SETTLEMENT, "settlement"],
+  [PAUSE.CLAIMS, "claims"],
+];
+
+const BANNER = networkBanner(TARGET_CHAIN_ID, process.env.NEXT_PUBLIC_REVIEW_STATUS);
+
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const v = useVessel();
+  const v = useBook();
   const path = usePathname();
+  const book = v.book.status === "ok" ? v.book.value : null;
+  const engine = v.engine.status === "ok" ? v.engine.value : null;
+  const paused = book ? PAUSE_NAMES.filter(([bit]) => book.pausedMask & bit).map(([, n]) => n) : [];
   const { toasts, dismissToast } = v;
 
   useEffect(() => {
@@ -48,138 +69,133 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-50 border-b border-white/8 bg-[rgba(7,11,16,0.88)] backdrop-blur-[14px]">
-        <div className="mx-auto flex h-[56px] max-w-[1280px] items-center gap-3 px-4 sm:h-[60px] sm:gap-6 sm:px-5 md:px-7">
+      <div
+        role="note"
+        className={`num border-b px-4 py-2 text-center text-[10.5px] uppercase leading-snug tracking-[0.2em] sm:px-5 md:px-7 ${
+          BANNER.tone === "mainnet" ? "border-red/40 bg-red/10 text-red" : "border-ink/8 bg-bg/90 text-amber"
+        }`}
+      >
+        <span data-testid="network-banner" className="font-medium">{BANNER.text}</span>
+        <span className="hidden text-steel sm:inline">
+          {engine === null || engine.simulated ? " · strategy engine simulated" : ""}
+        </span>
+        {v.reconnecting ? (
+          <span className="ml-3 text-steel">reconnecting…</span>
+        ) : (
+          <span className="ml-3 hidden text-steel sm:inline">
+            block{" "}
+            <Val of={mapLive(v.clock, (c) => c.number)}>{(b) => formatBlock(b)}</Val>
+            {v.isMock ? " · mock" : ""}
+          </span>
+        )}
+      </div>
+
+      <header className="sticky top-0 z-50 border-b border-ink/8 bg-[rgba(5,7,10,0.72)] backdrop-blur-[18px]">
+        <div className="mx-auto flex h-[60px] max-w-[1320px] items-center gap-3 px-4 sm:h-[70px] sm:gap-8 sm:px-5 md:px-[30px]">
           <Wordmark />
-          <nav className="hidden h-full items-stretch gap-1 sm:flex" aria-label="Primary">
+          <nav className="num hidden h-full items-stretch gap-1 text-[11.5px] uppercase tracking-[0.16em] lg:flex" aria-label="Primary">
             {NAV.map((n) => {
               const on = path === n.href || (n.href === "/deposit" && path === "/");
               return (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className={`relative px-4 text-sm font-medium ${on ? "text-ink" : "text-steel hover:text-ink"}`}
+                  className={`relative whitespace-nowrap px-3 ${n.href === "/onboarding" ? "hidden 2xl:block" : n.href === "/terminal" ? "hidden lg:block" : ""} ${on ? "text-ink" : "text-steel hover:text-hull"}`}
                 >
                   <span className="flex h-full items-center">{n.label}</span>
-                  {on ? <span className="absolute inset-x-3 bottom-0 h-0.5 bg-ink" /> : null}
+                  {on ? <span className="absolute inset-x-3 bottom-0 h-px bg-ink" /> : null}
                 </Link>
               );
             })}
           </nav>
-          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
             <a
               href="https://docs.vessel.wtf"
               target="_blank"
               rel="noreferrer"
-              className="hidden text-sm text-steel hover:text-purple sm:inline"
+              className="num hidden text-[11.5px] uppercase tracking-[0.16em] text-steel hover:text-hull xl:inline"
             >
-              Docs↗
+              Docs ↗
             </a>
-            {v.engine.simulated.status === "ok" && !v.engine.simulated.value ? (
-              <Badge
-                kind="hedged"
-                venue={v.engine.venueName.status === "ok" ? v.engine.venueName.value : undefined}
-              />
-            ) : (
-              <Badge kind="sim" />
-            )}
+            {/* Only a read of simulated=false earns the hedged chip; unread, unwired or simulated is SIM. */}
+            {engine && !engine.simulated ? <Badge kind="hedged" /> : <Badge kind="sim" />}
             <NetworkPill />
+            <SessionChip />
             {v.connected ? (
               <button
                 type="button"
                 onClick={() => void v.disconnect()}
-                className="num min-h-11 max-w-[9.5rem] truncate rounded-lg border border-white/14 px-3 py-1.5 text-[11.5px] text-[#B9C6D4] sm:max-w-none"
+                className="num min-h-11 max-w-[9.5rem] truncate rounded-[2px] border border-ink/15 px-3 py-1.5 text-[11.5px] text-dim sm:max-w-none"
               >
                 {v.address ? shorten(v.address) : "connected"}
               </button>
             ) : (
-              <ConnectButton className="min-h-11 px-3 py-1.5 text-sm" />
+              <ConnectButton />
             )}
           </div>
         </div>
       </header>
 
-      <div className="border-b border-amber/25 bg-amber/10 px-4 py-2 text-center text-xs leading-snug text-amber sm:px-5 md:px-7">
-        {COPY.banner}
-        <span className="hidden sm:inline">
-          {v.engine.simulated.status === "ok" && v.engine.simulated.value
-            ? " Sim badge visible when SimVenue is active."
-            : ""}
-        </span>
-        {v.reconnecting ? (
-          <span className="ml-2 text-steel">reconnecting…</span>
-        ) : (
-          <span className="num ml-2 hidden text-steel sm:inline">
-            block{" "}
-            <Val of={v.engine.lastBlock}>{(b) => formatBlock(b)}</Val>
-            {v.isMock ? " · mock" : ""}
-          </span>
-        )}
-      </div>
-
       {v.wrongNetwork ? (
-        <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between gap-3 px-4 py-3 sm:px-5 md:px-7">
+        <div className="mx-auto flex w-full max-w-[1320px] items-center justify-between gap-3 px-4 py-3 sm:px-5 md:px-7">
           <p className="text-sm text-amber">Wrong network — switch</p>
           <button
             type="button"
             onClick={() => void v.switchNetwork()}
-            className="min-h-11 rounded-[10px] border border-amber px-3 py-1.5 text-xs text-amber"
+            className="min-h-11 rounded-[2px] border border-amber px-3 py-1.5 text-xs text-amber"
           >
             Switch
           </button>
         </div>
       ) : null}
 
-      {v.impaired ? (
+      {book?.impaired ? (
         <div role="alert" className="border-b border-red/40 bg-red/10 px-4 py-3 text-center text-sm text-red sm:px-5">
           {COPY.impair}
         </div>
       ) : null}
 
-      {/* v.paused is a Live<boolean>. Testing the OBJECT is always truthy, which
-          showed "Guardian pause is on" on every screen while the chain said
-          paused=false — a fabricated claim of exactly the kind Rule 0 exists to
-          stop. Only assert the pause when we actually read it as true. */}
-      {v.paused.status === "ok" && v.paused.value ? (
+      {/* Only assert a pause we actually read; an unread mask asserts nothing. */}
+      {paused.length ? (
         <div className="border-b border-amber/30 bg-amber/5 px-4 py-2 text-center text-sm text-amber sm:px-5">
-          Guardian pause is on. Views still work; mutative paths are frozen.
+          Guardian pause is on for {paused.join(", ")}. Views still work.
         </div>
       ) : null}
 
       <main className="mx-auto w-full flex-1">{children}</main>
 
-      <footer className="mt-12 border-t border-white/8 px-4 py-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-xs text-steel sm:mt-16 sm:px-5 sm:pb-8 md:px-7">
-        <div className="mx-auto flex max-w-[1280px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-4">
-            <Link href="/transparency#contracts" className="hover:text-purple">
+      <footer className="mt-12 border-t border-ink/8 px-4 py-8 pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-xs text-steel sm:mt-16 sm:px-5 lg:pb-8 md:px-[30px]">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="num flex flex-wrap gap-6 text-[10.5px] uppercase tracking-[0.18em]">
+            <Link href="/transparency#contracts" className="hover:text-hull">
               Contracts
             </Link>
-            <a href="https://github.com/Lemma-Development-Labs/vessel" className="hover:text-purple">
+            <a href="https://github.com/Lemma-Development-Labs/vessel" className="hover:text-hull">
               GitHub
             </a>
-            <a href="https://docs.vessel.wtf" className="hover:text-purple">
+            <a href="https://docs.vessel.wtf" className="hover:text-hull">
               Docs
             </a>
           </div>
-          <AddressChip address={ADDRESSES.EngineLite} href={`https://testnet.monadvision.com/address/${ADDRESSES.EngineLite}`} />
+          <AddressChip address={V2.TrancheController} href={`https://testnet.monadvision.com/address/${V2.TrancheController}`} />
         </div>
-        <p className="mx-auto mt-4 max-w-[1280px] text-[11px] tracking-wide">{COPY.legal}</p>
+        <p className="mx-auto mt-5 max-w-[1320px] text-[11px] text-[#4E5762]">{COPY.legal}</p>
       </footer>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/8 bg-[rgba(7,11,16,0.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] sm:hidden"
+        className="num fixed inset-x-0 bottom-0 z-50 border-t border-ink/8 bg-[rgba(5,7,10,0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[18px] lg:hidden"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-3">
-          {NAV.map((n) => {
+        <div className="grid grid-cols-5">
+          {NAV.filter((n) => n.mobile).map((n) => {
             const on = path === n.href || (n.href === "/deposit" && path === "/");
             return (
               <Link
                 key={n.href}
                 href={n.href}
-                className={`flex min-h-12 items-center justify-center text-xs ${on ? "text-ink" : "text-steel"}`}
+                className={`flex min-h-12 items-center justify-center text-[10px] uppercase tracking-[0.12em] ${on ? "text-ink" : "text-steel"}`}
               >
-                {n.label}
+                {n.short}
               </Link>
             );
           })}
@@ -192,10 +208,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function NetworkPill() {
-  const v = useVessel();
+  const v = useBook();
   if (USE_MOCK) {
     return (
-      <span className="num hidden items-center gap-1.5 rounded-full border border-amber/40 px-3 py-1 text-[11px] text-amber sm:inline-flex">
+      <span className="num hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-amber/40 px-3 py-1 text-[11px] text-amber xl:inline-flex">
         <span className="h-1.5 w-1.5 rounded-full bg-amber" />
         mock · stage
       </span>
@@ -214,7 +230,7 @@ function NetworkPill() {
   }
   const ok = v.connected;
   return (
-    <span className="num hidden items-center gap-1.5 rounded-full border border-phosphor/40 px-3 py-1 text-[11px] text-phosphor sm:inline-flex">
+    <span className="num hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-phosphor/40 px-3 py-1 text-[11px] text-phosphor xl:inline-flex">
       <span className={`h-1.5 w-1.5 rounded-full bg-phosphor ${ok ? "pulse-dot" : ""}`} />
       Monad Testnet
     </span>
@@ -222,7 +238,7 @@ function NetworkPill() {
 }
 
 function ToastHost() {
-  const { toasts, dismissToast } = useVessel();
+  const { toasts, dismissToast } = useBook();
   if (!toasts.length) return null;
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex max-w-md flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-20 sm:bottom-auto sm:w-80">
@@ -235,7 +251,7 @@ function ToastHost() {
               : t.kind === "success"
                 ? "border-phosphor/40 text-phosphor"
                 : t.kind === "pending"
-                  ? "border-purple/40 text-[#B9ADFC]"
+                  ? "border-hull/40 text-hull"
                   : "border-line"
           }`}
         >
@@ -251,12 +267,28 @@ function ToastHost() {
             </button>
           </div>
           {t.href ? (
-            <a href={t.href} target="_blank" rel="noreferrer" className="num text-xs text-purple underline">
+            <a href={t.href} target="_blank" rel="noreferrer" className="num text-xs text-hull underline">
               View on explorer
             </a>
           ) : null}
         </div>
       ))}
     </div>
+  );
+}
+
+/** Signed-in state (SIWE session), distinct from merely having a wallet connected. */
+function SessionChip() {
+  const session = useSession();
+  if (!session.data) return null;
+  return (
+    <Link
+      href="/onboarding"
+      data-testid="session-chip"
+      className="hidden min-h-11 items-center rounded-[2px] border border-ink/15 px-2.5 text-[11px] text-ink sm:inline-flex"
+      title={`Signed in as ${session.data.address}`}
+    >
+      signed in
+    </Link>
   );
 }
