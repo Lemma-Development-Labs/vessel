@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 type Variant = "primary" | "ghost" | "mint" | "danger";
 
@@ -31,11 +31,13 @@ export function Button({
   ...rest
 }: Props) {
   const isDisabled = disabled || loading;
+  const tipId = useId();
+  const showTip = Boolean(tooltip && isDisabled);
   const btn = (
     <button
       type="button"
       disabled={isDisabled}
-      title={tooltip}
+      aria-describedby={showTip ? tipId : undefined}
       className={`num inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] px-5 py-3 text-[12px] font-medium uppercase tracking-[0.14em] transition-[background-color,color,box-shadow] duration-300 disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
       {...rest}
     >
@@ -49,11 +51,16 @@ export function Button({
       )}
     </button>
   );
-  if (tooltip && isDisabled) {
+  if (showTip) {
     return (
-      <span className="group relative inline-flex w-full" title={tooltip}>
+      // Our own tooltip only: a native `title` here showed a second, browser-styled copy on top.
+      <span className={`group relative inline-flex ${className.includes("w-full") ? "w-full" : ""}`}>
         {btn}
-        <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[2px] border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block">
+        <span
+          id={tipId}
+          role="tooltip"
+          className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[2px] border border-line bg-panel px-3 py-2 text-left text-xs font-normal text-dim shadow-none group-hover:block group-focus-within:block"
+        >
           {tooltip}
         </span>
       </span>

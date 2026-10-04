@@ -106,11 +106,9 @@ export function DepositScreen() {
           tooltip={
             capReached
               ? "Lifetime faucet cap reached for this address (1,000 dUSD)."
-              : cooldown > 0
-                ? COPY.cooldown(cooldown)
-                : v.wallet.status !== "ok"
-                  ? `Cooldown unknown — ${v.wallet.reason}`
-                  : undefined
+              : v.wallet.status !== "ok"
+                ? `Cooldown unknown — ${v.wallet.reason}`
+                : undefined // a cooldown is already shown in full under the button
           }
           disabled={cooldown > 0 || capReached}
         >

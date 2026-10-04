@@ -19,9 +19,9 @@ import { TARGET_CHAIN_ID } from "@/lib/wagmi";
 
 function Wordmark() {
   return (
-    <Link href="/deposit" className="flex min-w-0 items-center gap-3 text-ink hover:text-ink">
+    <Link href="/deposit" className="flex shrink-0 items-center gap-3 text-ink hover:text-ink">
       {/* The Vessel mark: hull circle, waterline, and the plumb in signal. Same paths as vessel.wtf. */}
-      <svg width="24" height="24" viewBox="0 0 40 40" fill="none" aria-hidden>
+      <svg width="24" height="24" viewBox="0 0 40 40" fill="none" aria-hidden className="shrink-0">
         <circle cx="20" cy="20" r="14.4" stroke="#F4F1EA" strokeWidth="2.6" />
         <path d="M3 20H37" stroke="#F4F1EA" strokeWidth="2.6" />
         <path d="M20 20V34.4" stroke="#FF5B29" strokeWidth="2.6" />
