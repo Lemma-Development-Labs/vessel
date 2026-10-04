@@ -28,7 +28,7 @@ export default function DemoStatesPage() {
             <p>{s.label}</p>
             <p className="mt-1 flex flex-wrap gap-3">
               {ROUTES.map((r) => (
-                <Link key={r} className="num text-xs text-purple" href={`${r}${s.q ? `?demo=${s.q}` : ""}`}>
+                <Link key={r} className="num text-xs text-hull" href={`${r}${s.q ? `?demo=${s.q}` : ""}`}>
                   {r}
                 </Link>
               ))}

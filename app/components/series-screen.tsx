@@ -32,7 +32,7 @@ export function SeriesScreen() {
 
   return (
     <div className="mx-auto max-w-[960px] px-4 py-10 sm:px-5 md:py-14">
-      <PageHead eyebrow="SERIES" title="Hull series">
+      <PageHead eyebrow="04 — SERIES" title="Hull" accent="series.">
         Hull is sold in dated 28-day series at a fixed rate, set by governance and published
         with a terms hash before the window opens.
       </PageHead>
@@ -88,16 +88,16 @@ function SeriesCard({ s, now }: { s: Series; now: bigint }) {
           ? `matured ${formatTs(s.maturity)}`
           : "";
   return (
-    <Card accent="steel" className="p-5 sm:p-6">
+    <Card accent="hull" className="p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="num text-[10px] tracking-[0.18em] text-steel">SERIES #{s.id.toString()}</p>
-          <p className="display mt-1 text-2xl text-[#C2D2E0]">{formatBps(s.rateBps)} fixed</p>
+          <p className="display mt-1 text-2xl text-hull">{formatBps(s.rateBps)} fixed</p>
           <p className="num mt-1 text-[12.5px] text-dim">{timeline}</p>
         </div>
         <span
-          className={`num rounded-[7px] border px-2.5 py-1 text-[10.5px] tracking-[0.12em] ${
-            s.state === "IMPAIRED" ? "border-red/50 text-red" : open ? "border-purple/50 text-purple" : "border-white/14 text-steel"
+          className={`num rounded-[2px] border px-2.5 py-1 text-[10.5px] tracking-[0.12em] ${
+            s.state === "IMPAIRED" ? "border-red/50 text-red" : open ? "border-hull/50 text-hull" : "border-ink/15 text-steel"
           }`}
         >
           {SERIES_LABEL[s.state].toUpperCase()}
@@ -127,7 +127,7 @@ function SeriesCard({ s, now }: { s: Series; now: bigint }) {
         terms {s.termsHash}
       </p>
       {open ? (
-        <Link href="/deposit" className="mt-4 inline-flex text-sm text-purple hover:underline">
+        <Link href="/deposit" className="mt-4 inline-flex text-sm text-hull hover:underline">
           Subscribe on Deposit →
         </Link>
       ) : null}

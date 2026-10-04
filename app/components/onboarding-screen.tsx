@@ -134,7 +134,7 @@ export function OnboardingScreen() {
       </p>
 
       {authDown ? (
-        <p role="alert" className="mt-6 rounded-lg border border-amber/30 bg-amber/10 px-4 py-3 text-sm text-amber">
+        <p role="alert" className="mt-6 rounded-[2px] border border-amber/30 bg-amber/10 px-4 py-3 text-sm text-amber">
           {explain(session.error)}
         </p>
       ) : null}
@@ -205,7 +205,7 @@ export function OnboardingScreen() {
                 autoComplete="off"
                 spellCheck={false}
                 placeholder="Invitation code"
-                className="num min-h-11 flex-1 rounded-[10px] border border-line bg-bg px-3 text-sm text-ink placeholder:text-steel/60 focus:border-purple focus:outline-none"
+                className="num min-h-11 flex-1 rounded-[2px] border border-line bg-bg px-3 text-sm text-ink placeholder:text-steel/60 focus:border-hull focus:outline-none"
               />
               <Button type="submit" disabled={redeem.isPending || !code.trim()}>
                 Redeem
@@ -224,7 +224,7 @@ export function OnboardingScreen() {
             <>
               <p className="num text-xs text-steel">version {disclosure.data.version}</p>
               <div
-                className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border border-line bg-bg p-4 text-[13px] leading-relaxed text-ink"
+                className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-[2px] border border-line bg-bg p-4 text-[13px] leading-relaxed text-ink"
                 data-testid="disclosure-text"
               >
                 {disclosure.data.text}

@@ -59,14 +59,14 @@ export function WithdrawScreen() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-14">
-      <PageHead eyebrow="WITHDRAW" title="Leave Ballast">
+      <PageHead eyebrow="03 — WITHDRAW" title="Leave" accent="Ballast." tone="ballast">
         An exit locks your units and starts a 48-hour cooldown. After that it is filled in
         request order as idle liquidity and Hull&apos;s 30% cover allow — possibly in parts.
         Units stay exposed to profit and loss until they are filled.
       </PageHead>
       <MockNotice />
 
-      <Card accent="brass" className="mt-8 grid gap-4 p-5 sm:grid-cols-3">
+      <Card accent="ballast" className="mt-8 grid gap-4 p-5 sm:grid-cols-3">
         <div>
           <SectionLabel>FREE UNITS</SectionLabel>
           <p className="num mt-1 text-lg">
@@ -87,12 +87,12 @@ export function WithdrawScreen() {
         </div>
       </Card>
 
-      <div className="mt-8 border-b border-white/12 pb-4">
+      <div className="mt-8 border-b border-ink/12 pb-4">
         <div className="flex items-center justify-between">
           <SectionLabel>AMOUNT (dUSD)</SectionLabel>
           <button
             type="button"
-            className="num min-h-11 text-[11px] text-purple disabled:opacity-40"
+            className="num min-h-11 text-[11px] text-hull disabled:opacity-40"
             disabled={free === 0n}
             onClick={() => {
               setAll(true);
@@ -162,11 +162,11 @@ export function WithdrawScreen() {
         </Val>
       </section>
 
-      <Card accent="steel" className="mt-10 p-5">
+      <Card accent="hull" className="mt-10 p-5">
         <p className="text-sm text-dim">
-          <span className="text-steel">Hull</span> has no early exit: each series pays principal and coupon at
+          <span className="text-hull">Hull</span> has no early exit: each series pays principal and coupon at
           maturity, and you claim it from escrow on the{" "}
-          <Link href="/portfolio" className="text-purple hover:underline">
+          <Link href="/portfolio" className="text-hull hover:underline">
             Portfolio
           </Link>{" "}
           page.

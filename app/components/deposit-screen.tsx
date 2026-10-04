@@ -84,7 +84,7 @@ export function DepositScreen() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-14">
-      <PageHead eyebrow="DEPOSIT" title="Board a deck">
+      <PageHead eyebrow="01 — DEPOSIT" title="Board a" accent="deck.">
         A deposit is a request. Your dUSD waits in custody until it is admitted — Ballast in
         queue order, Hull together when its subscription window closes. Anything not admitted
         becomes a refund you can claim.
@@ -121,12 +121,12 @@ export function DepositScreen() {
 
       <Eligibility />
 
-      <div className="mt-8 border-b border-white/12 pb-4">
+      <div className="mt-8 border-b border-ink/12 pb-4">
         <div className="flex items-center justify-between">
           <SectionLabel>AMOUNT</SectionLabel>
           <button
             type="button"
-            className="num min-h-11 text-[11px] text-purple disabled:opacity-40"
+            className="num min-h-11 text-[11px] text-hull disabled:opacity-40"
             disabled={v.wallet.status !== "ok"}
             onClick={() => v.wallet.status === "ok" && setAmt(formatDusd(v.wallet.value.dusd).replace(/,/g, ""))}
           >
@@ -301,18 +301,22 @@ function DeckPick({
           onSelect();
         }
       }}
-      className={`relative text-left ${hull ? "" : "ballast-shimmer"} rounded-[var(--radius-card)] border bg-bg2 p-5 sm:p-6 ${
-        selected ? (hull ? "border-2 border-steel" : "border-2 border-brass") : hull ? "border-line" : "border-brass/30"
-      }`}
+      className={`relative flex flex-col text-left ${hull ? "" : "ballast-shimmer"} rounded-[var(--radius-card)] border p-6 sm:p-7 ${
+        hull
+          ? "bg-[linear-gradient(180deg,rgba(244,241,234,0.07),rgba(244,241,234,0.02))]"
+          : "bg-[linear-gradient(180deg,rgba(255,91,41,0.12),rgba(255,91,41,0.02))]"
+      } ${selected ? (hull ? "border-hull" : "border-ballast") : hull ? "border-ink/15" : "border-ballast/30"}`}
     >
-      {selected ? (
-        <span className={`num absolute right-4 top-4 text-[10px] tracking-[0.14em] ${hull ? "text-steel" : "text-brass"}`}>●</span>
-      ) : null}
-      <p className={`num text-[10px] tracking-[0.18em] ${hull ? "text-steel" : "text-brass"}`}>{hull ? "SENIOR" : "JUNIOR"}</p>
-      <h2 className={`display mt-2 text-[26px] font-bold tracking-[0.03em] sm:text-[30px] ${hull ? "text-[#C2D2E0]" : "text-brass"}`}>
+      <div className={`num mb-7 flex justify-between text-[9.5px] tracking-[0.2em] ${hull ? "text-steel" : "text-[#C89486]"}`}>
+        <span>{hull ? "SENIOR" : "JUNIOR"}</span>
+        <span className={selected ? (hull ? "text-hull" : "text-ballast") : ""}>{selected ? "● SELECTED" : hull ? "A-DECK" : "B-DECK"}</span>
+      </div>
+      <h2 className="display text-[44px] leading-[0.9] tracking-[-0.04em] text-ink [font-variation-settings:'wdth'_115] sm:text-[52px]">
         {hull ? "HULL" : "BALLAST"}
       </h2>
-      <p className="mt-1 mb-4 text-sm text-dim">{hull ? "Fixed. Protected." : "Levered. First-loss."}</p>
+      <p className={`num mt-2 mb-6 text-[11.5px] tracking-[0.14em] ${hull ? "text-hull" : "text-ballast"}`}>
+        {hull ? "FIXED · PROTECTED" : "LEVERED · FIRST-LOSS"}
+      </p>
       {children}
     </button>
   );

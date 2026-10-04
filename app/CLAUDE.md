@@ -4,40 +4,53 @@ Do not restyle ad hoc. If a screen needs a new color, it is using the system wro
 
 ## Tokens
 
+One system with vessel.wtf: the values below are `vessel-landing/tokens.css` (the
+landing repo is the source; change them there first).
+
 | Token | Hex | Role |
 | --- | --- | --- |
-| `--bg` | `#070B10` | Page top |
-| `--bg2` | `#0B1118` | Page bottom / cards |
-| `--panel` | `#0E131B` | Raised panel |
-| `--line` | `rgba(255,255,255,0.12)` | Hairlines |
-| `--text` | `#EAEEF3` | Body |
-| `--text-dim` | `rgba(234,238,243,0.62)` | Dim copy |
-| `--purple` | `#836EF9` | **Primary actions and links ONLY** |
-| `--brass` | `#C9964B` | Ballast / risk ONLY |
-| `--steel` | `#8FA6BC` | Hull ONLY |
-| `--phosphor` | `#35D699` | Live / positive data ONLY — never decorative |
+| `--bg` (void) | `#05070A` | Page base |
+| `--bg2` / `--panel` | `#0B1015` | Raised surfaces |
+| `--line` | `rgba(244,241,234,0.12)` | Hairlines — warm, never a solid grey (`--line-soft` .08, `--line-strong` .16) |
+| `--text` (bone) | `#F4F1EA` | Primary text, the mark, primary buttons |
+| `--text-dim` | `#A9B4C0` | Body copy |
+| `--steel` | `#8A96A3` | Labels, nav, secondary text |
+| `--hull` (delta) | `#6BF2C0` | Hull / senior, links, connect |
+| `--ballast` (signal) | `#FF5B29` | Ballast / junior, the plumb — one accent per view |
+| `--phosphor` | `#6BF2C0` | Live / positive data — never decorative |
 | `--amber` | `#F0B35C` | Testnet / warnings |
 | `--red` | `#E5646C` | Errors / negative funding |
+| `--deep` | `#2C5CFF` | Atmosphere only, never type |
 
-Page background is a vertical gradient `bg → bg2`. Shadows: none. Depth is borders and background steps.
+Atmosphere: void base with a fixed layer of faint 64px grid plus three glows (deep top
+right, signal bottom left, delta below) — `body::before` in `app/globals.css`. No shadows
+except the hover glow on primary and connect buttons. Corners are square (2px); only pills
+and status dots are round.
 
-Radii: cards 16px (designed app), chips 8px, modals 16px.
-Spacing scale: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64.
+Spacing scale: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64. Content shell 1320px, 30px gutter.
 
 ## Type
 
-- **Bricolage Grotesque** — display: page titles, card titles, labels of big numbers
-- **Instrument Sans** — body / UI
-- **IBM Plex Mono** — EVERY number, address, hash, rate, timestamp. `tabular-nums`. No exceptions.
+Two faces, no more:
+
+- **Archivo** (variable width) — every word set as prose or headline. Headlines and section
+  titles use `.display`: weight 800, `wdth` 110–115, uppercase, tight negative tracking.
+  Page titles (`PageHead`) end on one accent line in `--hull`, or `--ballast` only where
+  Ballast is the subject.
+- **IBM Plex Mono** — EVERY number, address, hash, rate, timestamp, label, nav item and
+  button. Labels and buttons are uppercase with wide tracking (.14–.26em). `tabular-nums`.
 
 dUSD: 4 decimal places in tables, 2 in summaries.
 
 ## Color-by-role (honesty)
 
-- Hull is steel, still (zero motion). That stillness means protected.
-- Ballast is brass. One faint shimmer on hover only (1.2s). Reduced-motion: no shimmer.
-- Phosphor is for live numbers, not chrome.
+- Hull is delta mint, still (zero motion). That stillness means protected.
+- Ballast is signal orange on a warm panel. One faint shimmer on hover only (1.2s).
+  Reduced-motion: no shimmer.
+- Phosphor (the same mint) is for live numbers, not chrome.
 - Simulated venue is always an amber outlined chip. Never look "mainnet live".
+- The landing page's demo figures (OI hedged, funding today, venue rows) are marketing
+  placeholders. The app never shows a number it did not read (Rule 0).
 
 ## Honesty chrome (every route)
 
@@ -58,7 +71,7 @@ dUSD: 4 decimal places in tables, 2 in summaries.
 ## Motion
 
 `prefers-reduced-motion: reduce` — no shimmer, no gauge jitter, waterfall renders final rows only.
-Visible focus rings: 2px `--purple`.
+Visible focus rings: 2px `--hull`.
 No layout shift on data load — skeletons sized to content.
 
 ## Provider

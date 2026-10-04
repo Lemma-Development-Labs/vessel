@@ -15,7 +15,7 @@ export function TransparencyScreen() {
   const v = useBook();
   return (
     <div className="mx-auto max-w-[1080px] px-4 py-10 sm:px-5 md:py-14">
-      <PageHead eyebrow="TRANSPARENCY" title="The book, block by block">
+      <PageHead eyebrow="05 — TRANSPARENCY" title="Don't trust it." accent="Watch the book.">
         Every number on this page is read from the chain at one block. An independent checker
         recomputes the same book without our API — and you can run it yourself.
       </PageHead>
@@ -28,8 +28,8 @@ export function TransparencyScreen() {
       <section className="mt-10">
         <h2 className="display text-lg">Book</h2>
         <Card className="mt-4 grid grid-cols-2 gap-px overflow-hidden md:grid-cols-4">
-          <Cell label="HULL" tone="text-steel" of={mapLive(v.book, (b) => formatDusd4(b.hullNav))} />
-          <Cell label="BALLAST" tone="text-brass" of={mapLive(v.book, (b) => formatDusd4(b.ballastNav))} />
+          <Cell label="HULL" tone="text-hull" of={mapLive(v.book, (b) => formatDusd4(b.hullNav))} />
+          <Cell label="BALLAST" tone="text-ballast" of={mapLive(v.book, (b) => formatDusd4(b.ballastNav))} />
           <Cell label="RESERVE" of={mapLive(v.book, (b) => formatDusd4(b.reserveNav))} />
           <Cell label="TREASURY OWED" of={mapLive(v.book, (b) => formatDusd4(b.treasuryLiability))} />
           <Cell label="RECORDED ASSETS (A)" of={mapLive(v.book, (b) => formatDusd4(b.recordedActive))} />
@@ -147,7 +147,7 @@ export function TransparencyScreen() {
             )}
           </Val>
           <p className="mt-5 text-[12.5px] text-dim">Run the same checks yourself, against any RPC:</p>
-          <pre className="num mt-2 overflow-x-auto rounded-lg border border-line bg-bg px-3 py-2 text-[11.5px] text-ink">
+          <pre className="num mt-2 overflow-x-auto rounded-[2px] border border-line bg-bg px-3 py-2 text-[11.5px] text-ink">
             {`cd tools/verify-cli && pnpm verify --manifest ../../deployments/${RELEASE.environment}-v2.json --rpc https://testnet-rpc.monad.xyz`}
           </pre>
         </Card>
@@ -217,11 +217,11 @@ export function TransparencyScreen() {
 
       <section id="contracts" className="mt-12">
         <h2 className="display text-lg">Contracts</h2>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-line">
+        <div className="mt-4 overflow-hidden rounded-[2px] border border-line">
           {(Object.entries(V2) as [string, string][]).map(([name, addr]) => (
             <div
               key={name}
-              className="flex flex-col gap-2 border-b border-white/6 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-ink/6 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="num text-[11px] tracking-[0.14em] text-steel">{name}</span>
               <div className="flex min-w-0 items-center gap-3">
@@ -299,7 +299,7 @@ function VerificationMark({ name, address }: { name: string; address: string }) 
         <Badge kind={entry.state} />
         <a
           href={entry.url ?? explorerHref}
-          className="num text-[11px] text-purple"
+          className="num text-[11px] text-hull"
           title={entry.checkedAt ? `source verified, checked ${entry.checkedAt}` : "source verified"}
         >
           source ↗
@@ -313,7 +313,7 @@ function VerificationMark({ name, address }: { name: string; address: string }) 
       <span className="num text-[11px] text-steel/60" title="We have not confirmed this contract's source verification.">
         {label}
       </span>
-      <a href={explorerHref} className="num text-[11px] text-purple" title="Check verification status on the explorer">
+      <a href={explorerHref} className="num text-[11px] text-hull" title="Check verification status on the explorer">
         explorer ↗
       </a>
     </span>

@@ -53,9 +53,9 @@ export function TerminalScreen() {
         <button
           type="button"
           onClick={() => setPalette(true)}
-          className="num min-h-11 rounded-lg border border-white/14 px-3 text-[11.5px] text-steel hover:text-ink"
+          className="num min-h-11 rounded-[2px] border border-ink/15 px-3 text-[11.5px] text-steel hover:text-ink"
         >
-          commands <span className="ml-1 rounded border border-white/14 px-1.5 py-0.5 text-[10px]">⌘K</span>
+          commands <span className="ml-1 rounded border border-ink/15 px-1.5 py-0.5 text-[10px]">⌘K</span>
         </button>
       </div>
 
@@ -98,7 +98,7 @@ function Panel({ id, title, tag, children }: { id: string; title: string; tag?: 
 
 function Row({ k, children, tone }: { k: string; children: ReactNode; tone?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-white/6 py-1.5 last:border-0">
+    <div className="flex items-baseline justify-between gap-4 border-b border-ink/6 py-1.5 last:border-0">
       <span className="text-[12.5px] text-dim">{k}</span>
       <span className={`num text-[12.5px] ${tone ?? ""}`}>{children}</span>
     </div>
@@ -110,7 +110,7 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 function SimTag() {
-  return <span className="num rounded-[7px] border border-amber/50 px-2 py-0.5 text-[10px] tracking-[0.12em] text-amber">SIMULATED</span>;
+  return <span className="num rounded-[2px] border border-amber/50 px-2 py-0.5 text-[10px] tracking-[0.12em] text-amber">SIMULATED</span>;
 }
 
 /** BOOK: reconcile what the book holds against what it owes. */
@@ -135,8 +135,8 @@ function BookPanel() {
               </div>
               <div>
                 <p className="num mb-1 text-[10px] tracking-[0.16em] text-steel">OWES</p>
-                <Row k="Hull" tone="text-steel">{formatDusd4(b.hullNav)}</Row>
-                <Row k="Ballast" tone="text-brass">{formatDusd4(b.ballastNav)}</Row>
+                <Row k="Hull" tone="text-hull">{formatDusd4(b.hullNav)}</Row>
+                <Row k="Ballast" tone="text-ballast">{formatDusd4(b.ballastNav)}</Row>
                 <Row k="Reserve">{formatDusd4(b.reserveNav)}</Row>
                 <Row k="Treasury fee owed">{formatDusd4(b.treasuryLiability)}</Row>
               </div>
@@ -288,7 +288,7 @@ function SeriesPanel() {
               </thead>
               <tbody>
                 {[...xs].reverse().map((s) => (
-                  <tr key={s.id.toString()} className="border-t border-white/6">
+                  <tr key={s.id.toString()} className="border-t border-ink/6">
                     <td className="num py-1.5 text-[12.5px] pr-3">{s.id.toString()}</td>
                     <td className="num py-1.5 text-[12.5px] text-steel pr-3">{formatBps(s.rateBps)}</td>
                     <td className="py-1.5 text-[12.5px] pr-3">{SERIES_LABEL[s.state]}</td>
@@ -372,7 +372,7 @@ function OpportunitiesPanel() {
             <Val of={capacity}>{(c) => formatDusd(c)}</Val>
           </Row>
         </div>
-        <div className="rounded-xl border border-amber/30 bg-amber/5 p-4">
+        <div className="rounded-[2px] border border-amber/30 bg-amber/5 p-4">
           <p className="num text-[10.5px] tracking-[0.16em] text-amber">VERDICT · ENTRY REFUSED</p>
           <p className="mt-2 text-[13px] text-dim">
             Net carry cannot be estimated without an observed funding window on an approved venue, so the engine
@@ -466,7 +466,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                 type="button"
                 onMouseEnter={() => setSel(i)}
                 onClick={c.run}
-                className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm ${i === sel ? "bg-white/[0.05]" : ""}`}
+                className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm ${i === sel ? "bg-ink/[0.05]" : ""}`}
               >
                 <span className="num w-16 shrink-0 text-[10px] tracking-[0.12em] text-steel">{c.group.toUpperCase()}</span>
                 <span className="truncate">{c.label}</span>
