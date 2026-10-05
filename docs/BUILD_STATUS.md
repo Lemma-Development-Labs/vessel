@@ -97,10 +97,17 @@ on a testnet fork the real core on Circle USDC admitted 2,000 USDC, hedged
 826.97 MON spot against an 826-lot short in three slices, settled, unwound and
 recalled 1,799.16 of 1,800 USDC (0.05% round trip).
 
-Next: keeper hedge policy (paired slices, unwind for recalls); dUSD → USDC
-across the deploy script, keeper, app, SDK and verifier; then the fresh
-deployment and Safe batches. Testnet seeding waits on partner test MON, AUSD
-and USDC.
+Also built 2026-10-05: keeper hedge policy (`vessel-service/src/v2/hedge.ts`,
+simulated end to end in tests); recalls capped at engine cash; Circle USDC
+support across `DeployV2` (V2_ENGINE=hedged), `vessel-verify` (engine backing,
+recomputed value, hedge gap), SDK and app; Safe batch specs `testnet-v2h-01/03`;
+scripts to open and quote Vessel's Kuru markets.
+
+Next: rehearse the whole hedged deployment on an Anvil fork (open markets,
+quote, deploy, batches, a deposit, the real keeper hedging, `vessel-verify`).
+Perpl's mark cannot update on a fork, so the rehearsal must finish inside the
+60 s price window. Then the real deployment. Testnet seeding waits on partner
+test MON, AUSD and USDC.
 
 ## Blockers and follow-ups
 
