@@ -146,6 +146,7 @@ defaults. Summary table: [FACTS.md](../FACTS.md#venues-verified-2026-10-05).
 | Contract-owned Perpl account | contract opened account #842, deposited, shorted 1,000 MON IOC at 0.03107, closed, withdrew 599.94 / 600 AUSD to a fixed address | `PerplProof` on fork | **PROVEN on fork** (G01 shape) |
 | Kuru market creation | `Router.deployProxy` is public; Vessel can open MON/USDC (Circle) and MON/AUSD | `KuruProof` on fork | **PROVEN on fork** |
 | Kuru two-sided quotes | flip orders at ±3 bps plus a vault backstop quote both sides | `KuruProof.test_marketsQuoteBothSides` | **PROVEN on fork** |
+| Kuru market-order ABI | `placeAndExecuteMarketBuy/Sell(uint96, uint256 minOut, bool, bool)` | selector search in order-book impl `0x72caE0a9…9374` | VERIFIED — docs.kuru.io shows `uint96 minOut`, which is not deployed |
 | USDC→AUSD route | `Router.anyToAnySwap` USDC→MON→AUSD in one tx: 100 USDC → 99.936 AUSD → 99.873 USDC (12.7 bps round trip); below the floor the whole route reverts | `KuruProof` | **PROVEN on fork** (G04 shape) |
 | Seed per Kuru market | 2,000 quote + 64,500 MON flip, plus 10,000 MON + 310 quote vault | proof parameters | Our testnet wallets hold ~10 MON — **test MON is the binding constraint** |
 

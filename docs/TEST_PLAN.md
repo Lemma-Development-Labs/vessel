@@ -47,7 +47,7 @@ reference must not call the implementation under test.
 
 | Requirement | Artifact | Status |
 |---|---|---|
-| Delta bands, slice caps, slippage refusal | keeper policy tests + adapter replay | PLANNED-S3 |
+| Delta bands, slice caps, slippage refusal | `contracts/test/core/HedgedEngine.t.sol` (31 tests: slice cap min(100 USDC, 0.5%), one-slice hedge gap, 30 bps spot and perp bands, 20 bps conversion floor the keeper cannot loosen, stale prices stop trading, pause stops new risk only, donations quarantined, delta-neutral value under a +20% MON move); `test/fork/HedgedEngineFork.t.sol` on real venues | DONE (2026-10-05) on-chain bounds; keeper hedge policy PLANNED |
 | Paired slicing, failed-leg compensation, UNHEDGED_ALERT | adapter replay tests (recorded venue traces) | PLANNED-S3 |
 | Idempotent orders, lost-ack reconciliation, two keepers | `vessel-service/test/keeper-v2.test.ts` (persist-before-dispatch, crash restart, `timeout_is_unknown_not_failed`, `two_workers_one_signs`, `stale_worker_rejected_by_fencing`, allowlist, superseded) | DONE (2026-09-30) for v2 controller actions; venue orders PLANNED-S3 (G01) |
 | Margin stress +30% MON without top-up | stress model | PLANNED-S3 (gated G02) |

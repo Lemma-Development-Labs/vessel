@@ -88,10 +88,19 @@ Proven on testnet forks (opt-in `VENUE_FORK=1`, evidence in
 - `KuruProof`: Vessel-opened MON/USDC and MON/AUSD quote both sides;
   USDC→MON→AUSD in one transaction under the floor, 12.7 bps round trip.
 
-Next: `HedgedEngine` (replaces `SimulatedEngine`: Kuru spot, Perpl short,
-USDC⇄AUSD route, on-chain bounds); dUSD → USDC across contracts, keeper, app,
-SDK and verifier; then the fresh deployment and Safe batches. Testnet seeding
-waits on partner test MON, AUSD and USDC.
+Built: `HedgedEngine` (`contracts/src/core/engine/`) replaces
+`SimulatedEngine`. It owns the Perpl account, buys spot on Kuru, converts
+USDC⇄AUSD atomically, values itself through `PerplMarkValuation` (testnet only,
+not independent, G03), and enforces slices, hedge gap, price bands, conversion
+floor, stale-price stops and the RISK_INCREASE pause on chain. 31 unit tests;
+on a testnet fork the real core on Circle USDC admitted 2,000 USDC, hedged
+826.97 MON spot against an 826-lot short in three slices, settled, unwound and
+recalled 1,799.16 of 1,800 USDC (0.05% round trip).
+
+Next: keeper hedge policy (paired slices, unwind for recalls); dUSD → USDC
+across the deploy script, keeper, app, SDK and verifier; then the fresh
+deployment and Safe batches. Testnet seeding waits on partner test MON, AUSD
+and USDC.
 
 ## Blockers and follow-ups
 
