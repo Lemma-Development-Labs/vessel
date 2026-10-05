@@ -51,6 +51,8 @@ export interface Observed {
   /** book */
   activeIdle: bigint;
   engineValue: bigint;
+  /** USDC the engine can release right now (HedgedEngine `usdcCash`); omitted → all of engineValue */
+  engineCash?: bigint;
   treasuryLiability: bigint;
   engineWired: boolean;
   /** keeper memory (from the journal) */
@@ -72,6 +74,25 @@ const IMPAIRED = 7;
 const call = (fn: (typeof controllerWriteAbi)[number]["name"], args: readonly bigint[] = []) =>
   encodeFunctionData({ abi: controllerWriteAbi, functionName: fn, args } as never);
 
+const min = (a: bigint, b: bigint) => (a < b ? a : b);
+
+/**
+ * USDC the book wants back from the engine, and how much of it the engine holds as cash now.
+ * A hedged engine pays only from cash, so any shortfall is the hedge policy's to unwind.
+ */
+export function engineCashNeed(o: Observed, cfg: PolicyConfig): { need: bigint; available: bigint } {
+  const available = o.engineCash ?? o.engineValue;
+  if (!o.engineWired || o.engineValue === 0n) return { need: 0n, available };
+  if (o.activeSeries > 0n && o.seriesState === MATURED_UNWINDING && o.hullNav > 0n) {
+    const liquid = o.activeIdle > o.treasuryLiability ? o.activeIdle - o.treasuryLiability : 0n;
+    return { need: liquid < o.hullNav ? min(o.hullNav - liquid, o.engineValue) : 0n, available };
+  }
+  const a = o.activeIdle + o.engineValue - o.treasuryLiability;
+  const target = (a * cfg.idleTargetBps) / 10_000n + o.treasuryLiability;
+  const deficit = target > o.activeIdle ? target - o.activeIdle : 0n;
+  return { need: deficit > cfg.minMove ? min(deficit, o.engineValue) : 0n, available };
+}
+
 export function decide(o: Observed, cfg: PolicyConfig, controller: Address): PlannedAction | null {
   const plan = (id: string, action: string, calldata: string, inputs: object): PlannedAction => ({
     clientRequestId: id,
@@ -92,7 +113,10 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   if (sid > 0n && o.seriesState === MATURED_UNWINDING && o.hullNav > 0n) {
     const liquid = o.activeIdle > o.treasuryLiability ? o.activeIdle - o.treasuryLiability : 0n;
     if (liquid < o.hullNav && o.engineValue > 0n) {
-      const amount = o.hullNav - liquid < o.engineValue ? o.hullNav - liquid : o.engineValue;
+      // Recall only what the engine holds as cash; the hedge policy unwinds the rest first.
+      const { need, available } = engineCashNeed(o, cfg);
+      const amount = min(need, available);
+      if (amount === 0n) return null;
       return plan(`recall-for-series:${sid}:${o.now / 60n}`, "recallFromEngine", call("recallFromEngine", [amount]), { amount: amount.toString() });
     }
     return plan(`fund:${sid}:${o.hullNav}`, "fundSeries", call("fundSeries", [sid]), { series: sid.toString() });
@@ -119,6 +143,12 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
     if (o.activeIdle > target + cfg.minMove) {
       const amount = o.activeIdle - target;
       return plan(`deploy:${o.now / 900n}`, "deployToEngine", call("deployToEngine", [amount]), { amount: amount.toString() });
+    }
+    // Refill idle (exits drain it) from engine cash; a hedged engine unwinds the remainder first.
+    const { need, available } = engineCashNeed(o, cfg);
+    const amount = min(need, available);
+    if (amount > cfg.minMove) {
+      return plan(`refill:${o.now / 900n}`, "recallFromEngine", call("recallFromEngine", [amount]), { amount: amount.toString() });
     }
   }
 
