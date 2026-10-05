@@ -61,3 +61,23 @@ The seven protocol contracts: DemoUSD, Guardian, BlitzVault, Tranches, SimVenue,
 | e2e burner | account 2 `0x5de4…365a` | `0xfD49f731679FC9959A3F73dDE3d6444ed619030A` |
 
 These three must remain distinct on testnet. Never commit private keys.
+
+## Venues — testnet verified on chain 2026-10-05 (mainnet column: venue docs + earlier reads)
+
+Dollars: users only ever hold **Circle USDC**. AUSD is Perpl margin, internal to the engine (D02). dUSD is retired at the next deployment. Kuru's testnet "USD Coin" is not Circle USDC; never use it.
+
+| | Testnet (10143) | Mainnet (143) |
+| --- | --- | --- |
+| Circle USDC (6 dp) | `0x534b2f3A21130d7a60830c2Df862319e593943A3` — faucet.circle.com, 20 / 2 h / address | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
+| AUSD (6 dp, Perpl collateral) | `0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC` — the exchange holds ~64.3M. Perpl's README still names "Test USD" `0xdf5b…c027`; the exchange holds none, so that line is stale. No public faucet found. | `0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a` |
+| Perpl exchange | `0x1964C32f0bE608E7D29302AFF5E61268E72080cc` (impl `0xbcbd…adbb`), MON perp **64**: price 5 dp, lot 0 dp (1 lot = 1 MON), min account open 100 AUSD | `0x34B6552d57a35a1D042CcAe1951BD1C370112a6F`, MON perp **10** |
+| Kuru Router (permissionless `deployProxy`, `anyToAnySwap`) | `0x7EFbE105Ca7415dE98F96622173458ac1c054630`, MarginAccount `0xd029C2D98ff85D8F64799017fE00a59B1159CE02` | `0xd651346d7c789536ebf06dc72aE3C8502cd695CC`, MarginAccount `0x2A68ba1833cDf93fa9Da1EEbd7F46242aD8E90c5` |
+| Kuru MON/USDC, MON/AUSD | **None against Circle USDC or AUSD** — Vessel opens and seeds its own (proven on fork) | `0x065C9d28E428A0db40191a54d33d5b7c71a9C394`, `0x131a2e70a5b31a517a74b8c567149bc294470da9` |
+
+Perpl order types are **0-based**: 0 OpenLong, 1 OpenShort, 2 CloseLong, 3 CloseShort (dex-sdk `RequestType`). ABI: PerplFoundation/dex-sdk `crates/sdk/abi/dex/Exchange.json` (rc_v1.1.7-203); all used selectors present in the testnet impl.
+
+Fork proofs (opt-in: `VENUE_FORK=1 forge test --match-path 'test/fork/*Proof*' --fork-url <testnet rpc>`):
+
+- `PerplProof` — a **contract** owns Perpl account #842: create 500 AUSD, deposit 100, short 1,000 MON IOC at 0.03107, close, withdraw 599.94 AUSD to custody (G01 shape on testnet).
+- `KuruProof` — Vessel opens MON/USDC (Circle) and MON/AUSD; flip orders ±3 bps plus a vault backstop quote both sides; USDC → MON → AUSD in one `anyToAnySwap` under a floor: 100 USDC → 99.936 AUSD → 99.873 USDC (12.7 bps round trip, inside the 20 bps budget). Below the floor, the whole route reverts.
+- Seed per market used: 2,000 quote + 74,500 MON (64,500 flip + 10,000 vault) + 310 quote (vault). Our testnet wallets hold ~10 MON, so **test MON is the binding constraint**.
