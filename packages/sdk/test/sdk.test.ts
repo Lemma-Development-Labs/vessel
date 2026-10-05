@@ -45,6 +45,15 @@ const snap = (over: Partial<Snapshot["controller"]> = {}): Snapshot => ({
 });
 
 describe("prepare — encodes only, from the manifest, for the owner", () => {
+  it("approves whichever book asset the manifest lists: Circle USDC on ADR-009 deployments", () => {
+    const usdc = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
+    const { DemoUSD: _dusd, ...rest } = m.contracts;
+    const um = parseManifest({ ...m, contracts: { ...rest, USDC: usdc } });
+    const p = prepareBallastDeposit({ manifest: um, owner: OWNER, assets: 5_000_000n, minUnits: 1n, deadline: BigInt(NOW + 86_400), now: NOW });
+    expect(p.calls[0]!.to).toBe(getAddress(usdc));
+    expect(() => parseManifest({ ...m, contracts: rest })).toThrow(/book asset/);
+  });
+
   it("Ballast deposit: exact approval to custody, then requestDeposit with receiver = owner", () => {
     const p = prepareBallastDeposit({ manifest: m, owner: OWNER, assets: 5_000_000n, minUnits: 1n, deadline: BigInt(NOW + 86_400), now: NOW });
     expect(p.calls).toHaveLength(2);

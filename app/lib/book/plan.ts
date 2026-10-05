@@ -1,5 +1,6 @@
 import type { Live } from "../live";
 import { PAUSE, RULES, type BookState, type DepositRequest, type ExitRequest, type Series, type TrancheKind, type Wallet } from "./types";
+import { ASSET } from "./asset";
 
 /**
  * Pre-flight planning for the v2 book. Each check mirrors a revert in
@@ -21,7 +22,7 @@ export function previewUnits(assets: bigint, b: Pick<BookState, "ballastNav" | "
   return (assets * (b.ballastSupply + b.virtualUnits)) / (b.ballastNav + b.virtualAssets);
 }
 
-/** dUSD that units are worth at the current unit price (mirrors _assetsFor, floors). */
+/** Book asset that units are worth at the current unit price (mirrors _assetsFor, floors). */
 export function previewAssets(units: bigint, b: Pick<BookState, "ballastNav" | "ballastSupply" | "virtualUnits" | "virtualAssets">): bigint {
   return (units * (b.ballastNav + b.virtualAssets)) / (b.ballastSupply + b.virtualUnits);
 }
@@ -59,14 +60,19 @@ export function planDeposit(args: {
   const used = w.admitted + w.reserved;
   if (used + assets > w.betaAllowance) {
     const left = w.betaAllowance > used ? w.betaAllowance - used : 0n;
-    return { kind: "blocked", reason: `Above your beta allowance — ${fmt(left)} dUSD left.` };
+    return { kind: "blocked", reason: `Above your beta allowance — ${fmt(left)} ${ASSET.symbol} left.` };
   }
   const stageUsed = b.lifetimeAdmitted + b.pendingReserved;
   if (stageUsed + assets > b.stageCap) {
     const left = b.stageCap > stageUsed ? b.stageCap - stageUsed : 0n;
-    return { kind: "blocked", reason: `Above the beta stage cap — ${fmt(left)} dUSD of capacity left.` };
+    return { kind: "blocked", reason: `Above the beta stage cap — ${fmt(left)} ${ASSET.symbol} of capacity left.` };
   }
-  if (w.dusd < assets) return { kind: "blocked", reason: "Not enough dUSD in this wallet — use the faucet." };
+  if (w.cash < assets) {
+    return {
+      kind: "blocked",
+      reason: ASSET.kind === "usdc" ? "Not enough USDC in this wallet — get test USDC from Circle's faucet." : "Not enough dUSD in this wallet — use the faucet.",
+    };
+  }
 
   let minOut: bigint;
   if (tranche === "hull") {

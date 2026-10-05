@@ -40,6 +40,9 @@ import ballastJson from "./abis/BallastToken.json";
 import pausesJson from "./abis/PauseGuardian.json";
 import engineJson from "./abis/SimulatedEngine.json";
 import dusdJson from "./abis/DemoUSD.json";
+import hedgedJson from "./abis/HedgedEngine.json";
+import valuationJson from "./abis/PerplMarkValuation.json";
+import { ASSET, HEDGED } from "./asset";
 import custodyJson from "./abis/AssetCustody.json";
 
 const controllerAbi = controllerJson as Abi;
@@ -48,10 +51,71 @@ const ballastAbi = ballastJson as Abi;
 const pausesAbi = pausesJson as Abi;
 const engineAbi = engineJson as Abi;
 const dusdAbi = dusdJson as Abi;
+const hedgedAbi = hedgedJson as Abi;
+const valuationAbi = valuationJson as Abi;
+/** DemoUSD's ABI covers the standard ERC-20 calls made here, so it serves Circle USDC too. */
+const assetAbi = dusdAbi;
 const custodyAbi = custodyJson as Abi;
 
 const C = V2.TrancheController as `0x${string}`;
 const ZERO = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Engine reads for the wired engine. HedgedEngine has no simulation flag or funding rate; it
+ * exposes its position, and its prices come from the release's valuation contract.
+ */
+function engineReads(engine: `0x${string}`) {
+  if (!HEDGED) {
+    return [
+      { address: engine, abi: engineAbi, functionName: "isSimulated" },
+      { address: engine, abi: engineAbi, functionName: "value" },
+      { address: engine, abi: engineAbi, functionName: "fundingRateBps" },
+    ];
+  }
+  const valuation = (V2 as Readonly<Record<string, `0x${string}` | undefined>>).PerplMarkValuation!;
+  return [
+    { address: engine, abi: hedgedAbi, functionName: "value" },
+    { address: engine, abi: hedgedAbi, functionName: "monQty" },
+    { address: engine, abi: hedgedAbi, functionName: "shortLots" },
+    { address: engine, abi: hedgedAbi, functionName: "usdcCash" },
+    { address: engine, abi: hedgedAbi, functionName: "ausdCash" },
+    { address: engine, abi: hedgedAbi, functionName: "perplEquity" },
+    { address: engine, abi: hedgedAbi, functionName: "sliceCap" },
+    { address: valuation, abi: valuationAbi, functionName: "prices" },
+    { address: valuation, abi: valuationAbi, functionName: "isIndependent" },
+  ];
+}
+
+function readEngine(r: readonly (Entry | undefined)[]): EngineState {
+  if (!HEDGED) {
+    const v = need<readonly [bigint, bigint]>(r[1], "engine value");
+    return {
+      simulated: need<boolean>(r[0], "engine simulation flag"),
+      value: v[0],
+      observedAt: v[1],
+      fundingRateBps: need<bigint>(r[2], "funding rate"),
+      hedge: null,
+    };
+  }
+  const v = need<readonly [bigint, bigint]>(r[0], "engine value");
+  const prices = need<readonly [bigint, bigint, bigint]>(r[7], "valuation prices");
+  return {
+    simulated: false,
+    value: v[0],
+    observedAt: v[1],
+    fundingRateBps: null,
+    hedge: {
+      spotMon: need(r[1], "spot MON"),
+      shortLots: need(r[2], "short lots"),
+      usdcCash: need(r[3], "engine USDC"),
+      ausdCash: need(r[4], "engine AUSD"),
+      perplEquity: need(r[5], "Perpl equity"),
+      sliceCap: need(r[6], "slice cap"),
+      monPrice: prices[0],
+      independentPrice: need<boolean>(r[8], "price source"),
+    },
+  };
+}
 
 /** Request ids scanned per read. The beta is capped (25 subscribers a series, invited wallets). */
 const SCAN = 400n;
@@ -146,15 +210,20 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         { address: V2.ClaimEscrow, abi: escrowAbi, functionName: "totalFunded" },
         ...(address
           ? [
-              { address: V2.DemoUSD, abi: dusdAbi, functionName: "balanceOf", args: [address] },
-              { address: V2.DemoUSD, abi: dusdAbi, functionName: "allowance", args: [address, V2.AssetCustody] },
+              { address: ASSET.address, abi: assetAbi, functionName: "balanceOf", args: [address] },
+              { address: ASSET.address, abi: assetAbi, functionName: "allowance", args: [address, V2.AssetCustody] },
               ctl("allowanceOf", [address]),
               ctl("admittedOf", [address]),
               ctl("reservedOf", [address]),
               { address: V2.BallastToken, abi: ballastAbi, functionName: "balanceOf", args: [address] },
               { address: V2.BallastToken, abi: ballastAbi, functionName: "lockedOf", args: [address] },
-              { address: V2.DemoUSD, abi: dusdAbi, functionName: "lastFaucetAt", args: [address] },
-              { address: V2.DemoUSD, abi: dusdAbi, functionName: "mintedLifetime", args: [address] },
+              // Only the demo token has an on-chain faucet; Circle USDC comes from Circle's faucet site.
+              ...(ASSET.kind === "demo"
+                ? [
+                    { address: ASSET.address, abi: dusdAbi, functionName: "lastFaucetAt", args: [address] },
+                    { address: ASSET.address, abi: dusdAbi, functionName: "mintedLifetime", args: [address] },
+                  ]
+                : []),
             ]
           : []),
       ]);
@@ -213,12 +282,13 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       let wallet: Live<Wallet> = unavailable(address ? "wallet read failed" : "connect a wallet to see your position");
       if (address) {
         try {
-          const last = need<bigint>(first[w0 + 7], "faucet timestamp");
-          const minted = need<bigint>(first[w0 + 8], "faucet minted");
+          const demo = ASSET.kind === "demo";
+          const last = demo ? need<bigint>(first[w0 + 7], "faucet timestamp") : 0n;
+          const minted = demo ? need<bigint>(first[w0 + 8], "faucet minted") : FAUCET_CAP;
           const readyAt = last === 0n ? 0n : last + FAUCET_COOLDOWN;
           walletBase = {
-            dusd: need(first[w0], "dUSD balance"),
-            custodyAllowance: need(first[w0 + 1], "dUSD allowance"),
+            cash: need(first[w0], `${ASSET.symbol} balance`),
+            custodyAllowance: need(first[w0 + 1], `${ASSET.symbol} allowance`),
             betaAllowance: need(first[w0 + 2], "beta allowance"),
             admitted: need(first[w0 + 3], "admitted"),
             reserved: need(first[w0 + 4], "reserved"),
@@ -242,13 +312,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         ...(address ? seriesIds.flatMap((id) => [ctl("hullUnits", [id, address]), ctl("hullClaimable", [id, address])]) : []),
         ...depIds.map((id) => ctl("deposits", [id])),
         ...exitIds.map((id) => ctl("exits", [id])),
-        ...(engineAddr
-          ? [
-              { address: engineAddr, abi: engineAbi, functionName: "isSimulated" },
-              { address: engineAddr, abi: engineAbi, functionName: "value" },
-              { address: engineAddr, abi: engineAbi, functionName: "fundingRateBps" },
-            ]
-          : []),
+        ...(engineAddr ? engineReads(engineAddr) : []),
         ...(address ? [ctl("ballastUnitValue", [units])] : []),
       ]);
       let k = 0;
@@ -257,7 +321,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       const sMine = address ? take(seriesIds.length * 2) : [];
       const dRows = take(depIds.length);
       const eRows = take(exitIds.length);
-      const eng = engineAddr ? take(3) : [];
+      const eng = engineAddr ? take(engineReads(engineAddr).length) : [];
       const unitVal = address ? take(1)[0] : undefined;
 
       let series: Live<Series[]>;
@@ -294,12 +358,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       if (!engineAddr) engine = ok(null, "chain", asOf);
       else {
         try {
-          const v = need<readonly [bigint, bigint]>(eng[1], "engine value");
-          engine = ok(
-            { simulated: need<boolean>(eng[0], "engine simulation flag"), value: v[0], observedAt: v[1], fundingRateBps: need<bigint>(eng[2], "funding rate") },
-            "chain",
-            asOf,
-          );
+          engine = ok(readEngine(eng), "chain", asOf);
         } catch (err) {
           engine = unavailable(err instanceof Error ? err.message : "engine read failed");
         }
@@ -519,15 +578,18 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       toasts,
       connectors: connectors.map((c) => ({ id: c.id, name: c.name, ready: true })),
 
-      faucet: () => runTx("Faucet", () => send(V2.DemoUSD, dusdAbi, "faucet", [], CEIL.faucet)),
+      faucet: async () => {
+        if (ASSET.kind !== "demo") return false; // Circle USDC comes from faucet.circle.com, linked in the UI
+        return runTx("Faucet", () => send(ASSET.address, dusdAbi, "faucet", [], CEIL.faucet));
+      },
       requestDeposit: ({ tranche, seriesId, assets, minOut, deadline }) =>
         runTx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", async () => {
           if (!pc || !address) throw new Error("connect a wallet first");
           const allowance = (await pc.readContract({
-            address: V2.DemoUSD, abi: dusdAbi, functionName: "allowance", args: [address, V2.AssetCustody],
+            address: ASSET.address, abi: assetAbi, functionName: "allowance", args: [address, V2.AssetCustody],
           })) as bigint;
           if (allowance < assets) {
-            const h = await send(V2.DemoUSD, dusdAbi, "approve", [V2.AssetCustody, assets], CEIL.approve);
+            const h = await send(ASSET.address, assetAbi, "approve", [V2.AssetCustody, assets], CEIL.approve);
             await pc.waitForTransactionReceipt({ hash: h });
           }
           return send(C, controllerAbi, "requestDeposit", [tranche === "hull" ? 0 : 1, seriesId, assets, address, minOut, deadline], CEIL.request);

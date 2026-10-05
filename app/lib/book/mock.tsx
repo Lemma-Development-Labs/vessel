@@ -80,7 +80,7 @@ function seed(demo: string | null): Raw {
         },
       ];
   const wallet: Wallet = {
-    dusd: d(empty ? 100 : 412.5),
+    cash: d(empty ? 100 : 412.5),
     custodyAllowance: 0n,
     betaAllowance: demo === "notinvited" ? 0n : d(2_000),
     admitted: empty ? 0n : d(800),
@@ -113,7 +113,7 @@ function seed(demo: string | null): Raw {
         { blockNumber: "67171003", txHash: `0x${"c3".repeat(32)}`, logIndex: 0, event: "SeriesOpened", args: { seriesId: "2", rateBps: "800" }, finalized: true },
       ];
   return {
-    now: NOW0, block: 67_180_020n, book, engine: unwired ? null : { simulated: true, value: d(5_700), observedAt: NOW0 - 12n, fundingRateBps: 1_200n },
+    now: NOW0, block: 67_180_020n, book, engine: unwired ? null : { simulated: true, value: d(5_700), observedAt: NOW0 - 12n, fundingRateBps: 1_200n, hedge: null },
     series, wallet, deposits, exits, history, nextDeposit: 15n, nextExit: 4n,
   };
 }
@@ -184,13 +184,13 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
       faucet: () =>
         tx("Faucet", (r) => ({
           ...r,
-          wallet: { ...r.wallet, dusd: r.wallet.dusd + d(100), faucetRemaining: r.wallet.faucetRemaining - d(100), faucetCooldownSec: 3600 },
+          wallet: { ...r.wallet, cash: r.wallet.cash + d(100), faucetRemaining: r.wallet.faucetRemaining - d(100), faucetCooldownSec: 3600 },
         })),
       requestDeposit: ({ tranche, seriesId, assets, minOut, deadline }) =>
         tx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", (r) => ({
           ...r,
           nextDeposit: r.nextDeposit + 1n,
-          wallet: { ...r.wallet, dusd: r.wallet.dusd - assets, reserved: r.wallet.reserved + assets },
+          wallet: { ...r.wallet, cash: r.wallet.cash - assets, reserved: r.wallet.reserved + assets },
           book: { ...r.book, pendingReserved: r.book.pendingReserved + assets },
           series: r.series.map((s) => (s.id === seriesId && tranche === "hull" ? { ...s, subscriptions: s.subscriptions + 1n } : s)),
           deposits: [
@@ -215,7 +215,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           if (!dep) return r;
           return {
             ...r,
-            wallet: { ...r.wallet, dusd: r.wallet.dusd + dep.assets },
+            wallet: { ...r.wallet, cash: r.wallet.cash + dep.assets },
             deposits: r.deposits.map((x) => (x.id === id ? { ...x, status: "REFUNDED" } : x)),
           };
         }),
@@ -242,7 +242,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           if (!e) return r;
           return {
             ...r,
-            wallet: { ...r.wallet, dusd: r.wallet.dusd + e.claimable },
+            wallet: { ...r.wallet, cash: r.wallet.cash + e.claimable },
             exits: r.exits.map((x) => (x.id === id ? { ...x, claimable: 0n } : x)),
           };
         }),
@@ -252,7 +252,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           if (!s) return r;
           return {
             ...r,
-            wallet: { ...r.wallet, dusd: r.wallet.dusd + s.myClaimable },
+            wallet: { ...r.wallet, cash: r.wallet.cash + s.myClaimable },
             series: r.series.map((x) => (x.id === sid ? { ...x, myClaimable: 0n } : x)),
           };
         }),

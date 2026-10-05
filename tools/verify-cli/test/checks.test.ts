@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluate, overall, type Snapshot } from "../src/checks.ts";
+import { evaluate, overall, recomputeEngineValue, type HedgeSnapshot, type Snapshot } from "../src/checks.ts";
 
 const healthy = (): Snapshot => ({
   chainId: 10143,
@@ -74,5 +74,71 @@ describe("verifier checks", () => {
     s.controller.lifetimeAdmitted = 0n;
     s.controller.lastActive = s.controller.hullNav + s.controller.ballastNav + s.controller.reserveNav;
     expect(verdictOf(s, "units.backed")).toBe("MISMATCH");
+  });
+});
+
+describe("hedged engine checks", () => {
+  // 1,800 USDC engine: 600 margin (≈ 25.66 locked in an 826-lot short), 826.97 MON spot at 0.031.
+  const hedge = (): HedgeSnapshot => ({
+    usdcCash: 1_174_000_000n,
+    ausdCash: 0n,
+    monQty: 826_970_000_000_000_000_000n,
+    usdcBalance: 1_174_000_000n,
+    ausdBalance: 0n,
+    monBalance: 826_970_000_000_000_000_000n,
+    perplAccountId: 845n,
+    perplFree: 574_394_000n,
+    perplDeposit: 25_606_000n,
+    perplPnl: -9_000n,
+    shortLots: 826n,
+    perpLotScale: 1n,
+    px: 31_000_000_000_000_000n,
+    fx: 10n ** 18n,
+    priceAt: 1_790_000_000n,
+    independent: false,
+    sliceCap: 9_000_000n,
+  });
+  const hedged = (h = hedge()): Snapshot => {
+    const s = healthy();
+    s.asset = { symbol: "USDC", decimals: 6 };
+    s.engine = { present: true, simulated: false, value: recomputeEngineValue(h), observedAt: 1_790_000_000n, hedge: h };
+    return s;
+  };
+
+  it("passes a matched, backed hedge and labels the price source", () => {
+    const s = hedged();
+    expect(overall(evaluate(s))).toBe("PASS");
+    expect(verdictOf(s, "engine")).toBe("INFO");
+    expect(verdictOf(s, "engine.backing")).toBe("PASS");
+    expect(verdictOf(s, "engine.value")).toBe("PASS");
+    expect(verdictOf(s, "hedge.gap")).toBe("PASS");
+    const v = evaluate(s).find((c) => c.id === "valuation.source")!;
+    expect(v.summary).toMatch(/not an independent source/);
+  });
+
+  it("an engine ledger above its holdings is a MISMATCH", () => {
+    const h = hedge();
+    h.monBalance -= 1n;
+    expect(verdictOf(hedged(h), "engine.backing")).toBe("MISMATCH");
+  });
+
+  it("a reported value the venue state does not support is a MISMATCH", () => {
+    const s = hedged();
+    if (s.engine.present) s.engine.value += 2n;
+    expect(verdictOf(s, "engine.value")).toBe("MISMATCH");
+  });
+
+  it("an unhedged gap beyond one slice is a MISMATCH", () => {
+    const h = hedge();
+    h.shortLots = 500n; // 326 MON ≈ 10.1 USDC unhedged, slice cap 9
+    const s = hedged(h);
+    expect(verdictOf(s, "hedge.gap")).toBe("MISMATCH");
+    expect(overall(evaluate(s))).toBe("MISMATCH");
+  });
+
+  it("negative Perpl equity values the account at zero", () => {
+    const h = hedge();
+    h.perplPnl = -10_000_000_000n;
+    expect(recomputeEngineValue(h)).toBe(h.usdcCash + (h.monQty * h.px) / 10n ** 30n);
   });
 });

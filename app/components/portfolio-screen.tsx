@@ -11,6 +11,7 @@ import { Button, Card, EmptyState, Skeleton, StatBlock } from "@/components/ui";
 import { Unavailable, Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
 import { MockNotice, PageHead, SectionLabel, TrancheTag, useNow } from "@/components/book-ui";
+import { ASSET } from "@/lib/book/asset";
 
 export function PortfolioScreen() {
   const v = useBook();
@@ -53,13 +54,13 @@ export function PortfolioScreen() {
       <MockNotice />
 
       <Card className="mt-8 grid grid-cols-2 gap-px overflow-hidden md:grid-cols-4">
-        <Stat label="WALLET dUSD" of={mapLive(v.wallet, (w) => formatDusd(w.dusd))} />
+        <Stat label={`WALLET ${ASSET.symbol}`} of={mapLive(v.wallet, (w) => formatDusd(w.cash))} />
         <Stat label="BALLAST VALUE" of={mapLive(v.wallet, (w) => formatDusd(w.ballastValue))} tone="ballast" />
         <Stat label="HULL PRINCIPAL" of={mapLive(hullPrincipal, (x) => formatDusd(x))} tone="hull" />
         <Stat label="READY TO CLAIM" of={mapLive(claimable, (x) => formatDusd(x))} tone="phosphor" />
       </Card>
       <p className="num mt-3 text-[12px] text-dim">
-        Waiting for admission: <Val of={pending}>{(x) => `${formatDusd(x)} dUSD`}</Val>
+        Waiting for admission: <Val of={pending}>{(x) => `${formatDusd(x)} ${ASSET.symbol}`}</Val>
       </p>
 
       <section className="mt-10">
@@ -78,7 +79,7 @@ export function PortfolioScreen() {
                 <div className="grid gap-4 sm:grid-cols-3">
                   <Field label="UNITS">{formatShares(w.ballastUnits)}</Field>
                   <Field label="LOCKED IN EXITS">{formatShares(w.ballastLocked)}</Field>
-                  <Field label="VALUE NOW">{formatDusd4(w.ballastValue)} dUSD</Field>
+                  <Field label="VALUE NOW">{formatDusd4(w.ballastValue)} {ASSET.symbol}</Field>
                 </div>
               )
             }

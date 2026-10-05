@@ -12,6 +12,7 @@ import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
 import { MockNotice, PageHead, SectionLabel, formatDuration, useNow } from "@/components/book-ui";
+import { ASSET } from "@/lib/book/asset";
 
 export function WithdrawScreen() {
   const v = useBook();
@@ -40,7 +41,7 @@ export function WithdrawScreen() {
   const b = v.book.status === "ok" ? v.book.value : null;
   const validShape = /^\d+(\.\d{0,6})?$/.test(amt.trim());
   const assets = validShape ? parseDusd(amt) : 0n;
-  // Units to lock: everything free when MAX was chosen, else the units this dUSD amount buys back.
+  // Units to lock: everything free when MAX was chosen, else the units this amount buys back.
   let units = 0n;
   const free = w ? freeBallastUnits(w) : 0n;
   if (w && b) units = all ? free : assets > 0n ? previewUnits(assets, b) : 0n;
@@ -82,14 +83,14 @@ export function WithdrawScreen() {
         <div>
           <SectionLabel>TOTAL VALUE NOW</SectionLabel>
           <p className="num mt-1 text-lg">
-            <Val of={mapLive(v.wallet, (x) => x.ballastValue)}>{(x) => `${formatDusd(x)} dUSD`}</Val>
+            <Val of={mapLive(v.wallet, (x) => x.ballastValue)}>{(x) => `${formatDusd(x)} ${ASSET.symbol}`}</Val>
           </p>
         </div>
       </Card>
 
       <div className="mt-8 border-b border-ink/12 pb-4">
         <div className="flex items-center justify-between">
-          <SectionLabel>AMOUNT (dUSD)</SectionLabel>
+          <SectionLabel>AMOUNT ({ASSET.symbol})</SectionLabel>
           <button
             type="button"
             className="num min-h-11 text-[11px] text-hull disabled:opacity-40"
@@ -110,12 +111,12 @@ export function WithdrawScreen() {
           }}
           inputMode="decimal"
           placeholder="0.00"
-          aria-label="Exit amount in dUSD"
+          aria-label={`Exit amount in ${ASSET.symbol}`}
           className="num mt-2 w-full bg-transparent text-[clamp(1.75rem,10vw,2.5rem)] tracking-[-0.01em] outline-none"
         />
         <p className="num mt-2 text-sm text-dim">
-          Locks {formatShares(units)} units · worth ≈ {formatDusd(expected)} dUSD today · minimum accepted{" "}
-          {formatDusd(withSlippage(expected))} dUSD
+          Locks {formatShares(units)} units · worth ≈ {formatDusd(expected)} {ASSET.symbol} today · minimum accepted{" "}
+          {formatDusd(withSlippage(expected))} {ASSET.symbol}
         </p>
       </div>
 

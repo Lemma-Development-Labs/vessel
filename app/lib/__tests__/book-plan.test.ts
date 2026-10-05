@@ -39,7 +39,7 @@ const rawBook = (): BookState => {
 const wallet = (over: Partial<Wallet> = {}): Live<Wallet> =>
   ok(
     {
-      dusd: d(500), custodyAllowance: 0n, betaAllowance: d(1_000), admitted: d(200), reserved: 0n,
+      cash: d(500), custodyAllowance: 0n, betaAllowance: d(1_000), admitted: d(200), reserved: 0n,
       ballastUnits: 0n, ballastLocked: 0n, ballastValue: 0n, faucetCooldownSec: 0, faucetRemaining: d(900),
       ...over,
     },

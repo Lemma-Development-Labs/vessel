@@ -3,7 +3,8 @@
 import { useBook } from "@/lib/book/context";
 import { RELEASE, ROLES, V2 } from "@/lib/book/release";
 import { RULES, type BookState } from "@/lib/book/types";
-import { formatBlock, formatBps, formatDusd, formatDusd4 } from "@/lib/format";
+import { formatBlock, formatBps, formatDusd, formatDusd4, formatMonPrice, formatWmon } from "@/lib/format";
+import { ASSET, HEDGED, VENUE_LABEL } from "@/lib/book/asset";
 import { mapLive, type Live } from "@/lib/live";
 import { verificationOf } from "@/lib/verification";
 import { EXPLORER } from "@/lib/wagmi";
@@ -59,24 +60,56 @@ export function TransparencyScreen() {
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div>
                       <SectionLabel>MODE</SectionLabel>
-                      <div className="mt-1.5">{e.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" />}</div>
+                      <div className="mt-1.5">
+                        {e.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" venue={VENUE_LABEL} />}
+                      </div>
                     </div>
                     <div>
                       <SectionLabel>VALUE</SectionLabel>
                       <p className="num mt-1">{formatDusd4(e.value)}</p>
                     </div>
-                    <div>
-                      <SectionLabel>FUNDING RATE</SectionLabel>
-                      <p className={`num mt-1 ${e.fundingRateBps < 0n ? "text-red" : ""}`}>{formatBps(e.fundingRateBps)} APR</p>
-                    </div>
+                    {e.hedge ? (
+                      <>
+                        <div>
+                          <SectionLabel>SPOT MON (KURU)</SectionLabel>
+                          <p className="num mt-1">{formatWmon(e.hedge.spotMon)}</p>
+                        </div>
+                        <div>
+                          <SectionLabel>SHORT MON (PERPL)</SectionLabel>
+                          <p className="num mt-1">{e.hedge.shortLots.toString()}</p>
+                        </div>
+                        <div>
+                          <SectionLabel>PERPL EQUITY (AUSD)</SectionLabel>
+                          <p className="num mt-1">{formatDusd4(e.hedge.perplEquity)}</p>
+                        </div>
+                        <div>
+                          <SectionLabel>MON PRICE</SectionLabel>
+                          <p className="num mt-1">{formatMonPrice(e.hedge.monPrice)}</p>
+                        </div>
+                      </>
+                    ) : e.fundingRateBps !== null ? (
+                      <div>
+                        <SectionLabel>FUNDING RATE</SectionLabel>
+                        <p className={`num mt-1 ${e.fundingRateBps < 0n ? "text-red" : ""}`}>{formatBps(e.fundingRateBps)} APR</p>
+                      </div>
+                    ) : null}
                   </div>
                 )
               }
             </Val>
-            <p className="mt-4 text-[12.5px] text-dim">
-              On testnet the short leg is a labelled simulation: its funding rate is set by governance, not
-              earned on a venue. Real venue custody is not live (gate G01).
-            </p>
+            {HEDGED ? (
+              <p className="mt-4 text-[12.5px] text-dim">
+                The engine buys MON on Kuru and shorts the same amount on Perpl from its own account; no wallet
+                holds venue funds. Prices come from the Perpl mark with AUSD at par, which is not an independent
+                source (gate G03). On testnet, Vessel opens and seeds its own Kuru markets: testnet liquidity
+                provided by Vessel.
+              </p>
+            ) : (
+              <p className="mt-4 text-[12.5px] text-dim">
+                On testnet the short leg is a labelled simulation: its funding rate is set by governance, not
+                earned on a venue. Real venue custody is not live (gate G01).
+              </p>
+            )}
           </Card>
         </div>
         <div>
@@ -101,7 +134,7 @@ export function TransparencyScreen() {
               )}
             </Val>
             <p className="mt-4 text-[12.5px] text-dim">
-              Hard ceiling {formatDusd(RULES.ABSOLUTE_LIFETIME_CAP)} dUSD for the whole beta, fixed in the contract.
+              Hard ceiling {formatDusd(RULES.ABSOLUTE_LIFETIME_CAP)} {ASSET.symbol} for the whole beta, fixed in the contract.
             </p>
           </Card>
         </div>

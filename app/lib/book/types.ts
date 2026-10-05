@@ -69,7 +69,7 @@ export type BookState = {
   /** Custody cash: deposits awaiting admission, and idle book cash. */
   custodyPending: bigint;
   activeIdle: bigint;
-  /** dUSD funded into claim escrow and not yet paid out. */
+  /** Book asset funded into claim escrow and not yet paid out. */
   escrowFunded: bigint;
   /** Stressed close-cost estimate charged to Ballast in cover checks. */
   closeCost: bigint;
@@ -80,12 +80,31 @@ export type BookState = {
   exitQueue: bigint;
 };
 
+/** HedgedEngine position, read from the engine and its valuation (Perpl mark on testnet). */
+export type HedgeView = {
+  /** MON held as spot (wei) and shorted on Perpl (whole MON lots). */
+  spotMon: bigint;
+  shortLots: bigint;
+  /** USDC and AUSD cash held by the engine, and Perpl account equity (AUSD units). */
+  usdcCash: bigint;
+  ausdCash: bigint;
+  perplEquity: bigint;
+  /** Largest single trade the engine allows now, in book-asset units. */
+  sliceCap: bigint;
+  /** USDC per MON (1e18-scaled) and whether the price source is independent (G03). */
+  monPrice: bigint;
+  independentPrice: boolean;
+};
+
 export type EngineState = {
   simulated: boolean;
   value: bigint;
   /** Timestamp the engine's valuation refers to. */
   observedAt: bigint;
-  fundingRateBps: bigint;
+  /** Simulated engine only: the governance-set funding rate. */
+  fundingRateBps: bigint | null;
+  /** Hedged engine only: its real position. */
+  hedge: HedgeView | null;
 };
 
 export type Series = {
@@ -126,15 +145,16 @@ export type ExitRequest = {
   status: ExitStatus;
   /** Units still locked and exposed (not yet funded). */
   units: bigint;
-  /** dUSD moved to escrow for this exit so far. */
+  /** Book asset moved to escrow for this exit so far. */
   funded: bigint;
-  /** dUSD sitting in escrow for this exit, claimable now. */
+  /** Book asset sitting in escrow for this exit, claimable now. */
   claimable: bigint;
 };
 
 export type Wallet = {
-  dusd: bigint;
-  /** dUSD the custody contract may pull (deposits are pulled by AssetCustody). */
+  /** Book-asset balance in the wallet (USDC, or dUSD on the earlier testnet book). */
+  cash: bigint;
+  /** Book asset the custody contract may pull (deposits are pulled by AssetCustody). */
   custodyAllowance: bigint;
   /** Beta allowance set by governance; 0 means not invited. */
   betaAllowance: bigint;

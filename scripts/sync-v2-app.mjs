@@ -12,7 +12,12 @@ const env = process.env.V2_ENV ?? "testnet";
 const check = process.argv.includes("--check");
 const outDir = join(root, "app/lib/book/abis");
 
-const CONTRACTS = ["TrancheController", "AssetCustody", "ClaimEscrow", "BallastToken", "PauseGuardian", "SimulatedEngine", "DemoUSD"];
+// Both engines ship: the app reads whichever the release wires (ADR-009). DemoUSD's ABI also
+// serves Circle USDC for the standard ERC-20 calls the app makes (balanceOf, allowance, approve).
+const CONTRACTS = [
+  "TrancheController", "AssetCustody", "ClaimEscrow", "BallastToken", "PauseGuardian",
+  "SimulatedEngine", "HedgedEngine", "PerplMarkValuation", "DemoUSD",
+];
 
 const files = [];
 for (const name of CONTRACTS) {
@@ -38,6 +43,7 @@ export const RELEASE = {
   chainId: ${m.chainId},
   deployedBlock: ${m.deployedBlock},
   venue: ${JSON.stringify(m.venue)},
+  venues: ${JSON.stringify(m.venues ?? null)},
   status: ${JSON.stringify(m.status)},
   timelockDelaySeconds: ${m.timelockDelaySeconds},
 } as const;

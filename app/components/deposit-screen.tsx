@@ -13,6 +13,9 @@ import { Val } from "@/components/live";
 import { ConnectButton, GasFirstCard } from "@/components/connect";
 import { MockNotice, PageHead, SectionLabel, formatDuration, useNow } from "@/components/book-ui";
 import { WC_ENABLED } from "@/lib/wagmi";
+import { ASSET } from "@/lib/book/asset";
+
+const TEST_ONLY = ASSET.kind === "usdc" ? "Testnet USDC only." : "Demo dollars only.";
 
 export function DepositScreen() {
   const v = useBook();
@@ -60,8 +63,8 @@ export function DepositScreen() {
         <EmptyState title="Connect to board" action={<ConnectButton />} />
         <p className="mt-4 text-center text-sm text-dim">
           {WC_ENABLED
-            ? "Use a Monad-ready wallet. On a phone, use WalletConnect. Demo dollars only."
-            : "Use a Monad-ready browser wallet. WalletConnect is not configured on this deployment, so phones need an in-wallet browser. Demo dollars only."}
+            ? `Use a Monad-ready wallet. On a phone, use WalletConnect. ${TEST_ONLY}`
+            : `Use a Monad-ready browser wallet. WalletConnect is not configured on this deployment, so phones need an in-wallet browser. ${TEST_ONLY}`}
         </p>
       </div>
     );
@@ -85,7 +88,7 @@ export function DepositScreen() {
   return (
     <div className="mx-auto max-w-[720px] px-4 py-10 sm:px-5 md:py-14">
       <PageHead eyebrow="01 — DEPOSIT" title="Board a" accent="deck.">
-        A deposit is a request. Your dUSD waits in custody until it is admitted — Ballast in
+        A deposit is a request. Your {ASSET.symbol} waits in custody until it is admitted — Ballast in
         queue order, Hull together when its subscription window closes. Anything not admitted
         becomes a refund you can claim.
       </PageHead>
@@ -95,26 +98,38 @@ export function DepositScreen() {
 
       <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <SectionLabel>dUSD BALANCE</SectionLabel>
+          <SectionLabel>{ASSET.symbol} BALANCE</SectionLabel>
           <p className="num mt-1 text-3xl">
-            <Val of={mapLive(v.wallet, (w) => w.dusd)}>{(b) => formatDusd(b)}</Val>
+            <Val of={mapLive(v.wallet, (w) => w.cash)}>{(b) => formatDusd(b)}</Val>
           </p>
         </div>
-        <Button
-          variant="ghost"
-          onClick={() => void v.faucet()}
-          tooltip={
-            capReached
-              ? "Lifetime faucet cap reached for this address (1,000 dUSD)."
-              : v.wallet.status !== "ok"
-                ? `Cooldown unknown — ${v.wallet.reason}`
-                : undefined // a cooldown is already shown in full under the button
-          }
-          disabled={cooldown > 0 || capReached}
-        >
-          Get test dollars
-        </Button>
+        {ASSET.kind === "usdc" ? (
+          <a
+            href={ASSET.faucetUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="num inline-flex items-center rounded-[2px] border border-ink/16 px-4 py-2.5 text-[11px] uppercase tracking-[0.18em] hover:border-hull hover:text-hull"
+          >
+            Get test USDC from Circle ↗
+          </a>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={() => void v.faucet()}
+            tooltip={
+              capReached
+                ? "Lifetime faucet cap reached for this address (1,000 dUSD)."
+                : v.wallet.status !== "ok"
+                  ? `Cooldown unknown — ${v.wallet.reason}`
+                  : undefined // a cooldown is already shown in full under the button
+            }
+            disabled={cooldown > 0 || capReached}
+          >
+            Get test dollars
+          </Button>
+        )}
       </div>
+      {ASSET.kind === "usdc" ? <p className="mt-2 text-sm text-steel">{ASSET.faucetNote}</p> : null}
       {cooldown > 0 ? <p className="num mt-2 text-sm text-steel">{COPY.cooldown(cooldown)}</p> : null}
 
       <Eligibility />
@@ -126,7 +141,7 @@ export function DepositScreen() {
             type="button"
             className="num min-h-11 text-[11px] text-hull disabled:opacity-40"
             disabled={v.wallet.status !== "ok"}
-            onClick={() => v.wallet.status === "ok" && setAmt(formatDusd(v.wallet.value.dusd).replace(/,/g, ""))}
+            onClick={() => v.wallet.status === "ok" && setAmt(formatDusd(v.wallet.value.cash).replace(/,/g, ""))}
           >
             MAX
           </button>
@@ -135,10 +150,10 @@ export function DepositScreen() {
           value={amt}
           onChange={(e) => setAmt(e.target.value)}
           inputMode="decimal"
-          aria-label="Deposit amount in dUSD"
+          aria-label={`Deposit amount in ${ASSET.symbol}`}
           className="num mt-2 w-full bg-transparent text-[clamp(1.75rem,10vw,2.5rem)] tracking-[-0.01em] outline-none"
         />
-        <p className="mt-2 text-sm text-dim">You&apos;re requesting {validShape ? formatDusd(parsed) : "0.00"} dUSD</p>
+        <p className="mt-2 text-sm text-dim">You&apos;re requesting {validShape ? formatDusd(parsed) : "0.00"} {ASSET.symbol}</p>
       </div>
 
       <div role="radiogroup" aria-label="Deck" className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -190,7 +205,7 @@ export function DepositScreen() {
             REQUEST SENT
           </p>
           <p className="display mt-4 text-2xl">
-            {formatDusd(done.amount)} dUSD requested for {done.deck === "hull" ? "Hull" : "Ballast"}.
+            {formatDusd(done.amount)} {ASSET.symbol} requested for {done.deck === "hull" ? "Hull" : "Ballast"}.
           </p>
           <p className="mt-3 text-sm text-dim">
             {done.deck === "hull"
@@ -207,11 +222,11 @@ export function DepositScreen() {
       ) : (
         <Card className="mt-8 p-6">
           <p className="num text-sm text-dim">
-            {formatDusd(parsed)} dUSD → {deck === "hull" ? `HULL${series ? ` SERIES #${series.id}` : ""}` : "BALLAST QUEUE"}
+            {formatDusd(parsed)} {ASSET.symbol} → {deck === "hull" ? `HULL${series ? ` SERIES #${series.id}` : ""}` : "BALLAST QUEUE"}
           </p>
           {plan.kind === "blocked" ? <p className="mt-3 text-sm text-amber">{plan.reason}</p> : null}
           {plan.kind === "ok" && plan.needsApprove ? (
-            <p className="mt-3 text-[12.5px] text-dim">Your wallet will ask twice: approve dUSD, then send the request.</p>
+            <p className="mt-3 text-[12.5px] text-dim">Your wallet will ask twice: approve {ASSET.symbol}, then send the request.</p>
           ) : null}
           <div className="mt-4">
             <Button

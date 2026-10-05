@@ -149,7 +149,7 @@ function registerPrepare(server: McpServer, m: Manifest, now: () => number) {
   server.registerTool(
     "prepare_ballast_deposit",
     {
-      description: "Unsigned calls for a Ballast deposit request by `owner`: exact-amount dUSD approval to custody, then requestDeposit. The user's wallet signs each call; nothing is sent.",
+      description: "Unsigned calls for a Ballast deposit request by `owner`: exact-amount approval of the book asset (USDC, or dUSD on the earlier testnet book) to custody, then requestDeposit. The user's wallet signs each call; nothing is sent.",
       inputSchema: { owner: address, assets: units, minUnits: units, deadline, currentAllowance: units.optional() },
       annotations: PREP,
     },

@@ -6,7 +6,9 @@ import { useBook } from "@/lib/book/context";
 import { SERIES_LABEL } from "@/lib/book/plan";
 import { RELEASE, V2 } from "@/lib/book/release";
 import { PAUSE, RULES, type BookState, type EngineState } from "@/lib/book/types";
-import { formatBlock, formatBps, formatDusd, formatDusd4, formatTs } from "@/lib/format";
+import { formatBlock, formatBps, formatDusd, formatDusd4, formatMonPrice, formatTs, formatWmon } from "@/lib/format";
+import { HEDGED, VENUE_LABEL } from "@/lib/book/asset";
+import { Badge } from "@/components/ui";
 import { map2, mapLive } from "@/lib/live";
 import { Unavailable, Val } from "@/components/live";
 import { MockNotice, TxLink, formatDuration, useNow } from "@/components/book-ui";
@@ -217,9 +219,10 @@ function RiskPanel() {
   );
 }
 
-/** HEDGE: quantities and delta. On testnet there is no venue position to show. */
+/** HEDGE: quantities and delta, read from the hedged engine; the simulated engine has none. */
 function HedgePanel() {
   const v = useBook();
+  if (HEDGED) return <HedgedPanel />;
   return (
     <Panel id="hedge" title="HEDGE" tag={<SimTag />}>
       <Row k="Spot quantity">
@@ -245,13 +248,60 @@ function HedgePanel() {
   );
 }
 
-/** CARRY: funding vs costs vs realized. Only the simulated rate exists on testnet. */
+function HedgedPanel() {
+  const v = useBook();
+  const h = mapLive(v.engine, (e) => e?.hedge ?? null);
+  return (
+    <Panel id="hedge" title="HEDGE" tag={<Badge kind="hedged" compact venue={VENUE_LABEL} />}>
+      <Val of={h}>
+        {(x) =>
+          x === null ? (
+            <Unavailable reason="no engine wired yet" />
+          ) : (
+            <>
+              <Row k="Spot MON (Kuru)">{formatWmon(x.spotMon)}</Row>
+              <Row k="Short MON (Perpl, whole lots)">{x.shortLots.toString()}</Row>
+              <Row k="Net MON (spot − short)">{formatWmon(x.spotMon - x.shortLots * 10n ** 18n)}</Row>
+              <Row k="Perpl equity (AUSD)">{formatDusd4(x.perplEquity)}</Row>
+              <Row k="Engine cash (USDC / AUSD)">{`${formatDusd4(x.usdcCash)} / ${formatDusd4(x.ausdCash)}`}</Row>
+              <Row k="Largest trade now (slice cap)">{formatDusd4(x.sliceCap)}</Row>
+              <Row k="MON price" tone={x.independentPrice ? undefined : "text-amber"}>
+                {`${formatMonPrice(x.monPrice)} · ${x.independentPrice ? "independent" : "Perpl mark, not independent (G03)"}`}
+              </Row>
+            </>
+          )
+        }
+      </Val>
+      <Note>
+        Read from the engine and its valuation contract. The engine enforces one-slice trades, a one-slice hedge
+        gap, 30 bps price bands and a 20 bps USDC⇄AUSD floor on chain. Testnet liquidity on the Kuru markets is
+        provided by Vessel.
+      </Note>
+    </Panel>
+  );
+}
+
+/** CARRY: funding vs costs vs realized. */
 function CarryPanel() {
   const v = useBook();
+  if (HEDGED) {
+    return (
+      <Panel id="carry" title="CARRY">
+        <Row k="Funding">
+          <Unavailable reason="earned on Perpl and included in the engine value; a per-epoch breakdown needs settled history" />
+        </Row>
+        <Row k="Realized return">
+          <Unavailable reason="needs settled epochs on the hedged book" />
+        </Row>
+      </Panel>
+    );
+  }
   return (
     <Panel id="carry" title="CARRY" tag={<SimTag />}>
       <Row k="Funding rate (set by governance, not earned)">
-        <Val of={v.engine}>{(e) => (e ? `${formatBps(e.fundingRateBps)} APR` : "no engine")}</Val>
+        <Val of={v.engine}>
+          {(e) => (e && e.fundingRateBps !== null ? `${formatBps(e.fundingRateBps)} APR` : "no engine")}
+        </Val>
       </Row>
       <Row k="Marked spot / perp PnL">
         <Unavailable reason="no venue position on testnet (G01)" />

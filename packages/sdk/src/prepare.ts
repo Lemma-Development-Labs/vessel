@@ -1,5 +1,5 @@
 import { encodeAbiParameters, encodeFunctionData, getAddress, isAddress, keccak256, parseAbi, type Address, type Hex } from "viem";
-import type { Manifest } from "./vendor/verify/read.ts";
+import { bookAssetKey, type Manifest } from "./vendor/verify/read.ts";
 
 /**
  * Unsigned transaction preparation (spec §17). These functions only ENCODE:
@@ -72,7 +72,7 @@ export const exitKey = (id: bigint) =>
 function approveCall(m: Manifest, assets: bigint): PreparedCall {
   const custody = addr(m, "AssetCustody");
   return {
-    to: addr(m, "DemoUSD"),
+    to: addr(m, bookAssetKey(m)),
     data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [custody, assets] }),
     value: "0",
     function: "approve(address,uint256)",
@@ -96,7 +96,7 @@ type DepositArgs = {
   assets: bigint;
   deadline: bigint;
   now: number;
-  /** Current dUSD allowance to AssetCustody; the approve step is skipped only when it already covers `assets`. */
+  /** Current book-asset allowance to AssetCustody; the approve step is skipped only when it already covers `assets`. */
   currentAllowance?: bigint;
 };
 

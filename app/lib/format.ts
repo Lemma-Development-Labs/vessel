@@ -74,3 +74,9 @@ export function formatCountdown(sec: number): string {
 export function formatBlock(n: number | bigint): string {
   return Number(n).toLocaleString("en-US");
 }
+
+/** USDC per MON from a 1e18-scaled price, e.g. 31_000_000_000_000_000n → "$0.031000". */
+export function formatMonPrice(e18: bigint): string {
+  const micro = (e18 + 500_000_000_000n) / 1_000_000_000_000n; // round to 1e-6 USDC
+  return `$${(micro / 1_000_000n).toString()}.${(micro % 1_000_000n).toString().padStart(6, "0")}`;
+}

@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useBook } from "@/lib/book/context";
 import { MONAD_FAUCET_URL, WC_ENABLED, isMobileUA } from "@/lib/wagmi";
 import { Button, Card, Modal } from "@/components/ui";
+import { ASSET } from "@/lib/book/asset";
 
 /**
  * PHASE 3.1 / 3.3 — connecting, and onboarding someone who has never heard of
@@ -109,8 +110,9 @@ function WalletPicker({
       ) : null}
 
       <p className="mt-4 text-sm text-dim">
-        You&apos;ll need testnet MON for gas before anything else — including the
-        dUSD faucet, which is itself a transaction.
+        {ASSET.kind === "usdc"
+          ? "You'll need testnet MON for gas before anything else: every deposit and exit is a transaction."
+          : "You'll need testnet MON for gas before anything else — including the dUSD faucet, which is itself a transaction."}
       </p>
       <a
         href={MONAD_FAUCET_URL}
@@ -133,9 +135,9 @@ export function GasFirstCard({ className = "" }: { className?: string }) {
   const v = useBook();
   if (!v.connected) return null;
 
-  // Only shown when we know the user has no dUSD — if the read failed we do
-  // not guess at their state.
-  const noDusd = v.wallet.status === "ok" && v.wallet.value.dusd === 0n;
+  // Only shown when we know the user has none of the book asset — if the read
+  // failed we do not guess at their state.
+  const noDusd = v.wallet.status === "ok" && v.wallet.value.cash === 0n;
   if (!noDusd) return null;
 
   return (
@@ -155,10 +157,20 @@ export function GasFirstCard({ className = "" }: { className?: string }) {
           </a>{" "}
           — every transaction needs it, including step 2.
         </li>
-        <li>
-          <span className="num text-steel">2.</span> Then &ldquo;Get test dollars&rdquo; above for
-          100 dUSD to deposit.
-        </li>
+        {ASSET.kind === "usdc" ? (
+          <li>
+            <span className="num text-steel">2.</span> Then{" "}
+            <a href={ASSET.faucetUrl} target="_blank" rel="noopener noreferrer" className="text-hull">
+              test USDC from Circle&apos;s faucet ↗
+            </a>{" "}
+            — choose Monad Testnet; it sends 20 USDC every 2 hours.
+          </li>
+        ) : (
+          <li>
+            <span className="num text-steel">2.</span> Then &ldquo;Get test dollars&rdquo; above for
+            100 dUSD to deposit.
+          </li>
+        )}
       </ol>
     </Card>
   );

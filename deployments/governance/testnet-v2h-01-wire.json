@@ -1,0 +1,12 @@
+{
+  "name": "Vessel v2 hedged testnet 01 — wire HedgedEngine, caps, reserve",
+  "salt": "testnet-v2h-01-wire",
+  "notes": "ADR-009 deployment on Circle testnet USDC. Before scheduling: send 20 USDC (Circle, faucet.circle.com) to the TimelockController; it funds the reserve seed. Stage cap 25,000 USDC = the V1 ceiling; testnet USDC has no value. No funding-rate call: the hedged engine earns funding on Perpl.",
+  "calls": [
+    { "to": "TrancheController", "sig": "setEngine(address)", "args": ["@HedgedEngine"] },
+    { "to": "TrancheController", "sig": "setStageCap(uint256)", "args": ["25000000000"] },
+    { "to": "TrancheController", "sig": "setCloseCost(uint256)", "args": ["1000000"] },
+    { "to": "USDC", "sig": "approve(address,uint256)", "args": ["@AssetCustody", "20000000"] },
+    { "to": "TrancheController", "sig": "contributeReserve(uint256)", "args": ["20000000"] }
+  ]
+}

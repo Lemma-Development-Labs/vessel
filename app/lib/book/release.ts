@@ -5,6 +5,7 @@ export const RELEASE = {
   chainId: 10143,
   deployedBlock: 67565062,
   venue: "sim",
+  venues: null,
   status: "SIMULATED engine; G01-G04 BLOCKED; not audited",
   timelockDelaySeconds: 300,
 } as const;

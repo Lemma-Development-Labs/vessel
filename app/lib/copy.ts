@@ -1,3 +1,4 @@
+import { ASSET } from "./book/asset";
 /** Fixed user-facing copy (app/CLAUDE.md "Copy (do not paraphrase)"). */
 export const COPY = {
   floor: "Ballast must stay at or above 20% of deck TVL. Join Ballast or exit Hull.",
@@ -11,7 +12,10 @@ export const COPY = {
   },
   impair: "HULL IMPAIRMENT — halted",
   slippage: "price moved — try again",
-  legal: "Unaudited testnet. Demo dollars (dUSD) have no value. Not an offer of securities.",
+  legal:
+    ASSET.kind === "usdc"
+      ? "Unaudited testnet. Testnet USDC has no value. Not an offer of securities."
+      : "Unaudited testnet. Demo dollars (dUSD) have no value. Not an offer of securities.",
 } as const;
 
 export type Toast = {
