@@ -17,8 +17,8 @@ SimVenue). Evidence: source inspection this session and the chain reads in
 
 | ID | Decision (short) | Repo status |
 |---|---|---|
-| D01 | One chain, MON market, USDC deposits | **GAP** — v0 deposit asset is DemoUSD (valueless faucet token). USDC verified on mainnet (6 dec) but unused. |
-| D02 | Explicit USDC→AUSD collateral route | **GAP** — no AUSD code anywhere. AUSD verified on mainnet (6 dec). |
+| D01 | One chain, MON market, USDC deposits | **GAP** — v0 deposit asset is DemoUSD (valueless faucet token). USDC verified on mainnet (6 dec) but unused. **2026-10-05:** the v2 testnet book still uses dUSD; ADR-009 moves the next deployment to Circle testnet USDC and retires dUSD. |
+| D02 | Explicit USDC→AUSD collateral route | **GAP** — no AUSD code anywhere. AUSD verified on mainnet (6 dec). **2026-10-05:** the route is proven on a testnet fork (`KuruProof`, ADR-009); no production `CollateralAdapter` yet. |
 | D03 | No publicly redeemable pooled vault share | **PARTIAL** — vBLITZ exists; `deposit`/`mint` are Tranches-only, but `withdraw`/`redeem` are public to share holders (BlitzVault.sol:238-256). Only Tranches and the dead-share address hold shares today. v2 requires no external fungible custody share at all. |
 | D04 | Custom asynchronous request/claim interfaces | **GAP** — v0 join/exit are synchronous; no request queue, no claim escrow. |
 | D05 | Loss order Ballast → Reserve → Hull | **PARTIAL** — v0 does Ballast then Reserve, then **reverts** `HullImpairment()` (Tranches.sol:217) instead of impairing Hull into a wind-down state. |
@@ -29,7 +29,7 @@ SimVenue). Evidence: source inspection this session and the chain reads in
 | D10 | Queue shares exposed until USDC funded + segregated | **GAP** — no queues; exits either pay immediately or revert. |
 | D11 | 30% junior cover for new risk; 20% floor | **PARTIAL** — v0 enforces only the 20% floor (`THETA_MIN_BPS = 2000`); no 30% admission buffer, no projected full-term coupon cover. |
 | D12 | No proxies in V1 core | **ALIGNED** — v0 core has no proxies; economic parameters are `constant`/`immutable`. |
-| D13 | Trade key separate from owner/withdrawal rights | **N/A YET** — no venue keys exist; keeper key is gas-only and calls a permissionless `crank()`. Becomes real in Session 3. |
+| D13 | Trade key separate from owner/withdrawal rights | **N/A YET** — no venue keys exist; keeper key is gas-only and calls a permissionless `crank()`. Becomes real in Session 3. **2026-10-05:** `PerplProof` shows the venue account can be owned by a contract, so no EOA holds venue funds; the keeper only triggers bounded engine calls. |
 | D14 | Independent review before external beta capital | **OPEN** — no reviewer engaged (G05). |
 | D15 | Eight sessions with evidence gates | **IN PROGRESS** — Session 1 running. COMMON.md matches its recorded hash; the eight prompts are imported in their baseline-embedded edition ([spec/prompts/SESSIONS_BASELINE_EDITION.md](spec/prompts/SESSIONS_BASELINE_EDITION.md)), which does not reproduce the per-file hashes. |
 | D16 | One Vessel identity, one UI and auth system | **PARTIAL** — one app identity exists (app/CLAUDE.md design law); no auth system yet. Frozen design in [AUTH.md](AUTH.md). |
@@ -92,7 +92,7 @@ people named.
 - **Accounting impact:** conversion is internal (not a flow in `G`); FX changes enter `G` once.
 - **Migration effect:** `CollateralAdapter` (S3); DemoUSD confined to lab/test fixtures.
 - **Tests:** `collateral_route_refused_beyond_floor`; FX divergence halts (S3).
-- **Review owner:** Daksh · **Status:** accepted by spec; blocked on G04.
+- **Review owner:** Daksh · **Status:** accepted by spec; route proven on a testnet fork 2026-10-05 (ADR-009); mainnet blocked on G04.
 
 ### ADR-005 — Beta claim transfer restrictions (D09)
 
@@ -130,3 +130,13 @@ people named.
 - **Migration effect:** deferred items return as later phases; nothing deferred is labelled live.
 - **Tests:** unchanged per feature; deferred features stay PLANNED in TEST_PLAN.
 - **Review owner:** Kunal · **Status:** accepted.
+
+### ADR-009 — One user dollar: Circle USDC; Vessel-opened Kuru markets on testnet (2026-10-05)
+
+- **Old rule:** the testnet book uses dUSD (DemoUSD plus a Vessel faucet), and the short leg is the labelled `SimulatedEngine` (ADR-008).
+- **Replacement:** users deposit, hold claims in and withdraw only **Circle USDC** (testnet `0x534b…43A3`, mainnet `0x7547…b603`). dUSD and its faucet are retired at the next deployment; testers use faucet.circle.com. **AUSD is engine-internal** Perpl margin and never appears as a user balance (D02, ADR-004). Kuru's testnet "USD Coin" `0x3bA3…1570` is not Circle USDC and is never used. On testnet, Vessel opens its own Kuru **MON/USDC** and **MON/AUSD** markets (`deployProxy` is permissionless) and seeds them with flip orders plus a vault backstop, labelled "testnet liquidity provided by Vessel". On mainnet, the official Kuru MON/USDC and MON/AUSD markets serve the same code path. The only other dollars are the deferred vUSD/svUSD lab (spec §18, ADR-008), on its own testnet book.
+- **Reason:** founder direction 2026-10-05: official USDC, no other user dollar. The three testnet venues used three different dollars (dUSD, Kuru's test USDC, Perpl's AUSD), and Kuru testnet had no buyers. Fork proofs show a contract can own a Perpl account and convert USDC⇄AUSD atomically under the 20 bps floor ([FACT_CHECKS.md](FACT_CHECKS.md#testnet-venues--verified-2026-10-05-chain-reads--fork-proofs)).
+- **Accounting impact:** none to the waterfall. USDC and AUSD are both 6 dp, like dUSD. AUSD/USDC FX enters `G` once, per ADR-004.
+- **Migration effect:** a **fresh v2 deployment** (`setEngine` is once-only) with Circle USDC as the book asset and a `HedgedEngine` in place of `SimulatedEngine`; the deploy script, Safe batches, keeper, app, SDK and verifier switch from dUSD to USDC. The current dUSD deployment stays readable until it is retired. Testnet seeding needs test MON (~40k minimum, ~150k comfortable), AUSD and USDC from partners.
+- **Tests:** `PerplProof.test_contractOwnedShortLifecycle`, `KuruProof.test_marketsQuoteBothSides`, `test_usdcToAusdAtomicRoundTrip`, `test_floorRevertsWholeRoute` (fork, opt-in); HedgedEngine unit and invariant tests to follow.
+- **Review owner:** Kunal (scope) + Daksh · **Status:** accepted; fork-proven; engine and deployment in progress.

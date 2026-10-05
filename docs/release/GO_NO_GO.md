@@ -28,7 +28,7 @@ and batch 02 (Hull series 1) once Ballast and the reserve can cover it.
 | Gate | Status | Evidence / blocker |
 |---|---|---|
 | R01 Specification | PASS | ADR-008; 10,008 settlement cases agree across Python, TypeScript and Solidity; ACCOUNTING and STATE_MACHINES docs |
-| R02 Venues | BLOCKED | G01, G02, G04 — testnet short leg is a labelled simulator |
+| R02 Venues | BLOCKED | G01, G02, G04 — testnet short leg is a labelled simulator. Update 2026-10-05: G01 and G04 have testnet fork proofs (ADR-009); the deployed book is still simulated and mainnet is unproven |
 | R03 Valuation | BLOCKED | G03 — no oracle; on-chain reconstruction exists (`vessel-verify` PASS) |
 | R04 Economics | BLOCKED | 30-day rate history needs 30 days of observed carry |
 | R05 Security | BLOCKED | G05 — no independent review |

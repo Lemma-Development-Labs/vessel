@@ -127,10 +127,34 @@ Raw output: [evidence/phase1/factcheck-2026-09-30.txt](evidence/phase1/factcheck
    `KEEPER_PK` beside public endpoints) — violates the spec §5 boundary
    "public data cannot sign"; split scheduled (docs/ARCHITECTURE.md).
 
-## Testnet venue facts recorded on unmerged branches (not re-verified)
+## Testnet venues — verified 2026-10-05 (chain reads + fork proofs)
+
+Read with `cast` against `testnet-rpc.monad.xyz` (around block 68,43x,xxx) and
+proven on forks by `contracts/test/fork/PerplProof.t.sol` and
+`KuruProof.t.sol` (opt-in, `VENUE_FORK=1`). Testnet-only — never mainnet
+defaults. Summary table: [FACTS.md](../FACTS.md#venues-verified-2026-10-05).
+
+| Claim | Value | Evidence | Status |
+|---|---|---|---|
+| Circle USDC (testnet) | `0x534b2f3A21130d7a60830c2Df862319e593943A3`, 6 dp, "USDC" | `cast` name/symbol/decimals; listed on developers.circle.com; faucet.circle.com gives 20 / 2 h / address | VERIFIED |
+| Kuru testnet "USD Coin" | `0x3bA3d39AFcf8bb994f7964B3e0171Ea2Ba361570`, 6 dp, 1e15 supply, 1,737-byte code | `cast`; it is the quote of Kuru's only testnet market | VERIFIED — **not Circle USDC; never used** |
+| Perpl testnet collateral | AUSD `0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`, 6 dp | `getExchangeInfo()` returns it; exchange holds ~64.3M | VERIFIED. Perpl's README names "Test USD" `0xdf5b…c027`; the exchange holds none of it — **README stale** |
+| Perpl testnet Exchange | `0x1964C32f0bE608E7D29302AFF5E61268E72080cc`, impl `0xbcbd3701…adbb` (was `0x5dce9e6a…` on 09-06) | every selector the proof uses found in impl bytecode | VERIFIED — impl has been upgraded since September |
+| Perpl ABI | PerplFoundation/dex-sdk `crates/sdk/abi/dex/Exchange.json`, REVISION `rc_v1.1.7-203-g0e5902dd` | selectors `createAccount(uint256)` `0xcab13915`, `execOrder(OrderDesc)` `0x4d8dc985`, `depositCollateral` `0xbad4a01f`, `withdrawCollateral` `0x6112fe2e` present | VERIFIED |
+| Perpl order types | 0 OpenLong, 1 OpenShort, 2 CloseLong, 3 CloseShort, 4 Cancel, 5 IncreasePositionCollateral, 6 Change | dex-sdk `RequestType`; fork fill | VERIFIED — earlier notes that started at 1 were wrong |
+| Perpl MON perp 64 | price 5 dp, lot 0 dp (1 lot = 1 MON), mark ≈ 0.0311, OI 2.84M / 2.84M MON, 23 resting orders both sides, min account open 100 AUSD | `getPerpetualInfoV2(64)`, `getMinAccountOpenCNS()` | VERIFIED |
+| Contract-owned Perpl account | contract opened account #842, deposited, shorted 1,000 MON IOC at 0.03107, closed, withdrew 599.94 / 600 AUSD to a fixed address | `PerplProof` on fork | **PROVEN on fork** (G01 shape) |
+| Kuru market creation | `Router.deployProxy` is public; Vessel can open MON/USDC (Circle) and MON/AUSD | `KuruProof` on fork | **PROVEN on fork** |
+| Kuru two-sided quotes | flip orders at ±3 bps plus a vault backstop quote both sides | `KuruProof.test_marketsQuoteBothSides` | **PROVEN on fork** |
+| USDC→AUSD route | `Router.anyToAnySwap` USDC→MON→AUSD in one tx: 100 USDC → 99.936 AUSD → 99.873 USDC (12.7 bps round trip); below the floor the whole route reverts | `KuruProof` | **PROVEN on fork** (G04 shape) |
+| Seed per Kuru market | 2,000 quote + 64,500 MON flip, plus 10,000 MON + 310 quote vault | proof parameters | Our testnet wallets hold ~10 MON — **test MON is the binding constraint** |
+
+## Testnet venue facts recorded on unmerged branches (superseded 2026-10-05)
 
 Recorded on `cursor/perpl-venue-bf3b` / `cursor/hull-series-gate-bf3b`
-(2026-09-06/07). **UNVERIFIED here**; testnet-only — never mainnet defaults.
+(2026-09-06/07). Superseded by the verified section above: the Perpl impl has
+since been upgraded, and the account-ownership row is answered by the fork
+proof. Testnet-only — never mainnet defaults.
 
 | Claim | Value | Source |
 |---|---|---|
@@ -146,10 +170,10 @@ Owners are **proposed** per spec §25 and unconfirmed by the named people.
 
 | ID | Dependency | Evidence required | Proposed owner | Status |
 |---|---|---|---|---|
-| G01 | Contract-owned Perpl account, constrained recovery | Demonstrated account control, revocation, destination limits | Daksh | OPEN — blocks mainnet beta |
-| G02 | MON market metadata + executable depth (both venues) | Pinned ABIs, lot/precision, measured depth over time | Daksh | OPEN |
+| G01 | Contract-owned Perpl account, constrained recovery | Demonstrated account control, revocation, destination limits | Daksh | OPEN — blocks mainnet beta. **Testnet fork 2026-10-05:** a contract created, funded, traded and withdrew from its own account (`PerplProof`). Still open: mainnet fork, constrained recovery, destination limits in the real engine |
+| G02 | MON market metadata + executable depth (both venues) | Pinned ABIs, lot/precision, measured depth over time | Daksh | OPEN. **2026-10-05:** Perpl ABI pinned; testnet perp 64 metadata read. Kuru testnet has no Circle-USDC or AUSD market — Vessel opens and seeds its own (needs test MON). Mainnet depth not yet measured over time |
 | G03 | Onchain MON/USD, USDC/USD, AUSD/USD valuation inputs | Approved feed IDs with freshness/deviation bounds | Daksh | OPEN — no oracle identified |
-| G04 | USDC/AUSD conversion + withdrawal limits | Atomic two-leg route with aggregate output floor | Daksh | OPEN |
+| G04 | USDC/AUSD conversion + withdrawal limits | Atomic two-leg route with aggregate output floor | Daksh | OPEN. **Testnet fork 2026-10-05:** Kuru `anyToAnySwap` USDC→MON→AUSD is atomic under a floor, 12.7 bps round trip (`KuruProof`). Still open: mainnet route depth and Perpl withdrawal limits |
 | G05 | Independent security reviewer | Engagement, scope, findings | Kunal | OPEN — blocks external deposits (D14) |
 | G06 | Beta participant eligibility + offering terms | Counsel review, consent version | Kunal | OPEN — blocks invitations |
 | G07 | Two-person operating coverage | Named primary/backup with availability | Kunal + Daksh | OPEN |
@@ -161,5 +185,8 @@ Owners are **proposed** per spec §25 and unconfirmed by the named people.
 
 External sources S1–S12 are listed in docs/spec/VESSEL_V1.md §28 (checked
 2026-09-22 by the blueprint author). Chain evidence above is this repo's own,
-gathered 2026-09-23. Web-source rechecks (Kuru router vs market semantics,
-Perpl API key scopes, market IDs) remain open under G01–G04.
+gathered 2026-09-23. Rechecked 2026-10-05: Kuru router vs market semantics
+(docs.kuru.io Router, OrderBook, KuruAMMVault, Contract-addresses), the Perpl
+on-chain ABI and testnet market IDs (PerplFoundation/dex-sdk, api-docs), and
+Circle's USDC address list. Perpl API key scopes are unused: the engine trades
+on chain from its own account, with no API key.

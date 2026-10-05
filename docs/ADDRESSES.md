@@ -55,7 +55,12 @@ passes to the team by replacing signers on the Safe — tracked under G07.
 Reserve seed: 20 dUSD, contributed by Safe batch 01 (executed 2026-10-02), which also
 wired the SIMULATED engine `0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED` (12% funding),
 set the stage cap to 25,000 dUSD and the close cost to 1 dUSD. Next: batch 03
-(tester allowances) and batch 02 (Hull series 1) — see [`deployments/README.md`](../deployments/README.md).
+(tester allowances, executed) and batch 02 (Hull series 1) — see [`deployments/README.md`](../deployments/README.md).
+
+**Next deployment (ADR-009):** a fresh v2 deployment replaces dUSD with Circle USDC
+and `SimulatedEngine` with a `HedgedEngine` over Perpl and Vessel-opened Kuru markets.
+This table stays the source of truth until that deployment broadcasts. Venue and token
+addresses (Circle USDC, AUSD, Perpl, Kuru) are in [FACTS.md](../FACTS.md#venues-verified-2026-10-05).
 
 Superseded 2026-10-02: the first v2 deployment (block 67163430, governed by the
 previous Safe `0xe4f2…0279`, whose keys the team retired) — manifest kept at

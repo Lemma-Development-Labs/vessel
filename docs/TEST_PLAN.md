@@ -51,6 +51,9 @@ reference must not call the implementation under test.
 | Paired slicing, failed-leg compensation, UNHEDGED_ALERT | adapter replay tests (recorded venue traces) | PLANNED-S3 |
 | Idempotent orders, lost-ack reconciliation, two keepers | `vessel-service/test/keeper-v2.test.ts` (persist-before-dispatch, crash restart, `timeout_is_unknown_not_failed`, `two_workers_one_signs`, `stale_worker_rejected_by_fencing`, allowlist, superseded) | DONE (2026-09-30) for v2 controller actions; venue orders PLANNED-S3 (G01) |
 | Margin stress +30% MON without top-up | stress model | PLANNED-S3 (gated G02) |
+| Contract-owned Perpl account: create, deposit, short, close, withdraw to a fixed address (G01) | `contracts/test/fork/PerplProof.t.sol` — opt-in `VENUE_FORK=1`, testnet fork | DONE (2026-10-05) on testnet fork; mainnet fork PLANNED |
+| USDC⇄AUSD route atomic under the aggregate floor; below the floor the whole route reverts (G04, `collateral_route_refused_beyond_floor`) | `contracts/test/fork/KuruProof.t.sol` (`test_usdcToAusdAtomicRoundTrip`, `test_floorRevertsWholeRoute`) | DONE (2026-10-05) on testnet fork against Vessel-opened markets; production `CollateralAdapter` PLANNED |
+| Vessel-opened Kuru markets quote both sides | `KuruProof.test_marketsQuoteBothSides` | DONE (2026-10-05) on fork; live seeding waits on test MON |
 
 ## Evidence and data (spec §12–§13)
 

@@ -1,6 +1,6 @@
 # BUILD_STATUS
 
-Updated 2026-09-30 · branch `p-development` · v2 program per
+Updated 2026-10-05 · branch `p-development` · v2 program per
 [spec/VESSEL_V1.md](spec/VESSEL_V1.md) (+ D30 from [HANDBOOK_v4.md](HANDBOOK_v4.md)),
 sessions per §25.
 
@@ -66,13 +66,40 @@ transparency) and `/terminal` with a typed command palette; `packages/sdk`
 (spec read/verify tools, prepare gated); release record with all twelve
 gates evaluated.
 
+## Live testnet book — 2026-10-05
+
+Safe batches 01 and 03 (wave 1, tester `0xD802…6206` allowed 1,000 dUSD) are executed.
+The v2 keeper runs on Railway. The first live deposit (request #1, 100 dUSD
+Ballast) was admitted by the keeper. `/v1/book` at block 68,445,192: Ballast
+100 dUSD, reserve 20 dUSD, 102 dUSD in the simulated engine, epoch 52, every
+book check PASS. Batch 02 (Hull series 1) is not yet signed.
+
+## Venue integration — 2026-10-05 · `fork-proven`, engine in progress
+
+Decision: [ADR-009](DECISIONS.md#adr-009--one-user-dollar-circle-usdc-vessel-opened-kuru-markets-on-testnet-2026-10-05):
+Circle USDC is the only user dollar, AUSD is engine-internal, dUSD is retired at
+a fresh deployment, and Vessel opens its own Kuru markets on testnet.
+
+Proven on testnet forks (opt-in `VENUE_FORK=1`, evidence in
+[FACT_CHECKS.md](FACT_CHECKS.md#testnet-venues--verified-2026-10-05-chain-reads--fork-proofs)):
+
+- `PerplProof`: a contract owns Perpl account #842, shorts 1,000 MON, closes,
+  and withdraws 599.94 / 600 AUSD to a fixed address.
+- `KuruProof`: Vessel-opened MON/USDC and MON/AUSD quote both sides;
+  USDC→MON→AUSD in one transaction under the floor, 12.7 bps round trip.
+
+Next: `HedgedEngine` (replaces `SimulatedEngine`: Kuru spot, Perpl short,
+USDC⇄AUSD route, on-chain bounds); dUSD → USDC across contracts, keeper, app,
+SDK and verifier; then the fresh deployment and Safe batches. Testnet seeding
+waits on partner test MON, AUSD and USDC.
+
 ## Blockers and follow-ups
 
 | Item | Owner | Blocks |
 |---|---|---|
 | Fund the testnet keeper | Kunal | v0 demo settlement |
-| Safe batch 01 executed 2026-10-02. Next: tester wallet list for batch 03 (allowances), then batch 02 (Hull series 1) | Priya / Safe signers | first deposits; Hull series |
-| Set `V2_KEEPER_PK` (keeper `0xd158…f16f`, funded 5 MON) and the v2 manifest on Railway; `NEXT_PUBLIC_STATS_URL` on Vercel | Priya | v2 keeper + app evidence panels |
+| Batches 01 and 03 executed. Next: batch 02 (Hull series 1) on the current book, or fold it into the USDC deployment | Priya / Safe signers | Hull series |
+| v2 keeper live on Railway (done). Still to do: `NEXT_PUBLIC_STATS_URL` on Vercel | Priya | app evidence panels |
 | Confirm the 2026-08-29 transactions from compromised key `0x4307…` | Kunal | incident record |
 | New Safe `0x12B2…2Ee5` signers share one phrase during the build — swap in team-held signers at handover | Priya / team | G07, R07 |
 | Evidence OPS.md §0 Railway/Vercel token rotation | Kunal | R05 |
@@ -80,8 +107,9 @@ gates evaluated.
 | Set `VESSEL_ENV=testnet` on Railway before deploying this branch | Kunal | service start |
 | Set `VESSEL_API_URL` on Vercel for `/onboarding` | Kunal | sign-in in production |
 | Per-file session prompts 01–08 (hashes in `spec/SHA256SUMS.json`) | Kunal | D15 provenance only |
-| G01–G07, G09–G10 | see FACT_CHECKS | mainnet beta |
+| Test MON (~40k min, ~150k comfortable), test AUSD (~5–10k, from Perpl) and Circle USDC beyond the faucet's 20 / 2 h, to seed the Vessel Kuru markets | Kunal / Priya to request | testnet hedged engine |
+| G01–G07, G09–G10 (G01, G02 and G04 have testnet fork evidence; mainnet still open) | see FACT_CHECKS | mainnet beta |
 
 ## Resume instruction
 
-Meet the two testnet GO conditions in [release/GO_NO_GO.md](release/GO_NO_GO.md), then follow [sessions/05.md](sessions/05.md).
+Follow [sessions/06.md](sessions/06.md): build `HedgedEngine` against the two fork proofs, switch the book asset to Circle USDC, then rehearse the fresh deployment on an Anvil fork.

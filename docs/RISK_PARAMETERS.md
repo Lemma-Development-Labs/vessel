@@ -85,7 +85,7 @@ decimal strings; TypeScript uses `bigint`; Solidity uses checked integers.
 | P01 | Valuation | Exact price feeds and venue-state authentication | core activation | OPEN (G03) |
 | P02 | Precision | Unit decimals, virtual offsets, seed, rounding residual and dust destination | claim issuance | OPEN |
 | P03 | Hull rate | EWMA initialization, missing-data rule, cost dataset | Hull activation | OPEN |
-| P04 | Custody | Perpl account ownership, delegation, fixed withdrawal method | real execution | OPEN (G01) |
+| P04 | Custody | Perpl account ownership, delegation, fixed withdrawal method | real execution | OPEN (G01). Testnet fork 2026-10-05: the account is owned by a contract and withdraws to a fixed address (`PerplProof`); no delegation or API key is needed |
 | P05 | Routes | Provider contract versions, finality, timeouts | each source route | OPEN (G09) |
 | P06 | Operations | Named primary, backup and independent signers | any funded canary | OPEN (G07) |
 | P07 | Participation | Entity terms and eligible jurisdictions | external cohort | OPEN (G06) |

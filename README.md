@@ -93,6 +93,8 @@ Negative yield eats Ballast, then reserve. If both would be exhausted the crank 
 | Short-leg funding | **Simulated.** `SimVenue` implements `IVenue`. `isSimulated() == true`. Seeded pot; empty pot reverts `InsufficientPot`. |
 | Perp venue | `venues/PerplVenue.stub.sol` — compiles, every mutative call reverts `NotImplemented()`. Swap-in = one contract. See [PerplFoundation/api-docs](https://github.com/PerplFoundation/api-docs). |
 
+**Next (not deployed):** the v2 book moves to **Circle USDC** and a hedged engine over **Kuru** spot and a **Perpl** short, both proven on testnet forks on 2026-10-05. AUSD stays inside the engine as Perpl margin. Decision: [ADR-009](docs/DECISIONS.md#adr-009--one-user-dollar-circle-usdc-vessel-opened-kuru-markets-on-testnet-2026-10-05); evidence: [FACT_CHECKS.md](docs/FACT_CHECKS.md#testnet-venues--verified-2026-10-05-chain-reads--fork-proofs). Until that deployment broadcasts, everything in this table stands.
+
 Guardian can **only pause**. It cannot move funds or change params. There is **no privileged mint** (dUSD faucet is 100 / hour, lifetime 1,000 per address).
 
 **Spot mark:** EngineLite marks WMON from `router.getAmountsOut` (pool mid). That price is manipulable. Per-crank spot PnL is capped at **±5%** of the last marked spot value (`SPOT_PNL_CAP_BPS = 500`). The real fix is a TWAP/oracle.
@@ -517,7 +519,7 @@ DUSD=… TRANCHES=… ALICE_PK=… BOB_PK=… forge script script/Seed.s.sol --b
 
 ## The honest gap
 
-External security audit (the hard gate) · real venue: PerplVenue against Perpl’s order/margin/liquidation surface · real USDC and removal of DemoUSD/faucet · **Puddle** (or another real pool) wired as `router`/`wmon` · TWAP/oracle for the spot mark · timelock + multisig replacing single-key ownership; guardian policy published · deposit caps + progressive limits · monitoring/alerting beyond logs · legal review before vUSD.
+External security audit (the hard gate) · real venue: a contract-owned Perpl short and Kuru spot (fork-proven 2026-10-05, not deployed) · real USDC (Circle) and removal of DemoUSD/faucet (decided in ADR-009, lands with the next deployment) · Kuru markets replace Puddle as the planned spot route · TWAP/oracle for the spot mark · timelock + multisig replacing single-key ownership; guardian policy published · deposit caps + progressive limits · monitoring/alerting beyond logs · legal review before vUSD.
 
 Until every line here is crossed, the banner stays amber and the first word stays **unaudited**.
 

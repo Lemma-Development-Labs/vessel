@@ -40,7 +40,7 @@ Two faces, no more:
 - **IBM Plex Mono** — EVERY number, address, hash, rate, timestamp, label, nav item and
   button. Labels and buttons are uppercase with wide tracking (.14–.26em). `tabular-nums`.
 
-dUSD: 4 decimal places in tables, 2 in summaries.
+dUSD (USDC after the ADR-009 deployment): 4 decimal places in tables, 2 in summaries.
 
 ## Color-by-role (honesty)
 
@@ -58,6 +58,10 @@ dUSD: 4 decimal places in tables, 2 in summaries.
 - SIM VENUE chip when SimVenue is active
 - Footer legal line includes **unaudited**
 - dUSD is demo dollars. Never call it USDC.
+- From the ADR-009 deployment on, the book asset is Circle testnet USDC: label it `USDC`, link
+  faucet.circle.com instead of the dUSD faucet, and never show AUSD as a user balance (it is
+  engine-internal Perpl margin; it may appear only in Transparency/Terminal engine breakdowns).
+  Vessel-seeded Kuru markets carry the line `testnet liquidity provided by Vessel`.
 
 ## Copy (do not paraphrase)
 

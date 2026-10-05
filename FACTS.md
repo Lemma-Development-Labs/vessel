@@ -62,7 +62,9 @@ The seven protocol contracts: DemoUSD, Guardian, BlitzVault, Tranches, SimVenue,
 
 These three must remain distinct on testnet. Never commit private keys.
 
-## Venues — testnet verified on chain 2026-10-05 (mainnet column: venue docs + earlier reads)
+## Venues (verified 2026-10-05)
+
+Testnet column read on chain this day; mainnet column from venue docs and earlier reads.
 
 Dollars: users only ever hold **Circle USDC**. AUSD is Perpl margin, internal to the engine (D02). dUSD is retired at the next deployment. Kuru's testnet "USD Coin" is not Circle USDC; never use it.
 
