@@ -110,22 +110,29 @@ contract KuruQuotes is Script {
         console2.log("quotes written to", statePath);
     }
 
-    /// @dev Flip order ids this seeder created on `book`, from FlipOrderCreated (orderId and owner indexed).
+    /// @dev Flip order ids this seeder created on `book`. The deployed markets emit FlipOrderCreated with
+    ///      every field in the data (nothing indexed), unlike docs.kuru.io; both layouts are read.
     function _ids(Vm.Log[] memory logs, address book, address seeder) internal pure returns (uint256[] memory ids) {
         uint256 n;
         for (uint256 i; i < logs.length; i++) {
-            if (_isOurs(logs[i], book, seeder)) n++;
+            if (_ours(logs[i], book, seeder) != 0) n++;
         }
         require(n > 0, "no FlipOrderCreated logs: check the event signature against the deployed market");
         ids = new uint256[](n);
         n = 0;
         for (uint256 i; i < logs.length; i++) {
-            if (_isOurs(logs[i], book, seeder)) ids[n++] = uint256(logs[i].topics[1]);
+            uint256 id = _ours(logs[i], book, seeder);
+            if (id != 0) ids[n++] = id;
         }
     }
 
-    function _isOurs(Vm.Log memory l, address book, address seeder) private pure returns (bool) {
-        return l.emitter == book && l.topics.length == 4 && l.topics[0] == FLIP_CREATED
-            && address(uint160(uint256(l.topics[3]))) == seeder;
+    /// @return id the flip order id when `l` is a FlipOrderCreated by `seeder` on `book`, else 0
+    function _ours(Vm.Log memory l, address book, address seeder) private pure returns (uint256) {
+        if (l.emitter != book || l.topics.length == 0 || l.topics[0] != FLIP_CREATED) return 0;
+        if (l.topics.length == 4) {
+            return address(uint160(uint256(l.topics[3]))) == seeder ? uint256(l.topics[1]) : 0;
+        }
+        (uint40 id,, address owner,,,,) = abi.decode(l.data, (uint40, uint40, address, uint96, uint32, uint32, bool));
+        return owner == seeder ? id : 0;
     }
 }

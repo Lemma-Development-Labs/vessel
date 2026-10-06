@@ -103,11 +103,13 @@ support across `DeployV2` (V2_ENGINE=hedged), `vessel-verify` (engine backing,
 recomputed value, hedge gap), SDK and app; Safe batch specs `testnet-v2h-01/03`;
 scripts to open and quote Vessel's Kuru markets.
 
-Next: rehearse the whole hedged deployment on an Anvil fork (open markets,
-quote, deploy, batches, a deposit, the real keeper hedging, `vessel-verify`).
-Perpl's mark cannot update on a fork, so the rehearsal must finish inside the
-60 s price window. Then the real deployment. Testnet seeding waits on partner
-test MON, AUSD and USDC.
+Rehearsed 2026-10-06 ([sessions/07.md](sessions/07.md)): `scripts/v2-deploy-hedged.sh --rehearse`
+ran markets → quotes → deploy → reserve → Safe batches → a 1,000 USDC deposit
+→ the real keeper hedging (705.71 MON spot vs 705-lot short after 150 s) →
+`vessel-verify` OVERALL PASS with the new engine checks.
+
+Next: the real deployment, after partner test MON, AUSD and USDC arrive, the
+Safe signers are ready, and an explicit go-ahead.
 
 ## Blockers and follow-ups
 
@@ -128,4 +130,4 @@ test MON, AUSD and USDC.
 
 ## Resume instruction
 
-Follow [sessions/06.md](sessions/06.md): build `HedgedEngine` against the two fork proofs, switch the book asset to Circle USDC, then rehearse the fresh deployment on an Anvil fork.
+Follow [sessions/07.md](sessions/07.md) "Real run": run `scripts/v2-deploy-hedged.sh` for real once its preconditions hold.
