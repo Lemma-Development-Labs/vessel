@@ -78,6 +78,13 @@ Dollars: users only ever hold **Circle USDC**. AUSD is Perpl margin, internal to
 
 Perpl order types are **0-based**: 0 OpenLong, 1 OpenShort, 2 CloseLong, 3 CloseShort (dex-sdk `RequestType`). ABI: PerplFoundation/dex-sdk `crates/sdk/abi/dex/Exchange.json` (rc_v1.1.7-203); all used selectors present in the testnet impl.
 
+Test assets for seeding the Vessel Kuru markets (testnet):
+
+- **AUSD:** Agora's faucet `0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C` (proxy → impl `0xba80…2a49`), `requestFunds(address recipient)`: 10,000 AUSD per call, at most once a minute, until the recipient holds 100,000. Self-serve; no team request needed.
+- **Circle USDC:** faucet.circle.com, 20 every 2 hours per address.
+- **MON:** public faucets give about 1–10 per wallet per day, so the ~40k needed must be requested from the Monad (or Kuru) team.
+- **Seeder (Kuru market maker):** `0x933DF4E2c927903D68c1FC82691b9a06dC6249F9`, key `KURU_SEEDER_PK` in `contracts/.env`. Holds 30,000 AUSD as of 2026-10-06. Distinct from the v0 `SEEDER_PK` wallet.
+
 Fork proofs (opt-in: `VENUE_FORK=1 forge test --match-path 'test/fork/*Proof*' --fork-url <testnet rpc>`):
 
 - `PerplProof` — a **contract** owns Perpl account #842: create 500 AUSD, deposit 100, short 1,000 MON IOC at 0.03107, close, withdraw 599.94 AUSD to custody (G01 shape on testnet).
