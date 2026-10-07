@@ -67,6 +67,12 @@ export const JOURNAL_MIGRATIONS: ReadonlyArray<{ id: string; statements: string[
          WHERE state NOT IN ('SUPERSEDED','REJECTED')`,
     ],
   },
+  {
+    // Native value (wei, decimal string) a transaction carries. Only the testnet quoter's margin
+    // deposit of MON uses it; the allowlist refuses value on every non-payable entry.
+    id: "005_keeper_journal_value",
+    statements: [`ALTER TABLE action_journal ADD COLUMN value text NOT NULL DEFAULT '0'`],
+  },
 ];
 
 export type JournalState = "PERSISTED" | "DISPATCHED" | "UNKNOWN" | "CONFIRMED" | "REVERTED" | "SUPERSEDED" | "REJECTED";
@@ -80,6 +86,8 @@ export type JournalEntry = {
   target: string;
   calldata: string;
   planned_nonce: string;
+  /** wei, decimal string; '0' for every non-payable call */
+  value: string;
   state: JournalState;
   tx_hash: string | null;
 };
@@ -153,6 +161,7 @@ export async function persistAction(
     calldata: string;
     plannedNonce: bigint;
     inputs: object;
+    value?: bigint;
   },
 ): Promise<JournalEntry> {
   return sql.transaction(async (q) => {
@@ -164,9 +173,12 @@ export async function persistAction(
     if (existing) return existing;
     const [row] = await q.query<JournalEntry>(
       `INSERT INTO action_journal
-         (client_request_id, account, fencing_token, policy_version, action, target, calldata, planned_nonce, inputs, state)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PERSISTED') RETURNING *`,
-      [e.clientRequestId, e.account, e.token.toString(), e.policyVersion, e.action, e.target, e.calldata, e.plannedNonce.toString(), JSON.stringify(e.inputs)],
+         (client_request_id, account, fencing_token, policy_version, action, target, calldata, planned_nonce, inputs, value, state)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'PERSISTED') RETURNING *`,
+      [
+        e.clientRequestId, e.account, e.token.toString(), e.policyVersion, e.action, e.target, e.calldata,
+        e.plannedNonce.toString(), JSON.stringify(e.inputs), (e.value ?? 0n).toString(),
+      ],
     );
     return row!;
   });

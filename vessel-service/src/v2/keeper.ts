@@ -31,6 +31,8 @@ export interface Tx {
   to: string;
   data: string;
   nonce: bigint;
+  /** native value in wei; only allowlist entries marked payable may carry it */
+  value?: bigint;
 }
 
 export interface ChainPort {
@@ -54,6 +56,8 @@ export interface Allowed {
   target: string;
   selector: string;
   action: string;
+  /** may carry native value (default false) */
+  payable?: boolean;
 }
 
 export class NotAllowedError extends Error {
@@ -72,12 +76,16 @@ export async function guardedSend(
   token: bigint,
   entry: JournalEntry,
 ): Promise<string> {
+  const value = BigInt(entry.value ?? "0");
   const ok = allow.some(
-    (a) => a.target.toLowerCase() === entry.target.toLowerCase() && entry.calldata.toLowerCase().startsWith(a.selector.toLowerCase()),
+    (a) =>
+      a.target.toLowerCase() === entry.target.toLowerCase() &&
+      entry.calldata.toLowerCase().startsWith(a.selector.toLowerCase()) &&
+      (value === 0n || a.payable === true),
   );
-  if (!ok) throw new NotAllowedError(`${entry.action} to ${entry.target} is not allowlisted`);
+  if (!ok) throw new NotAllowedError(`${entry.action} to ${entry.target}${value ? ` with value ${value}` : ""} is not allowlisted`);
   await assertCurrentToken(sql, chain.address, token);
-  return chain.send({ to: entry.target, data: entry.calldata, nonce: BigInt(entry.planned_nonce) });
+  return chain.send({ to: entry.target, data: entry.calldata, nonce: BigInt(entry.planned_nonce), value });
 }
 
 /**
@@ -158,6 +166,8 @@ export interface PlannedAction {
   target: string;
   calldata: string;
   inputs: object;
+  /** native value in wei (testnet quoter's MON margin deposit only) */
+  value?: bigint;
 }
 
 /**
@@ -180,6 +190,7 @@ export async function tick(d: KeeperDeps, plan: () => Promise<PlannedAction | nu
     calldata: next.calldata,
     plannedNonce: await d.chain.minedNonce(),
     inputs: next.inputs,
+    value: next.value,
   });
   if (entry.state !== "PERSISTED") return entry; // idempotent replay of an old decision
   // The returned entry carries the state after this tick, so callers log what actually happened.

@@ -11,6 +11,19 @@ interface IKuruBookQuotes {
     function addFlipBuyOrder(uint32 _price, uint32 _flippedPrice, uint96 _size, bool _provisionOrRevert) external;
     function addFlipSellOrder(uint32 _price, uint32 _flippedPrice, uint96 _size, bool _provisionOrRevert) external;
     function batchCancelFlipOrders(uint40[] calldata _orderIds) external;
+    function s_orders(uint40 id)
+        external
+        view
+        returns (
+            address owner,
+            uint96 size,
+            uint40 prev,
+            uint40 next,
+            uint40 flippedId,
+            uint32 price,
+            uint32 flippedPrice,
+            bool isBuy
+        );
 }
 
 interface IKuruMarginQuotes {
@@ -74,10 +87,9 @@ contract KuruQuotes is Script {
             string memory key = i == 0 ? ".monUsdc" : ".monAusd";
             if (bytes(previous).length > 0 && previous.keyExists(key)) {
                 uint256[] memory old = previous.readUintArray(key);
-                uint40[] memory ids = new uint40[](old.length);
-                for (uint256 j; j < old.length; j++) {
-                    ids[j] = uint40(old[j]);
-                }
+                uint40[] memory ids = _stillOurs(IKuruBookQuotes(k.book), old, seeder);
+                // Kuru reverts the whole batch on an order that is already filled or gone
+                // (docs.kuru.io says the call is idempotent; the deployed market is not).
                 if (ids.length > 0) IKuruBookQuotes(k.book).batchCancelFlipOrders(ids);
             }
             // Top the seeder's Kuru margin balance up to one side of quote and one side of MON.
@@ -108,6 +120,24 @@ contract KuruQuotes is Script {
         string memory out = vm.serializeUint(s, "monAusd", _ids(logs, markets[1].book, seeder));
         vm.writeJson(out, statePath);
         console2.log("quotes written to", statePath);
+    }
+
+    /// @dev The ids from `old` that are still live orders of `seeder` on `book`.
+    function _stillOurs(IKuruBookQuotes book, uint256[] memory old, address seeder)
+        internal
+        view
+        returns (uint40[] memory ids)
+    {
+        uint256 n;
+        uint40[] memory tmp = new uint40[](old.length);
+        for (uint256 j; j < old.length; j++) {
+            (address owner, uint96 size,,,,,,) = book.s_orders(uint40(old[j]));
+            if (owner == seeder && size > 0) tmp[n++] = uint40(old[j]);
+        }
+        ids = new uint40[](n);
+        for (uint256 j; j < n; j++) {
+            ids[j] = tmp[j];
+        }
     }
 
     /// @dev Flip order ids this seeder created on `book`. The deployed markets emit FlipOrderCreated with

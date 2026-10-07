@@ -54,6 +54,7 @@ if [ "$MODE" = "--rehearse" ]; then
   for _ in $(seq 1 90); do "$CAST" block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
   "$CAST" block-number --rpc-url "$RPC" >/dev/null || { echo "anvil fork did not start"; exit 1; }
   OUT="$ROOT/contracts/out/rehearsal-hedged"   # inside forge fs_permissions; contracts/out is gitignored
+  rm -rf "$OUT"   # every rehearsal starts clean: a fork re-creates the same market addresses
   BROADCAST=(--broadcast)
   # Anvil's well-known account #1 stands in for the keeper so the real keeper code can sign on the fork.
   KEEPER=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
@@ -95,7 +96,8 @@ refresh_mark() {
   local mark
   # getPosition returns (position, markPricePNS, valid); any account id works for the mark.
   mark="$("$CAST" call "$PERPL" 'getPosition(uint256,uint256)((uint256,uint256,uint256,uint8,uint256,uint256,uint256,uint256,int256,int256,int256),uint256,bool)' "$PERP_ID" 1 --rpc-url "$RPC" | sed -n 2p | awk '{print $1}')"
-  "$CAST" send "$PERPL" 'updateMarkPricePNSByOwner(uint256,uint32)' "$PERP_ID" "$mark" --from "$PERPL_OWNER" --unlocked --rpc-url "$RPC" >/dev/null
+  "$CAST" send "$PERPL" 'updateMarkPricePNSByOwner(uint256,uint32)' "$PERP_ID" "$((mark * (10000 + ${1:-0}) / 10000))" \
+    --from "$PERPL_OWNER" --unlocked --rpc-url "$RPC" >/dev/null
 }
 
 if [ "$MODE" = "--rehearse" ]; then
@@ -184,13 +186,22 @@ if [ "$MODE" = "--rehearse" ]; then
   "$CAST" send "$TC" 'requestDeposit(uint8,uint256,uint256,address,uint256,uint256)' 1 0 1000000000 "$TESTER" 0 "$DEADLINE" \
     --from "$TESTER" --unlocked --rpc-url "$RPC" --json | jq -r '"   tester requested a 1,000 USDC Ballast deposit: status \(.status)"'
 
-  # The real keeper, against the fork, while the mark is kept fresh in the background.
-  ( while true; do refresh_mark || true; sleep 5; done ) &
+  # The real keeper and the Kuru quoter, against the fork, while the mark is kept fresh in the background.
+  # Halfway through, MON moves MARK_MOVE_BPS (default +60, twice the engine's 30 bps band): the quoter
+  # must re-centre the Kuru books on its own, or the engine stops trading.
+  HALF=$(( ${KEEPER_SECONDS:-150} / 2 ))
+  ( start=$SECONDS; moved=0
+    while true; do
+      if [ $moved = 0 ] && [ $((SECONDS - start)) -ge $HALF ]; then refresh_mark "${MARK_MOVE_BPS:-60}" || true; moved=1
+      else refresh_mark || true; fi
+      sleep 5
+    done ) &
   REFRESH_PID=$!
   trap 'kill $REFRESH_PID $ANVIL_PID 2>/dev/null || true' EXIT
-  (cd "$ROOT/vessel-service" && V2_MANIFEST_PATH="$M" V2_KEEPER_PK="$KEEPER_PK" RPC="$RPC" V2_KEEPER_INTERVAL_MS=1500 \
+  (cd "$ROOT/vessel-service" && V2_MANIFEST_PATH="$M" V2_KEEPER_PK="$KEEPER_PK" V2_QUOTER_PK="$SEEDER_PK" RPC="$RPC" \
+    V2_KEEPER_INTERVAL_MS=1500 V2_QUOTER_INTERVAL_MS=4000 \
     V2_SETTLE_EVERY_SEC=600 npx tsx scripts/rehearse-keeper.ts "${KEEPER_SECONDS:-150}" 2>"$LOGS/keeper.log" | tail -1 \
-    | jq -c '{engine, actions: (.journal | length), last: (.journal[-6:])}')
+    | jq -c '{engine, keeperActions: (.keeper | length), keeperLast: (.keeper[-4:]), quoter}')
   kill $REFRESH_PID 2>/dev/null || true
   wait $REFRESH_PID 2>/dev/null || true
 else

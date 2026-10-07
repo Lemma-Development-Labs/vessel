@@ -12,6 +12,7 @@ import { createPublicClient, http, parseAbi, type Address } from "viem";
 import { vesselChain } from "../src/addresses.ts";
 import { parseManifest } from "../src/vendor/verify/read.ts";
 import { openV2Sql, startV2Keeper } from "../src/v2/runner.ts";
+import { startV2Quoter } from "../src/v2/quoterLoop.ts";
 
 const seconds = Number(process.argv[2] ?? "60");
 const rpcUrl = process.env.RPC ?? "";
@@ -31,8 +32,11 @@ const handle = await startV2Keeper({
   sql,
 });
 if (!handle) throw new Error("keeper did not start (V2_KEEPER_PK unset?)");
+// The testnet quoter runs too when V2_QUOTER_PK (the seeder) is set.
+const quoter = await startV2Quoter({ manifest, pc, chain: vesselChain(rpcUrl, manifest.chainId), rpcUrl, log, sql });
 await new Promise((r) => setTimeout(r, seconds * 1000));
 handle.stop();
+quoter?.stop();
 
 const engine = manifest.contracts.HedgedEngine as Address;
 const abi = parseAbi([
@@ -49,6 +53,16 @@ for (const fn of ["value", "usdcCash", "ausdCash", "monQty", "shortLots", "perpl
   const v = await read(fn);
   out[fn] = Array.isArray(v) ? String(v[0]) : String(v);
 }
-const rows = await sql.query<{ action: string; state: string }>("SELECT action, state FROM action_journal ORDER BY id");
-console.log(JSON.stringify({ engine: out, journal: rows.map((r) => `${r.action}:${r.state}`) }));
+const rows = await sql.query<{ action: string; state: string; inputs: { why?: string } }>(
+  "SELECT action, state, inputs FROM action_journal ORDER BY id",
+);
+const keeperRows = rows.filter((r) => !["batchUpdate", "batchCancelFlipOrders", "marginDeposit", "approve"].includes(r.action));
+const quoterRows = rows.filter((r) => ["batchUpdate", "batchCancelFlipOrders", "marginDeposit", "approve"].includes(r.action));
+console.log(
+  JSON.stringify({
+    engine: out,
+    keeper: keeperRows.map((r) => `${r.action}:${r.state}`),
+    quoter: quoterRows.map((r) => `${r.action}:${r.state}${r.inputs?.why ? `(${r.inputs.why})` : ""}`),
+  }),
+);
 process.exit(0);

@@ -16,6 +16,7 @@ import { initAuth } from "./auth/bootstrap.ts";
 import { loadV2Manifest } from "./v2/manifest.ts";
 import { openV2Sql, startV2Keeper, type V2KeeperHandle } from "./v2/runner.ts";
 import { startV2Indexer } from "./v2/indexerLoop.ts";
+import { startV2Quoter, type V2QuoterHandle } from "./v2/quoterLoop.ts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -84,6 +85,11 @@ async function main(): Promise<void> {
       log,
     });
   }
+  // Testnet only, and only with its own key (V2_QUOTER_PK): quotes Vessel's Kuru markets around the Perpl mark.
+  let v2Quoter: V2QuoterHandle | null = null;
+  if (v2Manifest && v2Sql) {
+    v2Quoter = await startV2Quoter({ manifest: v2Manifest, sql: v2Sql, pc: publicClient, chain: vesselChain(rpcUrl, chainId), rpcUrl, log });
+  }
 
   let keeper: KeeperHandle | undefined;
   let indexer: Awaited<ReturnType<typeof startIndexer>> | undefined;
@@ -92,6 +98,7 @@ async function main(): Promise<void> {
     log.info({ signal }, "shutting down");
     keeper?.stop();
     v2Keeper?.stop();
+    v2Quoter?.stop();
     v2Indexer?.stop();
     indexer?.stop();
     await api.stop();

@@ -75,7 +75,7 @@ export function viemChainPort(pc: PublicClient, chain: Chain, rpcUrl: string, pk
       // Nothing below the sendTransaction call can have broadcast anything: those failures are refusals.
       let est: bigint;
       try {
-        est = await pc.estimateGas({ account: account.address, to: tx.to as Address, data: tx.data as Hex });
+        est = await pc.estimateGas({ account: account.address, to: tx.to as Address, data: tx.data as Hex, value: tx.value ?? 0n });
       } catch (err) {
         throw new RejectedError(`estimate failed: ${firstLine(err)}`);
       }
@@ -83,7 +83,7 @@ export function viemChainPort(pc: PublicClient, chain: Chain, rpcUrl: string, pk
       if (gas > GAS_CAP) throw new RejectedError(`gas ${gas} above cap ${GAS_CAP}`);
       let hash: Hex;
       try {
-        hash = await wallet.sendTransaction({ to: tx.to as Address, data: tx.data as Hex, nonce: Number(tx.nonce), gas, chain });
+        hash = await wallet.sendTransaction({ to: tx.to as Address, data: tx.data as Hex, value: tx.value ?? 0n, nonce: Number(tx.nonce), gas, chain });
       } catch (err) {
         const msg = firstLine(err);
         if (/insufficient funds/i.test(msg)) throw new RejectedError(msg);
