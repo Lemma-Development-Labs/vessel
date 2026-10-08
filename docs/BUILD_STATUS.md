@@ -108,8 +108,14 @@ ran markets → quotes → deploy → reserve → Safe batches → a 1,000 USDC 
 → the real keeper hedging (705.71 MON spot vs 705-lot short after 150 s) →
 `vessel-verify` OVERALL PASS with the new engine checks.
 
-Next: the real deployment, after partner test MON, AUSD and USDC arrive, the
-Safe signers are ready, and an explicit go-ahead.
+2026-10-08: the testnet Kuru quoter keeps Vessel's books centred on the Perpl
+mark (re-centred both books after a +0.6% move in rehearsal); Hull series 1
+batch `testnet-v2h-02` rehearsed; switch-day runbook
+[release/SWITCH_TO_HEDGED.md](release/SWITCH_TO_HEDGED.md). Seeder
+`0x933D…49F9` holds 30,000 AUSD.
+
+Next: the real deployment, after partner test MON (~40k) and USDC arrive,
+the Safe signers are ready, and an explicit go-ahead.
 
 ## Blockers and follow-ups
 

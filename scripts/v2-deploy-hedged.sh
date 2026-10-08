@@ -5,7 +5,8 @@
 #   2. quote them around the Perpl mark (KuruQuotes; needs test MON, USDC, AUSD)
 #   3. deploy the v2 core with HedgedEngine, governed by the existing Safe
 #   4. send the 20 USDC reserve seed to the new timelock
-#   5. generate Safe batches v2h-01 (wire) and v2h-03 (allowances)
+#   5. generate Safe batches v2h-01 (wire), v2h-03 (allowances) and v2h-02 (open Hull series 1;
+#      the Safe signs it when testers are ready, since it opens a 72 h subscription window)
 #   6. rehearsal only: execute both batches as the Safe, make a USDC deposit,
 #      run the real keeper against the fork, print what the engine holds
 #   7. vessel-verify against the result
@@ -165,21 +166,21 @@ echo "== 4/7 reserve seed: 20 USDC to the timelock"
 
 echo "== 5/7 governance batches"
 GOV="$OUT/governance"
-for s in testnet-v2h-01-wire testnet-v2h-03-allowances-wave1; do
+for s in testnet-v2h-01-wire testnet-v2h-03-allowances-wave1 testnet-v2h-02-open-series-1; do
   [ "$GOV" = "$ROOT/deployments/governance" ] || cp "$ROOT/deployments/governance/$s.json" "$GOV/"
   (cd "$ROOT" && PATH="$(dirname "$CAST"):$PATH" node scripts/v2-governance-batch.mjs "$GOV/$s.json" "$M" | tail -1)
 done
 
 if [ "$MODE" = "--rehearse" ]; then
   echo "== 6/7 rehearse: batches as the Safe, a USDC deposit, the real keeper"
-  for s in testnet-v2h-01-wire testnet-v2h-03-allowances-wave1; do
+  for s in testnet-v2h-01-wire testnet-v2h-03-allowances-wave1 testnet-v2h-02-open-series-1; do
     SD="$(jq -r '.transactions[0].data' "$GOV/$s.schedule.safe.json")"
     ED="$(jq -r '.transactions[0].data' "$GOV/$s.execute.safe.json")"
     "$CAST" send "$TL" "$SD" --from "$SAFE" --unlocked --rpc-url "$RPC" >/dev/null
     "$CAST" rpc evm_increaseTime "$((DELAY + 1))" --rpc-url "$RPC" >/dev/null && "$CAST" rpc evm_mine --rpc-url "$RPC" >/dev/null
     "$CAST" send "$TL" "$ED" --from "$SAFE" --unlocked --rpc-url "$RPC" --json | jq -r --arg s "$s" '"   \($s) executed: status \(.status)"'
   done
-  echo "   engine $("$CAST" call "$TC" 'engine()(address)' --rpc-url "$RPC") reserve $("$CAST" call "$TC" 'reserveNav()(uint256)' --rpc-url "$RPC")"
+  echo "   engine $("$CAST" call "$TC" 'engine()(address)' --rpc-url "$RPC") reserve $("$CAST" call "$TC" 'reserveNav()(uint256)' --rpc-url "$RPC") activeSeries $("$CAST" call "$TC" 'activeSeries()(uint256)' --rpc-url "$RPC")"
   CUSTODY="$(jq -r '.contracts.AssetCustody' "$M")"
   "$CAST" send "$USDC" 'approve(address,uint256)' "$CUSTODY" 1000000000 --from "$TESTER" --unlocked --rpc-url "$RPC" >/dev/null
   DEADLINE=$(( $("$CAST" block latest -f timestamp --rpc-url "$RPC") + 86400 ))
@@ -201,7 +202,7 @@ if [ "$MODE" = "--rehearse" ]; then
   (cd "$ROOT/vessel-service" && V2_MANIFEST_PATH="$M" V2_KEEPER_PK="$KEEPER_PK" V2_QUOTER_PK="$SEEDER_PK" RPC="$RPC" \
     V2_KEEPER_INTERVAL_MS=1500 V2_QUOTER_INTERVAL_MS=4000 \
     V2_SETTLE_EVERY_SEC=600 npx tsx scripts/rehearse-keeper.ts "${KEEPER_SECONDS:-150}" 2>"$LOGS/keeper.log" | tail -1 \
-    | jq -c '{engine, keeperActions: (.keeper | length), keeperLast: (.keeper[-4:]), quoter}')
+    | jq -c '{engine, keeperActions: (.keeper | length), keeperLast: (.keeper[-4:]), quoter: (.quoter | group_by(.) | map("\(.[0]) ×\(length)")), refused}')
   kill $REFRESH_PID 2>/dev/null || true
   wait $REFRESH_PID 2>/dev/null || true
 else

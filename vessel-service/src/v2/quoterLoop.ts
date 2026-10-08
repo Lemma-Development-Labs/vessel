@@ -76,7 +76,14 @@ export async function observeQuotes(
     const live: LiveOrder[] = [];
     rows.forEach(([owner, size, , , flippedId, price, flippedPrice, isBuy], i) => {
       if (owner.toLowerCase() === seeder.toLowerCase() && size > 0n) {
-        live.push({ id: ids[i]!, price: BigInt(price), size, isBuy, flip: flippedId !== 0 || flippedPrice !== 0 });
+        live.push({
+          id: ids[i]!,
+          price: BigInt(price),
+          size,
+          isBuy,
+          flip: flippedId !== 0 || flippedPrice !== 0,
+          flippedId: BigInt(flippedId),
+        });
       }
     });
     mark = (px * BigInt(pricePrecision)) / 10n ** 18n;

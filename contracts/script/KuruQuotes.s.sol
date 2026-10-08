@@ -131,13 +131,22 @@ contract KuruQuotes is Script {
         uint256 n;
         uint40[] memory tmp = new uint40[](old.length);
         for (uint256 j; j < old.length; j++) {
-            (address owner, uint96 size,,,,,,) = book.s_orders(uint40(old[j]));
-            if (owner == seeder && size > 0) tmp[n++] = uint40(old[j]);
+            (address owner, uint96 size,,, uint40 flippedId,,,) = book.s_orders(uint40(old[j]));
+            // Cancelling one order of a linked flip pair cancels both; naming both reverts the batch.
+            if (owner == seeder && size > 0 && !_has(tmp, n, flippedId)) tmp[n++] = uint40(old[j]);
         }
         ids = new uint40[](n);
         for (uint256 j; j < n; j++) {
             ids[j] = tmp[j];
         }
+    }
+
+    function _has(uint40[] memory xs, uint256 n, uint40 x) private pure returns (bool) {
+        if (x == 0) return false;
+        for (uint256 j; j < n; j++) {
+            if (xs[j] == x) return true;
+        }
+        return false;
     }
 
     /// @dev Flip order ids this seeder created on `book`. The deployed markets emit FlipOrderCreated with

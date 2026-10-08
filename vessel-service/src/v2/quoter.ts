@@ -45,6 +45,8 @@ export interface LiveOrder {
   size: bigint; // base units scaled by sizePrecision
   isBuy: boolean;
   flip: boolean;
+  /** the linked order a filled flip order spawned (0 if none) */
+  flippedId: bigint;
 }
 
 export interface QuoteMarket {
@@ -160,8 +162,13 @@ export function decideQuotes(o: QuoteObserved, cfg: QuoteConfig): PlannedAction 
   if (o.mark === 0n || o.markAt + cfg.markMaxAgeSec < o.now) return null;
 
   // 2. Flip orders from the seeding script are cancelled first; this loop posts plain resting orders.
+  // A partly filled flip order is linked to the order it spawned, and cancelling one cancels both
+  // (fork probe 2026-10-08); naming both makes Kuru revert the whole batch, so name one per pair.
   for (const m of o.markets) {
-    const flips = m.live.filter((x) => x.flip).map((x) => x.id);
+    const flips: bigint[] = [];
+    for (const x of m.live.filter((y) => y.flip).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+      if (!flips.includes(x.flippedId)) flips.push(x.id);
+    }
     if (flips.length) {
       return act(m.book, encodeFunctionData({ abi: kuruBookAbi, functionName: "batchCancelFlipOrders", args: [flips.map(Number)] }), "batchCancelFlipOrders", `cancelflip:${m.book}`, { ids: flips.map(String) });
     }

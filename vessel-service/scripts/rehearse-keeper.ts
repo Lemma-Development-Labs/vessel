@@ -53,9 +53,10 @@ for (const fn of ["value", "usdcCash", "ausdCash", "monQty", "shortLots", "perpl
   const v = await read(fn);
   out[fn] = Array.isArray(v) ? String(v[0]) : String(v);
 }
-const rows = await sql.query<{ action: string; state: string; inputs: { why?: string } }>(
-  "SELECT action, state, inputs FROM action_journal ORDER BY id",
+const rows = await sql.query<{ action: string; state: string; inputs: { why?: string }; result: { reason?: string } | null }>(
+  "SELECT action, state, inputs, result FROM action_journal ORDER BY id",
 );
+const refused = [...new Set(rows.filter((r) => r.state === "REJECTED").map((r) => `${r.action}: ${r.result?.reason ?? "?"}`))];
 const keeperRows = rows.filter((r) => !["batchUpdate", "batchCancelFlipOrders", "marginDeposit", "approve"].includes(r.action));
 const quoterRows = rows.filter((r) => ["batchUpdate", "batchCancelFlipOrders", "marginDeposit", "approve"].includes(r.action));
 console.log(
@@ -63,6 +64,7 @@ console.log(
     engine: out,
     keeper: keeperRows.map((r) => `${r.action}:${r.state}`),
     quoter: quoterRows.map((r) => `${r.action}:${r.state}${r.inputs?.why ? `(${r.inputs.why})` : ""}`),
+    refused,
   }),
 );
 process.exit(0);

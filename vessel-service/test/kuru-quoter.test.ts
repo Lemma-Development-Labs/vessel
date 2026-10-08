@@ -57,8 +57,8 @@ function liveFromFirstQuote(o: QuoteObserved): QuoteObserved {
   const [bp, bs, sp, ss] = d.args as unknown as [number[], bigint[], number[], bigint[]];
   let id = 1n;
   const live = [
-    ...bp.map((px, i) => ({ id: id++, price: BigInt(px), size: bs[i]!, isBuy: true, flip: false })),
-    ...sp.map((px, i) => ({ id: id++, price: BigInt(px), size: ss[i]!, isBuy: false, flip: false })),
+    ...bp.map((px, i) => ({ id: id++, price: BigInt(px), size: bs[i]!, isBuy: true, flip: false, flippedId: 0n })),
+    ...sp.map((px, i) => ({ id: id++, price: BigInt(px), size: ss[i]!, isBuy: false, flip: false, flippedId: 0n })),
   ];
   // Posting moves the funds out of the free margin balance into the orders.
   const postedMon = ss.reduce((acc, x) => acc + (x * E18) / 10_000_000_000n, 0n);
@@ -133,10 +133,21 @@ describe("kuru quoter — decisions", () => {
   });
 
   it("cancels flip orders left by the seeding script before posting", () => {
-    const o = base({ markets: [market(USDC_BOOK, USDC, { live: [{ id: 7n, price: MARK, size: 10n ** 13n, isBuy: true, flip: true }] })] });
+    const o = base({ markets: [market(USDC_BOOK, USDC, { live: [{ id: 7n, price: MARK, size: 10n ** 13n, isBuy: true, flip: true, flippedId: 0n }] })] });
     const p = decideQuotes(o, cfg)!;
     expect(p.action).toBe("batchCancelFlipOrders");
     expect(decodeBook(p.calldata).args).toEqual([[7]]);
+  });
+
+  it("names one order per linked flip pair: cancelling one cancels both, and naming both reverts", () => {
+    // As seen on the fork: #2 was partly filled and spawned #3; #2 and #3 point at each other.
+    const live = [
+      { id: 1n, price: MARK - 1_000n, size: 10n ** 15n, isBuy: true, flip: true, flippedId: 0n },
+      { id: 2n, price: MARK + 1_000n, size: 9n * 10n ** 14n, isBuy: false, flip: true, flippedId: 3n },
+      { id: 3n, price: MARK - 1_000n, size: 3n * 10n ** 13n, isBuy: true, flip: true, flippedId: 2n },
+    ];
+    const p = decideQuotes(base({ markets: [market(USDC_BOOK, USDC, { live })] }), cfg)!;
+    expect(decodeBook(p.calldata).args).toEqual([[1, 2]]);
   });
 
   it("moves wallet funds into Kuru first: approve, then deposit; MON keeps a gas reserve", () => {
