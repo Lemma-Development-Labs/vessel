@@ -160,11 +160,14 @@ contract MockKuruBook {
     uint32 public constant PRICE_PRECISION = 1e8;
     uint96 public constant SIZE_PRECISION = 1e10;
     IERC20 public immutable quote;
+    /// @dev address(0): native MON base (NATIVE_IN_BASE); otherwise an ERC-20 base (NO_NATIVE).
+    address public immutable base;
     uint256 public mid = 3_100_000; // 0.031 quote per MON
     uint256 public halfSpreadBps = 3;
 
-    constructor(IERC20 quote_) {
+    constructor(IERC20 quote_, address base_) {
         quote = quote_;
+        base = base_;
     }
 
     receive() external payable {}
@@ -179,7 +182,7 @@ contract MockKuruBook {
         view
         returns (uint32, uint96, address, uint256, address, uint256, uint32, uint96, uint96, uint256, uint256)
     {
-        return (PRICE_PRECISION, SIZE_PRECISION, address(0), 18, address(quote), 6, 100, 1e10, 1e18, 0, 0);
+        return (PRICE_PRECISION, SIZE_PRECISION, base, 18, address(quote), 6, 100, 1e10, 1e18, 0, 0);
     }
 
     function placeAndExecuteMarketBuy(uint96 quoteSize, uint256 minOut, bool, bool) external payable returns (uint256) {
@@ -188,15 +191,21 @@ contract MockKuruBook {
         uint256 ask = mid * (10_000 + halfSpreadBps) / 10_000;
         uint256 out = quoteIn * 1e12 * PRICE_PRECISION / ask;
         require(out >= minOut, "SlippageExceeded");
-        (bool ok,) = msg.sender.call{value: out}("");
-        require(ok, "native");
+        if (base == address(0)) {
+            (bool ok,) = msg.sender.call{value: out}("");
+            require(ok, "native");
+        } else {
+            IERC20(base).transfer(msg.sender, out);
+        }
         return out;
     }
 
     function placeAndExecuteMarketSell(uint96 size, uint256 minOut, bool, bool) external payable returns (uint256) {
-        require(msg.value == uint256(size) * 1e18 / SIZE_PRECISION, "value");
+        uint256 amount = uint256(size) * 1e18 / SIZE_PRECISION;
+        if (base == address(0)) require(msg.value == amount, "value");
+        else IERC20(base).transferFrom(msg.sender, address(this), amount);
         uint256 bid = mid * (10_000 - halfSpreadBps) / 10_000;
-        uint256 out = msg.value * bid / PRICE_PRECISION / 1e12;
+        uint256 out = amount * bid / PRICE_PRECISION / 1e12;
         require(out >= minOut, "SlippageExceeded");
         quote.transfer(msg.sender, out);
         return out;
@@ -216,15 +225,21 @@ contract MockKuruRouter {
         uint256 amount,
         uint256 minAmountOut
     ) external payable returns (uint256 out) {
-        require(markets.length == 2 && isBuy[0] && !isBuy[1] && !nativeSend[0] && nativeSend[1], "route");
-        IERC20(debitToken).transferFrom(msg.sender, address(this), amount);
         MockKuruBook a = MockKuruBook(payable(markets[0]));
         MockKuruBook b = MockKuruBook(payable(markets[1]));
-        require(address(a.quote()) == debitToken && address(b.quote()) == creditToken, "tokens");
+        bool native = a.base() == address(0);
+        require(markets.length == 2 && isBuy[0] && !isBuy[1] && !nativeSend[0] && nativeSend[1] == native, "route");
+        require(address(a.quote()) == debitToken && address(b.quote()) == creditToken && a.base() == b.base(), "tokens");
+        IERC20(debitToken).transferFrom(msg.sender, address(this), amount);
         IERC20(debitToken).approve(address(a), amount);
         uint256 mon = a.placeAndExecuteMarketBuy(uint96(amount * 1e8 / 1e6), 0, false, true);
         uint256 size = mon * 1e10 / 1e18;
-        out = b.placeAndExecuteMarketSell{value: size * 1e18 / 1e10}(uint96(size), 0, false, true);
+        if (native) {
+            out = b.placeAndExecuteMarketSell{value: size * 1e18 / 1e10}(uint96(size), 0, false, true);
+        } else {
+            IERC20(a.base()).approve(address(b), size * 1e18 / 1e10);
+            out = b.placeAndExecuteMarketSell(uint96(size), 0, false, true);
+        }
         require(out >= minAmountOut, "SlippageExceeded");
         IERC20(creditToken).transfer(msg.sender, out);
     }

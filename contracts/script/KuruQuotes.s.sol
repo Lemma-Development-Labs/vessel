@@ -70,6 +70,8 @@ contract KuruQuotes is Script {
             Market(m.readAddress(".monAusd"), m.readAddress(".ausd"))
         ];
 
+        // address(0) = native MON; a vMON market file (ADR-010) names the token.
+        address base = m.keyExists(".base") ? m.readAddress(".base") : address(0);
         IPerplExchange.PerpetualInfoV2 memory p = PERPL.getPerpetualInfoV2(MON_PERP);
         uint256 mid = (p.markPNS * PRICE_PRECISION / 10 ** p.priceDecimals) / TICK * TICK;
         require(mid > halfSpread, "mark too low for the spread");
@@ -99,9 +101,17 @@ contract KuruQuotes is Script {
                 IERC20(k.quote).approve(address(MARGIN), quotePerSide - haveQuote);
                 MARGIN.deposit(seeder, k.quote, quotePerSide - haveQuote);
             }
-            uint256 haveMon = MARGIN.getBalance(seeder, address(0));
-            uint256 monNeed = i == 0 ? monPerSide * 2 : monPerSide; // native MON balance is shared by both markets
-            if (haveMon < monNeed) MARGIN.deposit{value: monNeed - haveMon}(seeder, address(0), monNeed - haveMon);
+            // The spot balance (native MON, or vMON under ADR-010) is shared by both markets.
+            uint256 haveMon = MARGIN.getBalance(seeder, base);
+            uint256 monNeed = i == 0 ? monPerSide * 2 : monPerSide;
+            if (haveMon < monNeed) {
+                if (base == address(0)) {
+                    MARGIN.deposit{value: monNeed - haveMon}(seeder, base, monNeed - haveMon);
+                } else {
+                    IERC20(base).approve(address(MARGIN), monNeed - haveMon);
+                    MARGIN.deposit(seeder, base, monNeed - haveMon);
+                }
+            }
 
             uint96 bidSize = uint96(quotePerSide * SIZE_PRECISION * PRICE_PRECISION / bid / 1e6);
             uint96 askSize = uint96(monPerSide * SIZE_PRECISION / 1e18);

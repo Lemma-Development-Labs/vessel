@@ -10,6 +10,7 @@ import {IPauseGuardian, IStrategyEngine} from "../../src/core/interfaces/ICore.s
 import {IKuruOrderBook, IKuruRouter, IPerplExchange} from "../../src/core/interfaces/IVenues.sol";
 import {HedgedEngine} from "../../src/core/engine/HedgedEngine.sol";
 import {PerplMarkValuation} from "../../src/core/testnet/PerplMarkValuation.sol";
+import {VesselTestMON} from "../../src/core/testnet/VesselTestMON.sol";
 import {TestUSDC} from "../fixtures/CoreFixtures.sol";
 import {MockKuruBook, MockKuruRouter, MockPerpl, MockValuation} from "../fixtures/VenueMocks.sol";
 
@@ -35,6 +36,16 @@ contract HedgedEngineTest is Test {
     MockKuruRouter router;
     HedgedEngine engine;
 
+    /// @dev The spot asset under test: address(0) for native MON. The vMON suite below overrides it.
+    function _spotToken() internal virtual returns (address) {
+        return address(0);
+    }
+
+    /// @dev Give `to` `amount` of the spot asset (venue liquidity, or a donation).
+    function _fundSpot(address to, uint256 amount) internal virtual {
+        vm.deal(to, amount);
+    }
+
     function setUp() public {
         vm.warp(1_790_000_000);
         usdc = new TestUSDC();
@@ -44,12 +55,13 @@ contract HedgedEngineTest is Test {
         custody = c.custody();
         val = new MockValuation();
         perpl = new MockPerpl(ausd, PERP);
-        monUsdc = new MockKuruBook(usdc);
-        monAusd = new MockKuruBook(ausd);
+        address spotToken = _spotToken();
+        monUsdc = new MockKuruBook(usdc, spotToken);
+        monAusd = new MockKuruBook(ausd, spotToken);
         router = new MockKuruRouter();
         // Venue liquidity.
-        vm.deal(address(monUsdc), 10_000_000 ether);
-        vm.deal(address(monAusd), 10_000_000 ether);
+        _fundSpot(address(monUsdc), 10_000_000 ether);
+        _fundSpot(address(monAusd), 10_000_000 ether);
         usdc.mint(address(monUsdc), 1_000_000e6);
         ausd.mint(address(monAusd), 1_000_000e6);
         engine = new HedgedEngine(_config());
@@ -199,7 +211,7 @@ contract HedgedEngineTest is Test {
         _fund(1_000e6);
         usdc.mint(address(engine), 77e6);
         ausd.mint(address(engine), 5e6);
-        vm.deal(address(engine), 3 ether);
+        _fundSpot(address(engine), 3 ether);
         (uint256 v,) = engine.value();
         assertEq(v, 900e6);
         (uint256 qu, uint256 qa, uint256 qm) = engine.quarantined();
@@ -478,5 +490,60 @@ contract HedgedEngineTest is Test {
         assertEq(engine.ausdCash(), 0);
         assertApproxEqRel(custody.activeIdle(), 10_000e6, 0.001e18, "round trip > 10 bps");
         c.settle();
+    }
+}
+
+/// @notice The same 31 tests with the spot leg on vMON, the testnet ERC-20 stand-in (ADR-010),
+///         plus the guards that only apply to a token spot.
+contract HedgedEngineVmonTest is HedgedEngineTest {
+    VesselTestMON vmon;
+
+    function _spotToken() internal override returns (address) {
+        vmon = new VesselTestMON(address(this));
+        return address(vmon);
+    }
+
+    function _fundSpot(address to, uint256 amount) internal override {
+        vmon.mint(to, amount);
+    }
+
+    function test_vmon_engineRecordsTheTokenSpot() public view {
+        assertEq(engine.spot(), address(vmon));
+    }
+
+    function test_vmon_spotHeldAsTokenNotNative() public {
+        _fund(1_000e6);
+        _margin(300e6);
+        _pairedSlice();
+        assertGt(engine.monQty(), 0);
+        assertEq(vmon.balanceOf(address(engine)), engine.monQty());
+        assertEq(address(engine).balance, 0);
+    }
+
+    function test_vmon_tokenSpotRefusedOnMainnet() public {
+        vm.chainId(143);
+        vm.expectRevert(VesselTestMON.Mainnet.selector);
+        new VesselTestMON(address(this));
+    }
+
+    function test_vmon_engineRefusesTokenSpotOnMainnet() public {
+        HedgedEngine.Config memory cfg = _config();
+        vm.chainId(143);
+        // Valuation and venue mocks do not check the chain; the engine itself must refuse.
+        vm.expectRevert(HedgedEngine.TestSpotOnMainnet.selector);
+        new HedgedEngine(cfg);
+    }
+
+    function test_vmon_marketsMustShareTheSpotAsset() public {
+        HedgedEngine.Config memory cfg = _config();
+        cfg.monAusd = IKuruOrderBook(address(new MockKuruBook(ausd, address(0))));
+        vm.expectRevert(HedgedEngine.BadConfig.selector);
+        new HedgedEngine(cfg);
+    }
+
+    function test_vmon_onlyMinterMints() public {
+        vm.prank(mallory);
+        vm.expectRevert(VesselTestMON.NotMinter.selector);
+        vmon.mint(mallory, 1);
     }
 }

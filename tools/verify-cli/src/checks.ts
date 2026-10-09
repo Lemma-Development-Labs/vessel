@@ -66,6 +66,8 @@ export interface HedgeSnapshot {
   priceAt: bigint;
   independent: boolean;
   sliceCap: bigint;
+  /** spot leg is the vMON testnet stand-in priced at the Perpl mark (ADR-010), not MON */
+  testSpot?: boolean;
 }
 
 export type Verdict = "PASS" | "MISMATCH" | "SIMULATED" | "INFO";
@@ -157,10 +159,12 @@ export function evaluate(snap: Snapshot): Check[] {
     const e = snap.engine;
     out.push({
       id: "engine",
-      verdict: e.simulated ? "SIMULATED" : "INFO",
+      verdict: e.simulated || e.hedge?.testSpot ? "SIMULATED" : "INFO",
       summary: e.simulated
         ? "engine is SIMULATED (testnet): no spot leg, no short, funding from a seeded pot — not a hedge"
-        : e.hedge
+        : e.hedge?.testSpot
+          ? "hedged engine: MON short on Perpl is real; the spot leg is SIMULATED with the vMON test token, quoted at the Perpl mark (ADR-010)"
+          : e.hedge
           ? "hedged engine: MON spot bought on Kuru, MON short on Perpl from the engine's own account"
           : "engine is not marked simulated and exposes no hedge state to check",
       values: {
@@ -202,7 +206,7 @@ function hedgeChecks(reported: bigint, h: HedgeSnapshot): Check[] {
   out.push({
     id: "engine.backing",
     verdict: backed ? "PASS" : "MISMATCH",
-    summary: backed ? "engine holds at least the USDC, AUSD and MON its ledger claims" : "engine ledger claims more than it holds",
+    summary: backed ? "engine holds at least the USDC, AUSD and spot asset its ledger claims" : "engine ledger claims more than it holds",
     values: {
       usdcCash: s(h.usdcCash), usdcBalance: s(h.usdcBalance),
       ausdCash: s(h.ausdCash), ausdBalance: s(h.ausdBalance),

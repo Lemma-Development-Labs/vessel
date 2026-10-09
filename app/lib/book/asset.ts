@@ -31,5 +31,12 @@ export const ASSET: BookAsset = contracts.USDC
 /** True when the release wires HedgedEngine on Perpl and Vessel's Kuru markets. */
 export const HEDGED = Boolean(contracts.HedgedEngine);
 
+/**
+ * True when the spot leg is vMON, the testnet stand-in quoted at the Perpl mark (ADR-010). The Perpl
+ * short is still real; every screen that shows the spot leg must say it is simulated.
+ */
+export const SPOT_TEST = Boolean(contracts.VesselTestMON);
+export const SPOT_SYMBOL = SPOT_TEST ? "vMON" : "MON";
+
 /** Venue label for the hedged badge, from the reviewed release manifest. */
 export const VENUE_LABEL = (RELEASE.venue as string) === "perpl+kuru" ? "Perpl + Kuru testnet" : undefined;

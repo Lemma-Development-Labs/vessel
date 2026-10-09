@@ -4,7 +4,7 @@ import { useBook } from "@/lib/book/context";
 import { RELEASE, ROLES, V2 } from "@/lib/book/release";
 import { RULES, type BookState } from "@/lib/book/types";
 import { formatBlock, formatBps, formatDusd, formatDusd4, formatMonPrice, formatWmon } from "@/lib/format";
-import { ASSET, HEDGED, VENUE_LABEL } from "@/lib/book/asset";
+import { ASSET, HEDGED, SPOT_SYMBOL, SPOT_TEST, VENUE_LABEL } from "@/lib/book/asset";
 import { mapLive, type Live } from "@/lib/live";
 import { verificationOf } from "@/lib/verification";
 import { EXPLORER } from "@/lib/wagmi";
@@ -71,7 +71,7 @@ export function TransparencyScreen() {
                     {e.hedge ? (
                       <>
                         <div>
-                          <SectionLabel>SPOT MON (KURU)</SectionLabel>
+                          <SectionLabel>{SPOT_TEST ? "SPOT vMON (SIMULATED)" : "SPOT MON (KURU)"}</SectionLabel>
                           <p className="num mt-1">{formatWmon(e.hedge.spotMon)}</p>
                         </div>
                         <div>
@@ -99,8 +99,9 @@ export function TransparencyScreen() {
             </Val>
             {HEDGED ? (
               <p className="mt-4 text-[12.5px] text-dim">
-                The engine buys MON on Kuru and shorts the same amount on Perpl from its own account; no wallet
-                holds venue funds. Prices come from the Perpl mark with AUSD at par, which is not an independent
+                {SPOT_TEST
+                  ? `The MON short on Perpl is real. The spot leg is simulated: the engine buys ${SPOT_SYMBOL}, a Vessel test token quoted at the Perpl mark, because enough testnet MON could not be sourced (ADR-010).`
+                  : "The engine buys MON on Kuru and shorts the same amount on Perpl from its own account; no wallet holds venue funds."} Prices come from the Perpl mark with AUSD at par, which is not an independent
                 source (gate G03). On testnet, Vessel opens and seeds its own Kuru markets: testnet liquidity
                 provided by Vessel.
               </p>

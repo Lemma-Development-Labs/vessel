@@ -32,6 +32,12 @@ interface Venues {
   ausd: Address;
 }
 
+/** The spot asset from the manifest: native MON unless the release names vMON (ADR-010). */
+function spotOf(m: Manifest): Address {
+  const s = (m as unknown as { venues?: { spot?: Address } }).venues?.spot;
+  return (s && s !== NATIVE ? s : NATIVE) as Address;
+}
+
 function venuesOf(m: Manifest): Venues | null {
   const v = (m as unknown as { venues?: Partial<Venues> }).venues;
   return v?.kuruMonUsdc && v.kuruMonAusd && v.ausd ? (v as Venues) : null;
@@ -49,11 +55,14 @@ export async function observeQuotes(
     [v.kuruMonUsdc, usdc],
     [v.kuruMonAusd, v.ausd],
   ];
-  const [block, [px, , priceAt], marginMon, walletMon] = await Promise.all([
+  const spot = spotOf(m);
+  const native = spot === NATIVE;
+  const [block, [px, , priceAt], marginMon, walletMon, spotAllowance] = await Promise.all([
     pc.getBlock({ blockTag: "latest" }),
     pc.readContract({ address: m.contracts.PerplMarkValuation as Address, abi: valuationAbi, functionName: "prices" }),
-    pc.readContract({ address: KURU_TESTNET_MARGIN, abi: kuruMarginAbi, functionName: "getBalance", args: [seeder, NATIVE] }),
-    pc.getBalance({ address: seeder }),
+    pc.readContract({ address: KURU_TESTNET_MARGIN, abi: kuruMarginAbi, functionName: "getBalance", args: [seeder, spot] }),
+    native ? pc.getBalance({ address: seeder }) : pc.readContract({ address: spot, abi: erc20Abi, functionName: "balanceOf", args: [seeder] }),
+    native ? Promise.resolve(0n) : pc.readContract({ address: spot, abi: erc20Abi, functionName: "allowance", args: [seeder, KURU_TESTNET_MARGIN] }),
   ]);
 
   const markets: QuoteMarket[] = [];
@@ -112,8 +121,10 @@ export async function observeQuotes(
     markAt: priceAt,
     margin: KURU_TESTNET_MARGIN,
     seeder,
+    spot,
     marginMon,
     walletMon,
+    spotAllowance,
     markets,
     lastQuotedAt: Object.fromEntries(last.map((r) => [r.target, BigInt(Math.floor(new Date(r.at).getTime() / 1000))])),
   };
@@ -155,6 +166,7 @@ export async function startV2Quoter(opts: {
     allow: quoterAllowlist([venues.kuruMonUsdc, venues.kuruMonAusd], KURU_TESTNET_MARGIN, [
       opts.manifest.contracts.USDC as Address,
       venues.ausd,
+      ...(spotOf(opts.manifest) === NATIVE ? [] : [spotOf(opts.manifest)]),
     ]),
     policyVersion: QUOTER_POLICY_VERSION,
     now: () => new Date(),

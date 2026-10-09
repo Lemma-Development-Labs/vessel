@@ -10,7 +10,8 @@ import {IEngineValuation, IKuruOrderBook, IKuruRouter, IPerplExchange} from "../
 
 /// @title HedgedEngine
 /// @notice The book's strategy engine (spec §10–§11): MON spot bought on Kuru against USDC, and an
-///         equal MON short on Perpl margined in AUSD. The engine itself owns the Perpl account
+///         equal MON short on Perpl margined in AUSD. On testnet the spot asset may be vMON, a
+///         Vessel test token quoted at the Perpl mark (ADR-010); the short is always real MON. The engine itself owns the Perpl account
 ///         (G01), so no wallet ever holds venue funds. USDC⇄AUSD moves through two Kuru markets in
 ///         one transaction under an aggregate output floor (D02).
 ///
@@ -81,6 +82,9 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
     /// @dev Kuru MON/USDC precisions (quote sizes are scaled by pricePrecision, base by sizePrecision).
     uint256 public immutable spotPricePrecision;
     uint256 public immutable spotSizePrecision;
+    /// @notice The spot asset both Kuru markets trade: address(0) is native MON. An ERC-20 here is a
+    ///         testnet stand-in priced at the Perpl mark (ADR-010); it is refused on Monad mainnet.
+    address public immutable spot;
 
     /// @notice The book's USDC, AUSD and MON held by this contract.
     uint256 public usdcCash;
@@ -103,6 +107,7 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
     error BelowMinimum(uint256 got, uint256 minimum);
     error HedgeGap(uint256 gapUsdc, uint256 cap);
     error ZeroAmount();
+    error TestSpotOnMainnet();
 
     event Credited(uint256 amount);
     event Released(uint256 amount);
@@ -129,8 +134,13 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
         if (collateral != address(c.ausd)) revert BadConfig();
         IPerplExchange.PerpetualInfoV2 memory p = c.perpl.getPerpetualInfoV2(c.perpId);
         if (p.markPNS == 0 || p.priceDecimals > 18 || p.lotDecimals > 18) revert BadConfig();
-        (uint32 pp, uint96 sp) = _checkMarket(c.monUsdc, address(c.usdc));
-        _checkMarket(c.monAusd, address(c.ausd));
+        (uint32 pp, uint96 sp, address base) = _checkMarket(c.monUsdc, address(c.usdc));
+        (,, address base2) = _checkMarket(c.monAusd, address(c.ausd));
+        if (base2 != base) revert BadConfig();
+        if (base != address(0)) {
+            if (block.chainid == 143) revert TestSpotOnMainnet();
+            if (IERC20Metadata(base).decimals() != 18) revert BadConfig();
+        }
 
         usdc = c.usdc;
         ausd = c.ausd;
@@ -149,9 +159,10 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
         perpLotScale = 10 ** p.lotDecimals;
         spotPricePrecision = pp;
         spotSizePrecision = sp;
+        spot = base;
     }
 
-    /// @dev Kuru proceeds arrive as native MON. Only measured trade proceeds enter `monQty`.
+    /// @dev Native-MON markets pay proceeds as native MON. Only measured trade proceeds enter `monQty`.
     receive() external payable {}
 
     modifier onlyCustody() {
@@ -213,12 +224,12 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
 
         uint256 quoteSize = usdcIn * spotPricePrecision / 1e6;
         uint256 usdcBefore = usdc.balanceOf(address(this));
-        uint256 monBefore = address(this).balance;
+        uint256 monBefore = _spotBalance();
         usdc.forceApprove(address(monUsdc), usdcIn);
         monUsdc.placeAndExecuteMarketBuy(_u96(quoteSize), minMonOut, false, true);
         usdc.forceApprove(address(monUsdc), 0);
         uint256 spent = usdcBefore - usdc.balanceOf(address(this));
-        uint256 got = address(this).balance - monBefore;
+        uint256 got = _spotBalance() - monBefore;
         if (spent > usdcIn) revert Insufficient();
         if (got < minMonOut) revert BelowMinimum(got, minMonOut);
 
@@ -241,7 +252,15 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
         if (minUsdcOut < floor) revert FloorTooLoose(minUsdcOut, floor);
 
         uint256 usdcBefore = usdc.balanceOf(address(this));
-        monUsdc.placeAndExecuteMarketSell{value: exact}(_u96(size), minUsdcOut, false, true);
+        uint256 spotBefore = _spotBalance();
+        if (spot == address(0)) {
+            monUsdc.placeAndExecuteMarketSell{value: exact}(_u96(size), minUsdcOut, false, true);
+        } else {
+            IERC20(spot).forceApprove(address(monUsdc), exact);
+            monUsdc.placeAndExecuteMarketSell(_u96(size), minUsdcOut, false, true);
+            IERC20(spot).forceApprove(address(monUsdc), 0);
+        }
+        if (spotBefore - _spotBalance() != exact) revert Insufficient();
         uint256 got = usdc.balanceOf(address(this)) - usdcBefore;
         if (got < minUsdcOut) revert BelowMinimum(got, minUsdcOut);
 
@@ -356,11 +375,12 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
 
     /// @notice USDC and AUSD held here outside the book's ledger. Never valued.
     function quarantined() external view returns (uint256 usdcAmount, uint256 ausdAmount, uint256 monAmount) {
-        return (
-            usdc.balanceOf(address(this)) - usdcCash,
-            ausd.balanceOf(address(this)) - ausdCash,
-            address(this).balance - monQty
-        );
+        return
+            (
+                usdc.balanceOf(address(this)) - usdcCash,
+                ausd.balanceOf(address(this)) - ausdCash,
+                _spotBalance() - monQty
+            );
     }
 
     // ================================================================== internals
@@ -434,7 +454,7 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
         bool[] memory isBuy = new bool[](2);
         isBuy[0] = true;
         bool[] memory nativeSend = new bool[](2);
-        nativeSend[1] = true;
+        nativeSend[1] = spot == address(0); // the second leg sells the spot asset
 
         uint256 inBefore = tokenIn.balanceOf(address(this));
         uint256 outBefore = tokenOut.balanceOf(address(this));
@@ -447,11 +467,19 @@ contract HedgedEngine is IStrategyEngine, ReentrancyGuard {
         emit Converted(address(tokenIn), amountIn, got);
     }
 
-    function _checkMarket(IKuruOrderBook market, address quote) private view returns (uint32 pp, uint96 sp) {
-        address base;
+    function _checkMarket(IKuruOrderBook market, address quote)
+        private
+        view
+        returns (uint32 pp, uint96 sp, address base)
+    {
         address q;
         (pp, sp, base,, q,,,,,,) = market.getMarketParams();
-        if (base != address(0) || q != quote || pp == 0 || sp == 0) revert BadConfig();
+        if (q != quote || pp == 0 || sp == 0) revert BadConfig();
+    }
+
+    /// @dev The engine's holding of the spot asset (native MON or the testnet ERC-20).
+    function _spotBalance() private view returns (uint256) {
+        return spot == address(0) ? address(this).balance : IERC20(spot).balanceOf(address(this));
     }
 
     function _u96(uint256 x) private pure returns (uint96) {

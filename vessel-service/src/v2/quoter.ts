@@ -28,6 +28,7 @@ const NATIVE = "0x0000000000000000000000000000000000000000" as const;
 const BPS = 10_000n;
 const E18 = 10n ** 18n;
 
+/** `tokens`: the quote tokens, plus the spot token when it is an ERC-20 (vMON). */
 export function quoterAllowlist(markets: readonly Address[], margin: Address, quoteTokens: readonly Address[]): Allowed[] {
   return [
     ...markets.flatMap((m) => [
@@ -70,9 +71,13 @@ export interface QuoteObserved {
   markAt: bigint;
   margin: Address;
   seeder: Address;
-  /** seeder's free MON in Kuru's margin account (wei), shared by both markets, and in its wallet */
+  /** the markets' base asset: address(0) is native MON; otherwise the vMON test token (ADR-010) */
+  spot: Address;
+  /** seeder's free spot in Kuru's margin account (wei), shared by both markets, in its wallet,
+   *  and (token spot only) its allowance to the margin account */
   marginMon: bigint;
   walletMon: bigint;
+  spotAllowance: bigint;
   markets: QuoteMarket[];
   /** when this seeder last re-quoted each book (from the journal); 0 if never */
   lastQuotedAt: Record<string, bigint>;
@@ -151,12 +156,15 @@ export function decideQuotes(o: QuoteObserved, cfg: QuoteConfig): PlannedAction 
       );
     }
   }
-  if (o.walletMon > cfg.gasReserveMon + cfg.minDepositMon) {
-    const amount = o.walletMon - cfg.gasReserveMon;
-    return {
-      ...act(o.margin, encodeFunctionData({ abi: kuruMarginAbi, functionName: "deposit", args: [o.seeder, NATIVE, amount] }), "marginDeposit", "deposit:MON", { amount: amount.toString() }),
-      value: amount,
-    };
+  const nativeSpot = o.spot.toLowerCase() === NATIVE;
+  // Native MON keeps a gas reserve in the wallet; a token spot needs none (gas is native MON).
+  const spare = nativeSpot ? (o.walletMon > cfg.gasReserveMon ? o.walletMon - cfg.gasReserveMon : 0n) : o.walletMon;
+  if (spare >= cfg.minDepositMon) {
+    if (!nativeSpot && o.spotAllowance < spare) {
+      return act(o.spot, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [o.margin, 2n ** 256n - 1n] }), "approve", `approve:${o.spot}`, {});
+    }
+    const deposit = act(o.margin, encodeFunctionData({ abi: kuruMarginAbi, functionName: "deposit", args: [o.seeder, o.spot, spare] }), "marginDeposit", "deposit:spot", { amount: spare.toString() });
+    return nativeSpot ? { ...deposit, value: spare } : deposit;
   }
 
   if (o.mark === 0n || o.markAt + cfg.markMaxAgeSec < o.now) return null;

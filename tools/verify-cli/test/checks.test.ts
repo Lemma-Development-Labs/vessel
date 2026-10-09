@@ -142,3 +142,35 @@ describe("hedged engine checks", () => {
     expect(recomputeEngineValue(h)).toBe(h.usdcCash + (h.monQty * h.px) / 10n ** 30n);
   });
 });
+
+describe("hedged engine with a vMON spot leg (ADR-010)", () => {
+  it("still checks backing, value and gap, and labels the engine SIMULATED", () => {
+    const s: Snapshot = {
+      chainId: 10143, blockNumber: 1n, blockHash: "0xabc", blockTimestamp: 1n,
+      asset: { symbol: "USDC", decimals: 6 },
+      controller: {
+        hullNav: 0n, ballastNav: 980_000_000n, reserveNav: 20_000_000n, treasuryLiability: 0n,
+        lastActive: 1_000_000_000n, lifetimeAdmitted: 1_000_000_000n, pendingReserved: 0n,
+        stageCap: 25_000_000_000n, impaired: false, lossCarry: 0n, epoch: 1n,
+      },
+      custody: { pending: 0n, activeIdle: 150_000_000n, tokenBalance: 150_000_000n },
+      escrow: { totalFunded: 0n, tokenBalance: 0n },
+      engine: { present: false },
+      ballastSupply: 1n,
+    };
+    const h: HedgeSnapshot = {
+      usdcCash: 400_000_000n, ausdCash: 0n, monQty: 650n * 10n ** 18n,
+      usdcBalance: 400_000_000n, ausdBalance: 0n, monBalance: 650n * 10n ** 18n,
+      perplAccountId: 9n, perplFree: 420_000_000n, perplDeposit: 18_000_000n, perplPnl: 0n,
+      shortLots: 650n, perpLotScale: 1n, px: 26_000_000_000_000_000n, fx: 10n ** 18n,
+      priceAt: 1n, independent: false, sliceCap: 4_000_000n, testSpot: true,
+    };
+    s.engine = { present: true, simulated: false, value: recomputeEngineValue(h), observedAt: 1n, hedge: h };
+    const out = evaluate(s);
+    const engine = out.find((c) => c.id === "engine")!;
+    expect(engine.verdict).toBe("SIMULATED");
+    expect(engine.summary).toMatch(/vMON/);
+    expect(out.find((c) => c.id === "engine.backing")?.verdict).toBe("PASS");
+    expect(out.find((c) => c.id === "hedge.gap")?.verdict).toBe("PASS");
+  });
+});

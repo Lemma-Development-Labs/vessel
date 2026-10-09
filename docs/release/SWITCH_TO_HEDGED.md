@@ -12,7 +12,7 @@ Nothing here touches mainnet. Never paste a key into chat, a ticket or a commit.
 | Item | Check |
 |---|---|
 | Go-ahead | Explicit yes from Kunal/Priya: the switch replaces what testnet.vessel.wtf and the Railway keeper read |
-| Seeder `0x933DF4E2c927903D68c1FC82691b9a06dC6249F9` | ≥ 40,000 MON (plus ~5 MON gas), ≥ 500 Circle USDC, ≥ 10,000 AUSD (holds 30,000 since 2026-10-06) |
+| Seeder `0x933DF4E2c927903D68c1FC82691b9a06dC6249F9` | ~5 MON for gas; Circle USDC for the bid side (≥ 100, more is better); ≥ 10,000 AUSD (holds 30,000 since 2026-10-06). With the default `SPOT_MODE=vmon` (ADR-010) the deploy mints vMON to it, so no MON liquidity is needed; with `SPOT_MODE=native`, ≥ 40,000 MON |
 | Deployer `0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86` | ≥ 20 Circle USDC (reserve seed) and ≥ 1 MON gas |
 | Keeper `0xd1588b68d6beac5328E61166b952619b63dbf16f` | ≥ 3 MON gas (the hedge sends many more transactions than the simulated book did) |
 | Safe signers | Two of the three available for batches v2h-01 and v2h-03, a few minutes apart |
@@ -26,7 +26,8 @@ Nothing here touches mainnet. Never paste a key into chat, a ticket or a commit.
 scripts/v2-deploy-hedged.sh
 ```
 
-This opens the Kuru markets, places the first quotes from the seeder, archives the current manifest
+This deploys vMON and mints it to the seeder (default `SPOT_MODE=vmon`, ADR-010), opens the
+vMON/USDC and vMON/AUSD markets (the quoter on Railway posts the first quotes after step 3), archives the current manifest
 to `deployments/superseded/`, deploys the core with `HedgedEngine` under the existing Safe, sends the
 20 USDC reserve seed, generates batches v2h-01/03/02, and regenerates the app/SDK bindings. It
 stops at the first failed step (logs in `contracts/out/deploy-hedged-logs/`).

@@ -40,6 +40,7 @@ const hedgedAbi = parseAbi([
   "function perpLotScale() view returns (uint256)",
   "function valuation() view returns (address)",
   "function sliceCap() view returns (uint256)",
+  "function spot() view returns (address)",
 ]);
 const valuationAbi = parseAbi([
   "function prices() view returns (uint256, uint256, uint256)",
@@ -59,10 +60,14 @@ async function readHedge(pc: PublicClient, engine: Address, at: { blockNumber: b
     re<Address>("valuation"), re<bigint>("sliceCap"),
   ]);
   const bal = (token: Address) => pc.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [engine], ...at });
+  // The spot asset is native MON, or on testnet the vMON stand-in (ADR-010). Engines deployed before
+  // ADR-010 have no spot() and are native.
+  const spot = await re<Address>("spot").catch(() => "0x0000000000000000000000000000000000000000" as Address);
+  const testSpot = spot !== "0x0000000000000000000000000000000000000000";
   const [usdcBalance, ausdBalance, monBalance, [px, fx, priceAt], independent] = await Promise.all([
     bal(usdc),
     bal(ausd),
-    pc.getBalance({ address: engine, ...at }),
+    testSpot ? bal(spot) : pc.getBalance({ address: engine, ...at }),
     pc.readContract({ address: valuation, abi: valuationAbi, functionName: "prices", ...at }),
     pc.readContract({ address: valuation, abi: valuationAbi, functionName: "isIndependent", ...at }),
   ]);
@@ -84,7 +89,7 @@ async function readHedge(pc: PublicClient, engine: Address, at: { blockNumber: b
   return {
     usdcCash, ausdCash, monQty, usdcBalance, ausdBalance, monBalance,
     perplAccountId: accountId, perplFree, perplDeposit, perplPnl, shortLots, perpLotScale: lotScale,
-    px, fx, priceAt, independent, sliceCap,
+    px, fx, priceAt, independent, sliceCap, testSpot,
   };
 }
 

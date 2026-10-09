@@ -140,3 +140,14 @@ people named.
 - **Migration effect:** a **fresh v2 deployment** (`setEngine` is once-only) with Circle USDC as the book asset and a `HedgedEngine` in place of `SimulatedEngine`; the deploy script, Safe batches, keeper, app, SDK and verifier switch from dUSD to USDC. The current dUSD deployment stays readable until it is retired. Testnet seeding needs test MON (~40k minimum, ~150k comfortable), AUSD and USDC from partners.
 - **Tests:** `PerplProof.test_contractOwnedShortLifecycle`, `KuruProof.test_marketsQuoteBothSides`, `test_usdcToAusdAtomicRoundTrip`, `test_floorRevertsWholeRoute` (fork, opt-in); HedgedEngine unit and invariant tests to follow.
 - **Review owner:** Kunal (scope) + Daksh · **Status:** accepted; fork-proven; engine and deployment in progress.
+
+### ADR-010 — Testnet spot leg on vMON until testnet MON can be sourced (2026-10-09)
+
+- **Old rule:** the spot leg holds native MON bought on Vessel's Kuru MON/USDC market (ADR-009).
+- **Replacement:** on testnet the spot leg may hold **vMON** (`VesselTestMON`), an 18-decimal ERC-20 that only the deployer can mint and that refuses Monad mainnet. Vessel's Kuru markets become vMON/USDC and vMON/AUSD (Kuru `NO_NATIVE`). The keeper service's quoter posts them at the **Perpl MON mark**, so vMON tracks MON's price. The Perpl MON short, its margin and funding, the Kuru contracts, the USDC⇄AUSD route, deposits, Safe governance, keeper and verifier are all unchanged and real. `HedgedEngine` reads its spot asset from the Kuru markets (`spot()`, address(0) = native MON), refuses a token spot on chain 143 (`TestSpotOnMainnet`), and keeps the native path for mainnet. `SPOT_MODE=native` returns to MON with a fresh deployment.
+- **Reason:** quoting Vessel's markets needs about 40,000 testnet MON. Public faucets give 1–10 MON a day, Kuru's testnet margin account holds 328 MON in total, and a team allocation is not available now (2026-10-09). vMON lets the full machinery run on testnet today.
+- **Accounting impact:** none to the waterfall. Spot is valued at the same Perpl mark as before; vMON has no value, like dUSD before it. The engine still checks its ledger against what it holds (`engine.backing`).
+- **Honesty:** the release status, the verifier (engine verdict SIMULATED) and the app (amber "spot leg simulated (vMON)") all say the spot leg is simulated and the short is real. Nothing calls vMON MON.
+- **Migration effect:** `OpenKuruMarkets` (SPOT_MODE=vmon) deploys and mints vMON; `KuruQuotes`, the quoter and `vessel-verify` read the spot asset; the deploy script defaults to vmon and leaves first quotes to the quoter.
+- **Tests:** `HedgedEngineVmonTest` runs all 31 engine tests on vMON plus 6 token-spot guards; quoter and verifier vMON cases; fork rehearsal of the whole deployment.
+- **Review owner:** Kunal · **Status:** accepted for testnet; revisit when testnet MON is available.

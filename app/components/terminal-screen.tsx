@@ -7,7 +7,7 @@ import { SERIES_LABEL } from "@/lib/book/plan";
 import { RELEASE, V2 } from "@/lib/book/release";
 import { PAUSE, RULES, type BookState, type EngineState } from "@/lib/book/types";
 import { formatBlock, formatBps, formatDusd, formatDusd4, formatMonPrice, formatTs, formatWmon } from "@/lib/format";
-import { HEDGED, VENUE_LABEL } from "@/lib/book/asset";
+import { HEDGED, SPOT_SYMBOL, SPOT_TEST, VENUE_LABEL } from "@/lib/book/asset";
 import { Badge } from "@/components/ui";
 import { map2, mapLive } from "@/lib/live";
 import { Unavailable, Val } from "@/components/live";
@@ -259,9 +259,11 @@ function HedgedPanel() {
             <Unavailable reason="no engine wired yet" />
           ) : (
             <>
-              <Row k="Spot MON (Kuru)">{formatWmon(x.spotMon)}</Row>
+              <Row k={SPOT_TEST ? "Spot vMON (simulated)" : "Spot MON (Kuru)"} tone={SPOT_TEST ? "text-amber" : undefined}>
+                {formatWmon(x.spotMon)}
+              </Row>
               <Row k="Short MON (Perpl, whole lots)">{x.shortLots.toString()}</Row>
-              <Row k="Net MON (spot − short)">{formatWmon(x.spotMon - x.shortLots * 10n ** 18n)}</Row>
+              <Row k={`Net (${SPOT_SYMBOL} spot − MON short)`}>{formatWmon(x.spotMon - x.shortLots * 10n ** 18n)}</Row>
               <Row k="Perpl equity (AUSD)">{formatDusd4(x.perplEquity)}</Row>
               <Row k="Engine cash (USDC / AUSD)">{`${formatDusd4(x.usdcCash)} / ${formatDusd4(x.ausdCash)}`}</Row>
               <Row k="Largest trade now (slice cap)">{formatDusd4(x.sliceCap)}</Row>
@@ -275,7 +277,7 @@ function HedgedPanel() {
       <Note>
         Read from the engine and its valuation contract. The engine enforces one-slice trades, a one-slice hedge
         gap, 30 bps price bands and a 20 bps USDC⇄AUSD floor on chain. Testnet liquidity on the Kuru markets is
-        provided by Vessel.
+        provided by Vessel.{SPOT_TEST ? " The spot leg is simulated with vMON, quoted at the Perpl mark (ADR-010); the Perpl short is real." : ""}
       </Note>
     </Panel>
   );

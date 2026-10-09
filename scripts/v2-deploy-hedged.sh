@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Fresh v2 testnet deployment on Circle USDC with HedgedEngine (ADR-009).
 #
-#   1. open Vessel's Kuru markets (MON/USDC, MON/AUSD)
-#   2. quote them around the Perpl mark (KuruQuotes; needs test MON, USDC, AUSD)
+#   1. open Vessel's Kuru markets. SPOT_MODE=vmon (default, ADR-010) deploys the vMON test token,
+#      mints it to the seeder and opens vMON/USDC + vMON/AUSD; SPOT_MODE=native opens MON markets
+#   2. optional first quotes (QUOTE_SEED=1, KuruQuotes). By default the keeper service's quoter
+#      deposits the seeder's funds and posts the first quotes itself
 #   3. deploy the v2 core with HedgedEngine, governed by the existing Safe
 #   4. send the 20 USDC reserve seed to the new timelock
 #   5. generate Safe batches v2h-01 (wire), v2h-03 (allowances) and v2h-02 (open Hull series 1;
@@ -118,16 +120,21 @@ if [ "$MODE" = "--rehearse" ]; then
   echo "   deployer, keeper, Safe and tester funded; 100k USDC + 100k AUSD to the deployer, 1,000 USDC to the tester"
 fi
 
-echo "== 1/7 open Vessel's Kuru markets"
+SPOT_MODE="${SPOT_MODE:-vmon}"
+SEEDER_ADDR="$DEPLOYER"
+[ -n "$SEEDER_PK" ] && SEEDER_ADDR="$("$CAST" wallet address --private-key "$SEEDER_PK")"
+echo "== 1/7 open Vessel's Kuru markets (spot: $SPOT_MODE)"
 K_TMP="$ROOT/contracts/out/testnet-kuru-markets.new.json"
 rm -f "$K_TMP"
-forge_step open-markets "MON/USDC|MON/AUSD" env KURU_MARKETS_OUT="$K_TMP" \
+forge_step open-markets "MON/USDC|MON/AUSD" env KURU_MARKETS_OUT="$K_TMP" SPOT_MODE="$SPOT_MODE" VMON_TO="$SEEDER_ADDR" \
   "$FORGE" script script/OpenKuruMarkets.s.sol:OpenKuruMarkets --rpc-url "$RPC" "${BROADCAST[@]}"
 mv "$K_TMP" "$OUT/testnet-kuru-markets.json"
 K="$OUT/testnet-kuru-markets.json"
 
-echo "== 2/7 quote the markets around the Perpl mark"
-if [ -z "$SEEDER_PK" ]; then
+echo "== 2/7 first quotes"
+if [ "${QUOTE_SEED:-0}" != "1" ]; then
+  echo "   left to the quoter: it deposits the seeder's USDC, AUSD and $([ "$SPOT_MODE" = vmon ] && echo vMON || echo MON) into Kuru and posts both books"
+elif [ -z "$SEEDER_PK" ]; then
   echo "   SKIPPED: KURU_SEEDER_PK unset. The engine cannot trade until the markets are quoted;"
   echo "   run script/KuruQuotes.s.sol once the seeder holds test MON, USDC and AUSD."
 else

@@ -41,8 +41,10 @@ const base = (over: Partial<QuoteObserved> = {}): QuoteObserved => ({
   markAt: 1_800_000_000n,
   margin: MARGIN,
   seeder: SEEDER,
+  spot: "0x0000000000000000000000000000000000000000",
   marginMon: 100_000n * E18,
   walletMon: E18,
+  spotAllowance: 0n,
   markets: [market(USDC_BOOK, USDC), market(AUSD_BOOK, AUSD)],
   lastQuotedAt: {},
   ...over,
@@ -166,6 +168,18 @@ describe("kuru quoter — decisions", () => {
     expect(mon.action).toBe("marginDeposit");
     expect(mon.value).toBe(1_000n * E18 - cfg.gasReserveMon);
     expect(decideQuotes(base({ walletMon: cfg.gasReserveMon + E18 }), cfg)?.action).toBe("batchUpdate"); // dust stays
+  });
+
+  it("vMON spot (ADR-010): approves then deposits the token, with no native value and no gas reserve", () => {
+    const VMON = "0x00000000000000000000000000000000000000f1" as const;
+    const a = decideQuotes(base({ spot: VMON, walletMon: 10_000n * E18 }), cfg)!;
+    expect(a.action).toBe("approve");
+    expect(a.target).toBe(VMON);
+    const d = decideQuotes(base({ spot: VMON, walletMon: 10_000n * E18, spotAllowance: 2n ** 255n }), cfg)!;
+    expect(d.action).toBe("marginDeposit");
+    const [, token, amount] = decodeFunctionData({ abi: kuruMarginAbi, data: d.calldata as `0x${string}` }).args;
+    expect([token.toLowerCase(), amount]).toEqual([VMON, 10_000n * E18]); // all of it: gas is native MON
+    expect(d.value ?? 0n).toBe(0n);
   });
 
   it("drops levels below the market's minimum size", () => {

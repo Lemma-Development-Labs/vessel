@@ -114,8 +114,13 @@ batch `testnet-v2h-02` rehearsed; switch-day runbook
 [release/SWITCH_TO_HEDGED.md](release/SWITCH_TO_HEDGED.md). Seeder
 `0x933D…49F9` holds 30,000 AUSD.
 
-Next: the real deployment, after partner test MON (~40k) and USDC arrive,
-the Safe signers are ready, and an explicit go-ahead.
+2026-10-09 (ADR-010): testnet MON could not be sourced, so the spot leg can
+run on vMON, a testnet token quoted at the Perpl mark; the Perpl short stays
+real. Rehearsed end to end with `vessel-verify` OVERALL PASS (engine labelled
+SIMULATED).
+
+Next: the real deployment once the seeder holds some Circle USDC (AUSD and vMON
+are covered), the Safe signers are ready, and an explicit go-ahead.
 
 ## Blockers and follow-ups
 

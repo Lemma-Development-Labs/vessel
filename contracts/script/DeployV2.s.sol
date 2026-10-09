@@ -126,9 +126,11 @@ contract DeployV2 is Script {
         vm.serializeAddress(c, "ClaimEscrow", d.escrow);
         vm.serializeAddress(c, "BallastToken", d.ballast);
         string memory contractsJson;
+        address spot = d.hedged ? HedgedEngine(payable(d.engine)).spot() : address(0);
         if (d.hedged) {
             vm.serializeAddress(c, "USDC", asset);
             vm.serializeAddress(c, "PerplMarkValuation", d.valuation);
+            if (spot != address(0)) vm.serializeAddress(c, "VesselTestMON", spot);
             contractsJson = vm.serializeAddress(c, "HedgedEngine", d.engine);
         } else {
             vm.serializeAddress(c, "DemoUSD", asset);
@@ -154,13 +156,16 @@ contract DeployV2 is Script {
             vm.serializeAddress(v, "ausd", vm.envAddress("V2_AUSD"));
             vm.serializeAddress(v, "kuruRouter", vm.envAddress("V2_KURU_ROUTER"));
             vm.serializeAddress(v, "kuruMonUsdc", vm.envAddress("V2_KURU_MON_USDC"));
+            vm.serializeAddress(v, "spot", spot); // address(0) = native MON; otherwise vMON (ADR-010)
             string memory venuesJson = vm.serializeAddress(v, "kuruMonAusd", vm.envAddress("V2_KURU_MON_AUSD"));
             vm.serializeString(m, "venues", venuesJson);
             vm.serializeString(m, "venue", "perpl+kuru");
             vm.serializeString(
                 m,
                 "status",
-                "HEDGED engine on Perpl + Vessel-opened Kuru markets; Perpl-mark valuation (not independent, G03); not audited"
+                spot == address(0)
+                    ? "HEDGED engine on Perpl + Vessel-opened Kuru markets; Perpl-mark valuation (not independent, G03); not audited"
+                    : "HEDGED engine: real Perpl MON short; SIMULATED spot leg on vMON test token quoted at the Perpl mark (ADR-010); not independent valuation (G03); not audited"
             );
         } else {
             vm.serializeString(m, "venue", "sim");

@@ -16,6 +16,7 @@ import { ConnectButton } from "@/components/connect";
 import { useSession } from "@/lib/auth";
 import { networkBanner } from "@/lib/banner";
 import { TARGET_CHAIN_ID } from "@/lib/wagmi";
+import { SPOT_TEST } from "@/lib/book/asset";
 
 function Wordmark() {
   return (
@@ -77,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <span data-testid="network-banner" className="font-medium">{BANNER.text}</span>
         <span className="hidden text-steel sm:inline">
-          {engine === null || engine.simulated ? " · strategy engine simulated" : ""}
+          {engine === null || engine.simulated ? " · strategy engine simulated" : SPOT_TEST ? " · spot leg simulated (vMON)" : ""}
         </span>
         {v.reconnecting ? (
           <span className="ml-3 text-steel">reconnecting…</span>

@@ -82,7 +82,7 @@ Test assets for seeding the Vessel Kuru markets (testnet):
 
 - **AUSD:** Agora's faucet `0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C` (proxy → impl `0xba80…2a49`), `requestFunds(address recipient)`: 10,000 AUSD per call, at most once a minute, until the recipient holds 100,000. Self-serve; no team request needed.
 - **Circle USDC:** faucet.circle.com, 20 every 2 hours per address.
-- **MON:** public faucets give about 1–10 per wallet per day, so the ~40k needed must be requested from the Monad (or Kuru) team.
+- **MON:** public faucets give about 1–10 per wallet per day, and the ~40k needed could not be arranged, so the testnet spot leg runs on **vMON** (Vessel test token, ADR-010), minted at deploy. MON is needed only for gas.
 - **Seeder (Kuru market maker):** `0x933DF4E2c927903D68c1FC82691b9a06dC6249F9`, key `KURU_SEEDER_PK` in `contracts/.env`. Holds 30,000 AUSD as of 2026-10-06. Distinct from the v0 `SEEDER_PK` wallet.
 
 Fork proofs (opt-in: `VENUE_FORK=1 forge test --match-path 'test/fork/*Proof*' --fork-url <testnet rpc>`):
