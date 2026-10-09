@@ -67,7 +67,7 @@ if [ "$MODE" = "--rehearse" ]; then
   SEEDER_PK="$DEPLOYER_PK"
   echo "== REHEARSAL on a local fork of testnet (nothing is sent to the real chain)"
 else
-  RPC="$MONAD_TESTNET_RPC"
+  RPC="${RPC_URL:-$MONAD_TESTNET_RPC}"   # RPC_URL overrides when the public endpoint is unreliable
   OUT="$ROOT/deployments"
   BROADCAST=(--broadcast --slow)
   KEEPER="$(jq -r '.roles.operator' "$CURRENT")"
