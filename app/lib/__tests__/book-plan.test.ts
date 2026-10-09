@@ -11,6 +11,7 @@ import {
   withSlippage,
 } from "../book/plan";
 import { RULES, type BookState, type DepositRequest, type ExitRequest, type Series, type Wallet } from "../book/types";
+import { ASSET } from "../book/asset";
 
 const d = (n: number) => BigInt(Math.round(n * 1e6));
 const NOW = 1_800_000_000n;
@@ -75,12 +76,12 @@ describe("planDeposit mirrors requestDeposit's reverts", () => {
 
   it("CapExceeded (wallet): admitted + reserved + assets above the allowance", () => {
     const p = ballast(d(801), { w: { admitted: d(200) } });
-    expect(p.kind === "blocked" && p.reason).toMatch(/800\.00 dUSD left/);
+    expect(p.kind === "blocked" && p.reason).toMatch(new RegExp(`800\\.00 ${ASSET.symbol} left`));
   });
 
   it("CapExceeded (stage): lifetime admitted + pending + assets above the stage cap", () => {
     const p = ballast(d(100), { b: { stageCap: d(6_050) } });
-    expect(p.kind === "blocked" && p.reason).toMatch(/stage cap — 50\.00 dUSD/);
+    expect(p.kind === "blocked" && p.reason).toMatch(new RegExp(`stage cap — 50\\.00 ${ASSET.symbol}`));
   });
 
   it("paused admission and an impaired book both block", () => {
@@ -90,7 +91,7 @@ describe("planDeposit mirrors requestDeposit's reverts", () => {
     expect(ballast(d(10), { b: { pausedMask: 8 } }).kind).toBe("ok");
   });
 
-  it("not enough dUSD blocks before the wallet is asked to sign", () => {
+  it("not enough of the book asset blocks before the wallet is asked to sign", () => {
     expect(ballast(d(600)).kind).toBe("blocked");
   });
 

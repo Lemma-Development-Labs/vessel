@@ -1,5 +1,5 @@
 import type { PublicClient } from "viem";
-import { client, parseManifest, readSnapshot, type Manifest } from "./vendor/verify/read.ts";
+import { bookAssetKey, client, parseManifest, readSnapshot, type Manifest } from "./vendor/verify/read.ts";
 import type { Snapshot } from "./vendor/verify/checks.ts";
 import {
   ballastState,
@@ -19,7 +19,7 @@ import { TESTNET_V2 } from "./manifests/testnet.ts";
 
 export * from "./state.ts";
 export * from "./prepare.ts";
-export { client, parseManifest, readSnapshot, TESTNET_V2 };
+export { bookAssetKey, client, parseManifest, readSnapshot, TESTNET_V2 };
 export type { Manifest, Snapshot };
 
 /** Why venue-dependent reads are unavailable on this release (spec gate G01). */

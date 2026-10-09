@@ -25,7 +25,34 @@ Verified explorer URLs:
 
 Verify runsheet: [docs.monad.xyz/guides/verify-smart-contract](https://docs.monad.xyz/guides/verify-smart-contract). Match `solc 0.8.24` and `optimizer_runs = 200` from `contracts/foundry.toml`. Constructor args via `cast abi-encode`.
 
-## v2 core — Monad testnet (2026-10-02)
+## v2 hedged — Monad testnet (2026-10-09)
+
+Source of truth: [`deployments/testnet-v2.json`](../deployments/testnet-v2.json), block 69502573.
+Book asset: Circle testnet USDC `0x534b2f3A21130d7a60830c2Df862319e593943A3`. Engine: `HedgedEngine` with a **real Perpl MON short**
+(exchange `0x1964C32f0bE608E7D29302AFF5E61268E72080cc`, perp 64) and a **simulated spot leg on vMON** quoted at the Perpl
+mark (ADR-010). Governance: Safe `0x12B2…2Ee5` → TimelockController (300 s). Operator (keeper)
+`0xd1588b68d6beac5328E61166b952619b63dbf16f`. Kuru seeder (quoter) `0x933DF4E2c927903D68c1FC82691b9a06dC6249F9`.
+Not wired until Safe batch `testnet-v2h-01` executes. Not audited.
+
+| Contract | Testnet (10143) | Verified |
+| --- | --- | --- |
+| TrancheController | [`0x072e29863dB9C4dD8fB0FF5f0552ea0071A6E2dd`](https://testnet.monadvision.com/address/0x072e29863dB9C4dD8fB0FF5f0552ea0071A6E2dd) | Sourcify exact |
+| TimelockController | [`0x8B7a034c2e0e35527c1DC34222AbC9049564b1a4`](https://testnet.monadvision.com/address/0x8B7a034c2e0e35527c1DC34222AbC9049564b1a4) | Sourcify exact |
+| PauseGuardian | [`0x1ab932dD00Cb671f2A03B38c7eE60bb82874847c`](https://testnet.monadvision.com/address/0x1ab932dD00Cb671f2A03B38c7eE60bb82874847c) | Sourcify exact |
+| AssetCustody | [`0xC3D1531a0865ff989b772A4b6404B612734038aB`](https://testnet.monadvision.com/address/0xC3D1531a0865ff989b772A4b6404B612734038aB) | Sourcify exact |
+| ClaimEscrow | [`0x8b59F0DE634520ec465f59673143901B00279ab8`](https://testnet.monadvision.com/address/0x8b59F0DE634520ec465f59673143901B00279ab8) | Sourcify exact |
+| BallastToken | [`0x02DcfA00C6a1bb2FC2aF7D6086454fE17dD54085`](https://testnet.monadvision.com/address/0x02DcfA00C6a1bb2FC2aF7D6086454fE17dD54085) | Sourcify exact |
+| HedgedEngine | [`0xECCc5199C824427D592995e944C57e95a224E642`](https://testnet.monadvision.com/address/0xECCc5199C824427D592995e944C57e95a224E642) | Sourcify exact |
+| PerplMarkValuation | [`0xfbb20f5BFEabeBc8c556C655BeEa32B102EA4D40`](https://testnet.monadvision.com/address/0xfbb20f5BFEabeBc8c556C655BeEa32B102EA4D40) | Sourcify exact |
+| VesselTestMON (vMON, ADR-010) | [`0xB35E2149EBE206Afc0BCDe39B293Ef4F0B3FbA5C`](https://testnet.monadvision.com/address/0xB35E2149EBE206Afc0BCDe39B293Ef4F0B3FbA5C) | Sourcify exact |
+| Kuru vMON/USDC market | [`0x1E11c17A42425991d8A6D36b2CBbB4dEB3D275E6`](https://testnet.monadvision.com/address/0x1E11c17A42425991d8A6D36b2CBbB4dEB3D275E6) | Kuru market (Vessel-opened) |
+| Kuru vMON/AUSD market | [`0x4C9E2ff866498B2A7355f49Ed311925555dfa3DA`](https://testnet.monadvision.com/address/0x4C9E2ff866498B2A7355f49Ed311925555dfa3DA) | Kuru market (Vessel-opened) |
+
+Superseded 2026-10-09: the dUSD v2 book at block 67565062 (manifest in
+[`deployments/superseded/testnet-v2-block67565062.json`](../deployments/superseded/testnet-v2-block67565062.json)).
+Its contracts stay on chain and readable; the section below describes it.
+
+## v2 core — Monad testnet (2026-10-02) (superseded 2026-10-09)
 
 Source of truth: [`deployments/testnet-v2.json`](../deployments/testnet-v2.json)
 (release manifest, schema v1). Block 67565062. Deployer

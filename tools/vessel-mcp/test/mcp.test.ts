@@ -98,7 +98,7 @@ describe("prepare gate", () => {
     );
     expect(r.authorization).toMatch(/user's own wallet/);
     expect(r.expiresAt).toBe(String(NOW + 900));
-    expect(r.calls.map((x: { to: string }) => x.to)).toEqual([m.contracts.DemoUSD, m.contracts.TrancheController]);
+    expect(r.calls.map((x: { to: string }) => x.to)).toEqual([m.contracts.USDC ?? m.contracts.DemoUSD, m.contracts.TrancheController]);
     expect(decodeFunctionData({ abi, data: r.calls[0].data }).args).toEqual([m.contracts.AssetCustody, 5_000_000n]);
   });
 

@@ -2,16 +2,18 @@
 export const TESTNET_V2 = {
   "chainId": 10143,
   "contracts": {
-    "AssetCustody": "0x800b830A3B6C63bcAABAa9128A217a03aaD7377d",
-    "BallastToken": "0x278E531dBc080Fa4C0314da9c1592bA6f148926d",
-    "ClaimEscrow": "0x6B60BcdF3a2DB8762Ade4b05D590aB0aCf0FDF3d",
-    "DemoUSD": "0x959E54DcF8576856F7A9424190a9751c68739495",
-    "PauseGuardian": "0x6B12C7375FC96dc2f805Cd1e28999b711d1C3e17",
-    "SimulatedEngine": "0x2174EBa2b5b20B6CA128FD2BCfc74A9c0736ffED",
-    "TimelockController": "0xA75526e97f0b0f5d2f9B06f0eD0C7DB9545A9f80",
-    "TrancheController": "0x717147E566C42D8926c258fCe24B1746ceDB1740"
+    "AssetCustody": "0xC3D1531a0865ff989b772A4b6404B612734038aB",
+    "BallastToken": "0x02DcfA00C6a1bb2FC2aF7D6086454fE17dD54085",
+    "ClaimEscrow": "0x8b59F0DE634520ec465f59673143901B00279ab8",
+    "HedgedEngine": "0xECCc5199C824427D592995e944C57e95a224E642",
+    "PauseGuardian": "0x1ab932dD00Cb671f2A03B38c7eE60bb82874847c",
+    "PerplMarkValuation": "0xfbb20f5BFEabeBc8c556C655BeEa32B102EA4D40",
+    "TimelockController": "0x8B7a034c2e0e35527c1DC34222AbC9049564b1a4",
+    "TrancheController": "0x072e29863dB9C4dD8fB0FF5f0552ea0071A6E2dd",
+    "USDC": "0x534b2f3A21130d7a60830c2Df862319e593943A3",
+    "VesselTestMON": "0xB35E2149EBE206Afc0BCDe39B293Ef4F0B3FbA5C"
   },
-  "deployedBlock": 67565062,
+  "deployedBlock": 69502573,
   "environment": "testnet",
   "roles": {
     "deployer": "0x64d81F3E47c9Ba737BE17f8F9E5398EBf7e9Ce86",
@@ -20,7 +22,16 @@ export const TESTNET_V2 = {
     "operator": "0xd1588b68d6beac5328E61166b952619b63dbf16f"
   },
   "schemaVersion": 1,
-  "status": "SIMULATED engine; G01-G04 BLOCKED; not audited",
+  "status": "HEDGED engine: real Perpl MON short; SIMULATED spot leg on vMON test token quoted at the Perpl mark (ADR-010); not independent valuation (G03); not audited",
   "timelockDelaySeconds": 300,
-  "venue": "sim"
+  "venue": "perpl+kuru",
+  "venues": {
+    "ausd": "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC",
+    "kuruMonAusd": "0x4C9E2ff866498B2A7355f49Ed311925555dfa3DA",
+    "kuruMonUsdc": "0x1E11c17A42425991d8A6D36b2CBbB4dEB3D275E6",
+    "kuruRouter": "0x7EFbE105Ca7415dE98F96622173458ac1c054630",
+    "perpId": 64,
+    "perpl": "0x1964C32f0bE608E7D29302AFF5E61268E72080cc",
+    "spot": "0xB35E2149EBE206Afc0BCDe39B293Ef4F0B3FbA5C"
+  }
 } as const;

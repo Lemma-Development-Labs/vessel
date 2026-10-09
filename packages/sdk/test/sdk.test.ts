@@ -2,6 +2,7 @@ import { decodeFunctionData, getAddress, parseAbi } from "viem";
 import { describe, expect, it } from "vitest";
 import {
   AUTHORIZATION,
+  bookAssetKey,
   PrepareError,
   QUOTE_TTL_SEC,
   TESTNET_V2,
@@ -47,7 +48,7 @@ const snap = (over: Partial<Snapshot["controller"]> = {}): Snapshot => ({
 describe("prepare — encodes only, from the manifest, for the owner", () => {
   it("approves whichever book asset the manifest lists: Circle USDC on ADR-009 deployments", () => {
     const usdc = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
-    const { DemoUSD: _dusd, ...rest } = m.contracts;
+    const { DemoUSD: _dusd, USDC: _usdc, ...rest } = m.contracts;
     const um = parseManifest({ ...m, contracts: { ...rest, USDC: usdc } });
     const p = prepareBallastDeposit({ manifest: um, owner: OWNER, assets: 5_000_000n, minUnits: 1n, deadline: BigInt(NOW + 86_400), now: NOW });
     expect(p.calls[0]!.to).toBe(getAddress(usdc));
@@ -58,7 +59,7 @@ describe("prepare — encodes only, from the manifest, for the owner", () => {
     const p = prepareBallastDeposit({ manifest: m, owner: OWNER, assets: 5_000_000n, minUnits: 1n, deadline: BigInt(NOW + 86_400), now: NOW });
     expect(p.calls).toHaveLength(2);
     const [approve, request] = p.calls;
-    expect(approve!.to).toBe(m.contracts.DemoUSD);
+    expect(approve!.to).toBe(m.contracts[bookAssetKey(m)]);
     const ap = decodeFunctionData({ abi, data: approve!.data });
     expect(ap.args).toEqual([m.contracts.AssetCustody, 5_000_000n]); // exact amount, never unlimited
     expect(request!.to).toBe(m.contracts.TrancheController);
