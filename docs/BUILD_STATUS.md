@@ -119,8 +119,14 @@ run on vMON, a testnet token quoted at the Perpl mark; the Perpl short stays
 real. Rehearsed end to end with `vessel-verify` OVERALL PASS (engine labelled
 SIMULATED).
 
-Next: the real deployment once the seeder holds some Circle USDC (AUSD and vMON
-are covered), the Safe signers are ready, and an explicit go-ahead.
+**2026-10-09: live on testnet.** The hedged book (block 69,502,573) is wired by
+the Safe; Railway runs the keeper and the quoter on it; the first USDC deposit
+(20 Ballast) is admitted; `vessel-verify` OVERALL PASS. See
+[sessions/07.md](sessions/07.md) "Switch day".
+
+Next: about 180–200 USDC more deposits to start the first live hedge; merge
+`p-development` → `main` so testnet.vessel.wtf shows the new book (team
+decision); Safe batch v2h-02 (Hull series 1) when testers are ready.
 
 ## Blockers and follow-ups
 
