@@ -17,6 +17,8 @@ import { loadV2Manifest } from "./v2/manifest.ts";
 import { openV2Sql, startV2Keeper, type V2KeeperHandle } from "./v2/runner.ts";
 import { startV2Indexer } from "./v2/indexerLoop.ts";
 import { startV2Quoter, type V2QuoterHandle } from "./v2/quoterLoop.ts";
+import { readOps, type OpsDeps } from "./v2/ops.ts";
+import { privateKeyToAccount } from "viem/accounts";
 import { startIndexer } from "./indexer.ts";
 import { startKeeper, type KeeperHandle } from "./keeper.ts";
 
@@ -64,6 +66,13 @@ async function main(): Promise<void> {
       : undefined;
   const v2Indexer =
     v2Manifest && v2Sql ? await startV2Indexer({ manifest: v2Manifest, pc: publicClient, sql: v2Sql, log }) : null;
+  // Addresses only: the keys stay where they are.
+  const addressOf = (pk: string | undefined) =>
+    pk && /^0x[0-9a-fA-F]{64}$/.test(pk.trim()) ? privateKeyToAccount(pk.trim() as `0x${string}`).address : null;
+  const v2Ops: OpsDeps | undefined =
+    v2Manifest && v2Sql
+      ? { client: publicClient, sql: v2Sql, keeper: addressOf(process.env.V2_KEEPER_PK), quoter: addressOf(process.env.V2_QUOTER_PK) }
+      : undefined;
 
   const api = await startApi({
     store,
@@ -71,7 +80,18 @@ async function main(): Promise<void> {
     addrs,
     ...(auth ? { auth: auth.deps } : {}),
     ...(v1 ? { v1 } : {}),
+    ...(v2Ops ? { v2Ops } : {}),
   });
+  // A warning in the logs every 10 minutes while the v2 keeper or quoter is low on gas or idle.
+  const opsTimer = v2Ops
+    ? setInterval(() => {
+        void readOps(v2Ops)
+          .then((r) => {
+            if (!r.ok) log.warn({ degraded: r.degraded }, "v2 ops degraded");
+          })
+          .catch((err) => log.error({ err }, "v2 ops check failed"));
+      }, 10 * 60_000)
+    : null;
 
   let v2Keeper: V2KeeperHandle | null = null;
   if (v2Manifest && v2Sql) {
@@ -99,6 +119,7 @@ async function main(): Promise<void> {
     keeper?.stop();
     v2Keeper?.stop();
     v2Quoter?.stop();
+    if (opsTimer) clearInterval(opsTimer);
     v2Indexer?.stop();
     indexer?.stop();
     await api.stop();

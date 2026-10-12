@@ -29,6 +29,7 @@ import { fundingApr7dBps, type Store } from "./db.ts";
 import { getIndexerStatus } from "./indexer.ts";
 import { authRoutes, type AuthRouteDeps } from "./auth/routes.ts";
 import { v1Routes, type V1Deps } from "./v2/api.ts";
+import { v2HealthRoutes, type OpsDeps } from "./v2/ops.ts";
 import { getKeeperStatus, getLastSuccessfulCrank } from "./keeper.ts";
 
 const log = pino({ name: "api", level: process.env.LOG_LEVEL ?? "info" });
@@ -68,6 +69,8 @@ export async function startApi(opts: {
   auth?: AuthRouteDeps;
   /** v2 evidence API (/v1/*). Omitted → not served. */
   v1?: V1Deps;
+  /** v2 keeper/quoter gas and liveness (/v2/health). Omitted → not served. */
+  v2Ops?: OpsDeps;
 }): Promise<ApiHandle> {
   const rpcUrl = getRpcUrl();
   const chainId = getChainId();
@@ -135,6 +138,11 @@ export async function startApi(opts: {
   if (opts.v1) {
     await app.register(v1Routes({ ...opts.v1, rateLimit: { max: rlMax, timeWindow: rlWindowSec * 1000 } }));
     log.info({ environment: opts.v1.manifest.environment, controller: opts.v1.manifest.contracts.TrancheController }, "v1 evidence routes registered");
+  }
+
+  if (opts.v2Ops) {
+    await app.register(v2HealthRoutes(opts.v2Ops));
+    log.info({ keeper: opts.v2Ops.keeper, quoter: opts.v2Ops.quoter }, "v2 health route registered");
   }
 
   if (opts.auth) {

@@ -369,6 +369,24 @@ See `FACTS.md` for the per-contract runsheet. Toolchain must match
 net delta and RPC reachability, returns `null` (never `0`) for anything it cannot
 read, and returns 503 with an explicit `degraded` list when the system is broken.
 
+### v2 book (hedged, since 2026-10-09)
+
+`/health` above describes the v0 vault and reports v0 problems on the v2-only Railway service. For
+the v2 book use **`GET /v2/health`** (`vessel-service/src/v2/ops.ts`):
+
+| Alarm | Condition |
+| --- | --- |
+| v2 keeper gas | balance < 2 MON (the hedge sends many transactions) |
+| Kuru quoter gas | seeder balance < 1 MON |
+| v2 keeper idle | no confirmed action for 3 h (it settles at least hourly) |
+| Kuru quoter idle | no confirmed action for 45 min (it refreshes every 15 min) |
+
+It returns 200 when healthy and 503 with the reasons otherwise, and the service logs `v2 ops
+degraded` every 10 minutes while anything is wrong. Point any uptime monitor (for example a free
+UptimeRobot or Better Stack HTTP check) at
+`https://vessel-v2-production.up.railway.app/v2/health` to get an email on 503. Fund the address
+the message names.
+
 ---
 
 ## 6. Known gaps
