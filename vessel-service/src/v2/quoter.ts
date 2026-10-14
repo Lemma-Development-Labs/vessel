@@ -89,6 +89,10 @@ export interface QuoteConfig {
   levelShareBps: readonly bigint[];
   /** re-quote when our mid is this far from the mark */
   recenterBps: bigint;
+  /** at most one re-quote per book in this many seconds, unless the mid is `urgentBps` off
+   *  (each re-quote costs ~0.09 MON on Monad, which bills the gas limit) */
+  minRequoteGapSec: bigint;
+  urgentBps: bigint;
   /** re-quote anyway after this long, or when more than this share of a book's capital sits unposted
    *  in the margin account (fills move capital to the other side, where it waits to be re-posted) */
   maxAgeSec: bigint;
@@ -104,8 +108,10 @@ export interface QuoteConfig {
 export const defaultQuoteConfig: QuoteConfig = {
   levelsBps: [5n, 25n],
   levelShareBps: [4_000n, 6_000n],
-  recenterBps: 10n,
-  maxAgeSec: 900n,
+  recenterBps: 15n,
+  minRequoteGapSec: 300n,
+  urgentBps: 25n,
+  maxAgeSec: 6n * 3600n,
   idleBps: 2_500n,
   gasReserveMon: 2n * E18,
   minDepositQuote: 1_000_000n,
@@ -202,8 +208,11 @@ export function decideQuotes(o: QuoteObserved, cfg: QuoteConfig): PlannedAction 
     const idleQuote = m.marginQuote;
     const idleMon = monForBook > lockedMon(m) ? monForBook - lockedMon(m) : 0n;
     const depleted = idleQuote * BPS > quoteCapital * cfg.idleBps || idleMon * BPS > monForBook * cfg.idleBps;
-    const stale = o.now - (o.lastQuotedAt[m.book.toLowerCase()] ?? 0n) > cfg.maxAgeSec;
+    const since = o.now - (o.lastQuotedAt[m.book.toLowerCase()] ?? 0n);
+    const stale = since > cfg.maxAgeSec;
     if (off <= cfg.recenterBps && !depleted && !stale) continue;
+    // Gas guard: a book that was just quoted waits, unless the engine is about to be priced out.
+    if (since < cfg.minRequoteGapSec && off <= cfg.urgentBps) continue;
 
     const buyPrices = levelPrices(o.mark, m.tick, cfg.levelsBps, true);
     const sellPrices = levelPrices(o.mark, m.tick, cfg.levelsBps, false);

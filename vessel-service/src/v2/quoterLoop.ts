@@ -173,12 +173,37 @@ export async function startV2Quoter(opts: {
     leaseStaleAfterMs: 5 * 60_000,
   };
   const intervalMs = envInt("V2_QUOTER_INTERVAL_MS", 15_000, 1_000, 3_600_000);
+  // Gas guards kept in memory too, so they hold even if the journal lookup is wrong:
+  // when each book was last re-quoted by this process, and how many re-quotes in the last 24 h.
+  const DAILY_BUDGET = envInt("V2_QUOTER_DAILY_REQUOTES", 48, 1, 1_000);
+  const lastLocal: Record<string, bigint> = {};
+  const recent: Record<string, number[]> = {};
   let running = true;
   const loop = async () => {
     while (running) {
       try {
-        const entry = await tick(deps, async () => decideQuotes(await observeQuotes(opts.pc, opts.manifest, opts.sql, seeder), defaultQuoteConfig));
-        if (entry) opts.log.info({ action: entry.action, id: entry.client_request_id, state: entry.state }, "kuru quoter action");
+        let why: string | undefined;
+        const entry = await tick(deps, async () => {
+          const o = await observeQuotes(opts.pc, opts.manifest, opts.sql, seeder);
+          for (const [book, at] of Object.entries(lastLocal)) {
+            if ((o.lastQuotedAt[book] ?? 0n) < at) o.lastQuotedAt[book] = at;
+          }
+          const plan = decideQuotes(o, defaultQuoteConfig);
+          if (plan?.action === "batchUpdate") {
+            const book = plan.target.toLowerCase();
+            const day = Date.now() - 24 * 3600_000;
+            recent[book] = (recent[book] ?? []).filter((t) => t > day);
+            if (recent[book]!.length >= DAILY_BUDGET) {
+              opts.log.warn({ book, budget: DAILY_BUDGET }, "kuru quoter: daily re-quote budget spent, skipping");
+              return null;
+            }
+            recent[book]!.push(Date.now());
+            lastLocal[book] = o.now;
+          }
+          why = (plan?.inputs as { why?: string } | undefined)?.why;
+          return plan;
+        });
+        if (entry) opts.log.info({ action: entry.action, id: entry.client_request_id, state: entry.state, why }, "kuru quoter action");
       } catch (err) {
         opts.log.error({ err }, "kuru quoter tick failed");
       }

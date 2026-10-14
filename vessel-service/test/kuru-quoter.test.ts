@@ -110,7 +110,10 @@ describe("kuru quoter — decisions", () => {
   });
 
   it("re-posts capital that fills moved to the other side, and refreshes a quote that is simply old", () => {
-    const quoted = liveFromFirstQuote(base({ markets: [market(USDC_BOOK, USDC)] }));
+    // Past the re-quote gap: fills are re-posted, but not within minutes of the last quote.
+    const fresh = liveFromFirstQuote(base({ markets: [market(USDC_BOOK, USDC)] }));
+    const later = fresh.now + cfg.minRequoteGapSec + 1n;
+    const quoted = { ...fresh, now: later, markAt: later };
     const m = quoted.markets[0]!;
     // 80% of the bids filled: ~1,600 USDC became ~55k MON, now idle in the margin account.
     const bidsFilled = {
@@ -128,6 +131,15 @@ describe("kuru quoter — decisions", () => {
     expect(decideQuotes(quoted, cfg)).toBeNull();
     const old = { ...quoted, now: quoted.now + cfg.maxAgeSec + 1n, markAt: quoted.now + cfg.maxAgeSec + 1n };
     expect((decideQuotes(old, cfg)?.inputs as { why: string }).why).toBe("refresh");
+  });
+
+  it("gas guard: a just-quoted book waits out the gap unless the mid is close to the engine's band", () => {
+    const quoted = liveFromFirstQuote(base({ markets: [market(USDC_BOOK, USDC)] }));
+    const at = (bps: bigint, dt: bigint) => ({ ...quoted, now: quoted.now + dt, markAt: quoted.now + dt, mark: (MARK * (10_000n + bps)) / 10_000n });
+    expect(decideQuotes(at(20n, 60n), cfg)).toBeNull(); // 20 bps off one minute later: wait
+    expect(decideQuotes(at(20n, cfg.minRequoteGapSec + 1n), cfg)?.action).toBe("batchUpdate"); // after the gap: re-centre
+    expect(decideQuotes(at(30n, 60n), cfg)?.action).toBe("batchUpdate"); // 30 bps: the engine's band, now
+    expect(decideQuotes(at(12n, cfg.minRequoteGapSec + 1n), cfg)).toBeNull(); // 12 bps: inside the 15 bps re-centre threshold
   });
 
   it("does nothing on a stale mark: the engine would refuse to trade anyway", () => {
