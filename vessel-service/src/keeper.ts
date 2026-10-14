@@ -356,11 +356,26 @@ export async function startKeeper(opts?: {
   );
 
   if (runway.cranksRemaining < minRunway) {
+    // Do NOT kill the process. An underfunded keeper is a degraded protocol,
+    // not a broken service: the API still serves /stats and /waterfall and the
+    // indexer still tracks the chain, and those are exactly what the app needs
+    // to keep telling the truth while nobody is cranking.
+    //
+    // Exiting here took the whole service down for four days when the keeper
+    // drained — the healthcheck never came up, so Railway removed the
+    // deployment and the stats service went with it. /health already reports
+    // this honestly, which is the right channel for it.
+    status.running = false;
+    status.lastError = `gas runway ${runway.cranksRemaining} < MIN_CRANKS_RUNWAY ${minRunway} — fund ${account.address}`;
     log.error(
-      { minCranksRunway: minRunway, ...runwayFields(runway) },
-      "keeper gas runway below MIN_CRANKS_RUNWAY — refuse to start (key is gas-only; fund it)",
+      { minCranksRunway: minRunway, keeper: account.address, ...runwayFields(runway) },
+      "keeper gas runway below MIN_CRANKS_RUNWAY — NOT cranking (key is gas-only; fund it). API and indexer continue.",
     );
-    process.exit(1);
+    return {
+      stop: () => {},
+      address: account.address,
+      lastCrankTs: () => getLastSuccessfulCrank(),
+    };
   }
 
   log.info({ keeper: account.address, chain: chainId, engine }, "preflight ok");

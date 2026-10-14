@@ -1,0 +1,78 @@
+{
+  "releaseCommit": null,
+  "activationAuthorized": false,
+  "gates": {
+    "R01": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R02": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R03": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R04": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R05": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R06": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R07": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R08": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R09": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R10": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R11": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    },
+    "R12": {
+      "status": "NOT_EVALUATED",
+      "owner": null,
+      "evidence": [],
+      "checkedAt": null
+    }
+  }
+}

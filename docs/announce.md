@@ -1,6 +1,6 @@
 # Testnet announce (copy-paste)
 
-Monad testnet `10143`, broadcast 2026-08-29, `deployedBlock` 57874280. Sourcify verified (`solc 0.8.24`, optimizer 200, via-ir). Source: [Lemma-Development-Labs/vessel](https://github.com/Lemma-Development-Labs/vessel).
+Monad testnet `10143`, broadcast 2026-08-29, `deployedBlock` 57923009. Sourcify verified (`solc 0.8.24`, optimizer 200, via-ir). Source: [Lemma-Development-Labs/vessel](https://github.com/Lemma-Development-Labs/vessel).
 
 ## Tweet (filled)
 
@@ -21,20 +21,20 @@ https://github.com/Lemma-Development-Labs/vessel
 ### 2/2
 
 ```
-Vault    0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5
-Tranches 0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842
-Engine   0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85
+Vault    0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d
+Tranches 0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373
+Engine   0x60eC904955CA843285B24E3F6e7e2034F8f96140
 
-https://testnet.monadvision.com/address/0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85
+https://testnet.monadvision.com/address/0x60eC904955CA843285B24E3F6e7e2034F8f96140
 ```
 
 ## Addresses
 
 | Name | Address | Explorer |
 | --- | --- | --- |
-| Vault (BlitzVault) | `0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5` | [MonadVision](https://testnet.monadvision.com/address/0xE1c3aBAd2789aC170833d9E9bd72E706284a70c5) |
-| Tranches | `0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842` | [MonadVision](https://testnet.monadvision.com/address/0xdb4666c3F187e73795bcF9Cfb3a6D64A875EF842) |
-| Engine (EngineLite) | `0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85` | [MonadVision](https://testnet.monadvision.com/address/0xDE65E58df3e3da55DD3c6e107E30E1655Fb5fC85) |
+| Vault (BlitzVault) | `0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d` | [MonadVision](https://testnet.monadvision.com/address/0x27eE1688F8b07E2aa767a4B4f4b90040E3ABC55d) |
+| Tranches | `0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373` | [MonadVision](https://testnet.monadvision.com/address/0x7Df78EA918FA4531a74b79CE0a53a6D94B72E373) |
+| Engine (EngineLite) | `0x60eC904955CA843285B24E3F6e7e2034F8f96140` | [MonadVision](https://testnet.monadvision.com/address/0x60eC904955CA843285B24E3F6e7e2034F8f96140) |
 
 ## CREATE hashes
 

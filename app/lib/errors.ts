@@ -1,10 +1,28 @@
 import { BaseError, decodeErrorResult, type Abi } from "viem";
-import { COPY } from "./provider";
-import demoAbi from "./abis/DemoUSD.json";
-import engineAbi from "./abis/EngineLite.json";
-import tranchesAbi from "./abis/Tranches.json";
+import { COPY } from "./copy";
+import controllerAbi from "./book/abis/TrancheController.json";
+import escrowAbi from "./book/abis/ClaimEscrow.json";
+import dusdAbi from "./book/abis/DemoUSD.json";
 
-const abis = [demoAbi, tranchesAbi, engineAbi] as Abi[];
+const abis = [controllerAbi, escrowAbi, dusdAbi] as Abi[];
+
+/** Contract error name → what the user should read. Unknown names pass through as-is. */
+const MESSAGES: Record<string, string> = {
+  NotEligible: "This wallet is not on the beta allowlist yet. Access goes out in waves.",
+  CapExceeded: "Above your beta allowance or the stage cap.",
+  WindowClosed: "The subscription window has closed.",
+  WindowOpen: "The subscription window is still open.",
+  TooManySubscribers: "This series is full (25 subscribers).",
+  DeadlinePassed: "The request deadline has passed.",
+  BookImpaired: COPY.impair,
+  BadSeries: "That series is not open.",
+  BadStatus: "This request can no longer be changed.",
+  NotOwner: "Only the request owner can do that.",
+  ZeroAmount: "Nothing to do — the amount is zero.",
+  ClaimsPaused: "Claims are paused by the guardian.",
+  NothingToClaim: "Nothing to claim yet.",
+  Paused: "Paused by the guardian — views still work.",
+};
 
 export function decodeVesselError(err: unknown): string {
   const raw = extractData(err);
@@ -12,19 +30,8 @@ export function decodeVesselError(err: unknown): string {
     for (const abi of abis) {
       try {
         const decoded = decodeErrorResult({ abi, data: raw });
-        if (decoded.errorName === "SubordinationFloor") return COPY.floor;
-        if (decoded.errorName === "FaucetCooldown") {
-          const seconds = Number(decoded.args?.[0] ?? 0);
-          return COPY.cooldown(seconds);
-        }
-        if (decoded.errorName === "HullImpairment") return COPY.impair;
-        if (
-          decoded.errorName === "Slippage" ||
-          decoded.errorName === "InsufficientOutput"
-        ) {
-          return COPY.slippage;
-        }
-        return decoded.errorName;
+        if (decoded.errorName === "FaucetCooldown") return COPY.cooldown(Number(decoded.args?.[0] ?? 0));
+        return MESSAGES[decoded.errorName] ?? decoded.errorName;
       } catch {
         /* try next abi */
       }

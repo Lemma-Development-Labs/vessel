@@ -1,5 +1,3 @@
-export const MIN_JOIN = 1_000_000n; // 1 dUSD, matches Tranches.MIN_JOIN
-
 /**
  * MONAD CHARGES THE GAS LIMIT, NOT GAS USED.
  *
@@ -30,25 +28,12 @@ export const MIN_JOIN = 1_000_000n; // 1 dUSD, matches Tranches.MIN_JOIN
  * unchanged. Cold-heavy paths therefore cost meaningfully more on Monad than
  * a foundry number suggests.
  *
- * So: estimate at call time and add 10% (`bufferGas`). These constants are
- * only the CEILING used when estimation is impossible — set from the foundry
+ * So: estimate at call time and add 10% (`bufferGas`). Per-call ceilings (lib/book/chain.tsx) are
+ * only used when estimation is impossible — set from the foundry
  * worst case plus generous headroom for Monad's cold-access repricing. A
  * too-tight ceiling is worse than a loose one: an out-of-gas transaction still
  * pays the full limit and accomplishes nothing.
  */
-export const GAS_CEILING = {
-  faucet: 200_000n,
-  approve: 90_000n,
-  join: 420_000n,
-  exit: 200_000n,
-  crank: 550_000n,
-  deployLiquidity: 750_000n,
-  unwind: 460_000n,
-} as const;
-
-/** Back-compat alias; prefer GAS_CEILING so the semantics are explicit. */
-export const GAS = GAS_CEILING;
-
 /** The skill's maximum recommended buffer over a real estimate. */
 export const GAS_BUFFER_PCT = 10n;
 

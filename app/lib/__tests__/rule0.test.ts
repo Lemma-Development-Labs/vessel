@@ -31,11 +31,12 @@ function walk(dir: string, out: string[] = []): string[] {
 
 
 /**
- * Live<T> fields on the provider. `connected`, `wrongNetwork`, `loading`,
- * `impaired` and `isMock` are plain booleans and are legitimately truthy-tested.
+ * Live<T> fields on the book provider. `connected`, `wrongNetwork`, `loading`,
+ * `reconnecting` and `isMock` are plain booleans and are legitimately truthy-tested.
  */
-const LIVE_TOP = "dusdBalance|hullShares|balShares|paused";
-const LIVE_GROUP = "engine|deck|vault|faucetState|hullMeta|balMeta";
+const LIVE_TOP = "clock|book|engine|series|wallet|myDeposits|myExits|history|evidence";
+/** The live provider file. */
+const LIVE_PROVIDER = "lib/book/chain.tsx";
 
 /** `v.paused ?`, `!v.paused`, `v.engine.shortId &&` — object in a boolean slot. */
 function truthinessHits(line: string): string[] {
@@ -43,8 +44,6 @@ function truthinessHits(line: string): string[] {
   const pats = [
     new RegExp(`\\bv\\.(?:${LIVE_TOP})\\s*(?:\\?(?!\\.)|&&|\\|\\|)`, "g"),
     new RegExp(`!\\s*v\\.(?:${LIVE_TOP})\\b(?!\\s*\\.)`, "g"),
-    new RegExp(`\\bv\\.(?:${LIVE_GROUP})\\.[A-Za-z0-9_]+\\s*(?:\\?(?!\\.)|&&|\\|\\|)`, "g"),
-    new RegExp(`!\\s*v\\.(?:${LIVE_GROUP})\\.[A-Za-z0-9_]+\\b(?!\\s*\\.)`, "g"),
   ];
   for (const re of pats) for (const m of line.matchAll(re)) out.push(m[0].trim());
   return out;
@@ -56,7 +55,7 @@ function truthinessHits(line: string): string[] {
  */
 describe("Rule 0 — the live provider never lies", () => {
   it("the live provider does not import the mock module", () => {
-    const chain = read("lib/chain.tsx");
+    const chain = read(LIVE_PROVIDER);
     // Any import that resolves to lib/mock, however it is spelled.
     const offenders = chain
       .split("\n")
@@ -70,12 +69,12 @@ describe("Rule 0 — the live provider never lies", () => {
       );
     expect(
       offenders,
-      `lib/chain.tsx must never import from the mock module. Offending lines: ${JSON.stringify(offenders)}`,
+      `${LIVE_PROVIDER} must never import from the mock module. Offending lines: ${JSON.stringify(offenders)}`,
     ).toEqual([]);
   });
 
   it("the live provider never constructs a mock-sourced value", () => {
-    const chain = read("lib/chain.tsx");
+    const chain = read(LIVE_PROVIDER);
     expect(chain).not.toMatch(/["']mock["']/);
   });
 
@@ -83,7 +82,7 @@ describe("Rule 0 — the live provider never lies", () => {
     // `?? 0n` / `|| 0n` / `?? 0` on a read result is exactly the bug Rule 0
     // exists to prevent. Files that legitimately need a numeric default for
     // pure layout math opt out with an inline `rule0-ok` comment.
-    const liveFiles = ["lib/chain.tsx", "lib/stats.ts"];
+    const liveFiles = [LIVE_PROVIDER, "lib/stats.ts"];
     const problems: string[] = [];
     for (const rel of liveFiles) {
       read(rel)
@@ -112,9 +111,9 @@ describe("Rule 0 — the live provider never lies", () => {
       const lines = readFileSync(f, "utf8").split("\n");
       lines.forEach((line, i) => {
         if (line.includes("rule0-ok")) return;
-        const access = /\bv\.(engine|deck|vault|faucetState)\.([A-Za-z0-9_]+)\.value\b/g;
+        const access = new RegExp(`\\bv\\.(${LIVE_TOP})\\.value\\b`, "g");
         for (const m of line.matchAll(access)) {
-          const field = `${m[1]}.${m[2]}`;
+          const field = m[1];
           const window = lines.slice(Math.max(0, i - GUARD_WINDOW), i + 1).join("\n");
           const guarded =
             window.includes(`${field}.status === "ok"`) ||
@@ -156,14 +155,14 @@ describe("Rule 0 — the live provider never lies", () => {
 
   it("the truthiness detector actually catches a planted violation", () => {
     const bad = [
-      "      {v.paused ? <Banner /> : null}",
-      "      if (!v.dusdBalance) return null;",
-      "      const x = v.engine.shortId && other;",
+      "      {v.book ? <Banner /> : null}",
+      "      if (!v.wallet) return null;",
+      "      const x = v.engine && other;",
     ];
     const good = [
-      '      {v.paused.status === "ok" && v.paused.value ? <Banner /> : null}',
-      "      const n = valueOrForLogic(v.dusdBalance, 0n);",
-      "      <Val of={v.engine.shortId}>{(s) => String(s)}</Val>",
+      '      {v.book.status === "ok" && v.book.value.impaired ? <Banner /> : null}',
+      "      const n = valueOrForLogic(v.wallet, null);",
+      "      <Val of={v.engine}>{(e) => String(e)}</Val>",
       "      if (v.connected && !v.wrongNetwork) return null;",
     ];
     expect(bad.flatMap(truthinessHits)).toHaveLength(3);
@@ -174,19 +173,13 @@ describe("Rule 0 — the live provider never lies", () => {
     // Guards the guard: if the detector above stopped matching, it would go
     // green on a codebase full of unguarded reads and prove nothing.
     const GUARD_WINDOW = 4;
-    const bad = ['const x = v.engine.fundingAccrued.value;'];
-    const good = [
-      'v.engine.fundingAccrued.status === "ok" ? (',
-      "  v.engine.fundingAccrued.value",
-      ") : null",
-    ];
+    const bad = ["const x = v.book.value.hullNav;"];
+    const good = ['v.book.status === "ok" ? (', "  v.book.value.hullNav", ") : null"];
     const scan = (lines: string[]) => {
       const hits: string[] = [];
       lines.forEach((line, i) => {
-        for (const m of line.matchAll(
-          /\bv\.(engine|deck|vault|faucetState)\.([A-Za-z0-9_]+)\.value\b/g,
-        )) {
-          const field = `${m[1]}.${m[2]}`;
+        for (const m of line.matchAll(new RegExp(`\\bv\\.(${LIVE_TOP})\\.value\\b`, "g"))) {
+          const field = m[1];
           const window = lines.slice(Math.max(0, i - GUARD_WINDOW), i + 1).join("\n");
           if (!window.includes(`${field}.status === "ok"`)) hits.push(line);
         }

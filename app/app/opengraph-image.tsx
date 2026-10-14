@@ -23,7 +23,7 @@ export default function OpengraphImage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "linear-gradient(160deg, #070B10 0%, #0B1118 100%)",
+          background: "radial-gradient(70% 60% at 80% 0%, rgba(44,92,255,0.22), transparent 70%), #05070A",
           padding: "64px 72px",
           fontFamily: "monospace",
         }}
@@ -50,7 +50,7 @@ export default function OpengraphImage() {
               border: "1px solid rgba(143,166,188,0.35)",
               borderRadius: 8,
               padding: "8px 14px",
-              color: "#8FA6BC",
+              color: "#6BF2C0",
               fontSize: 22,
               letterSpacing: 2,
             }}
@@ -63,7 +63,7 @@ export default function OpengraphImage() {
           <div
             style={{
               display: "flex",
-              color: "#EAEEF3",
+              color: "#F4F1EA",
               fontSize: 104,
               fontWeight: 700,
               letterSpacing: -2,
@@ -76,7 +76,7 @@ export default function OpengraphImage() {
             style={{
               display: "flex",
               marginTop: 20,
-              color: "#EAEEF3",
+              color: "#F4F1EA",
               fontSize: 42,
               lineHeight: 1.2,
               maxWidth: 940,
@@ -100,16 +100,16 @@ export default function OpengraphImage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#8FA6BC" }} />
-            <div style={{ display: "flex", color: "#8FA6BC", fontSize: 24, letterSpacing: 1 }}>HULL · senior</div>
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#6BF2C0" }} />
+            <div style={{ display: "flex", color: "#6BF2C0", fontSize: 24, letterSpacing: 1 }}>HULL · senior</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#C9964B" }} />
-            <div style={{ display: "flex", color: "#C9964B", fontSize: 24, letterSpacing: 1 }}>
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#FF5B29" }} />
+            <div style={{ display: "flex", color: "#FF5B29", fontSize: 24, letterSpacing: 1 }}>
               BALLAST · first-loss
             </div>
           </div>
-          <div style={{ display: "flex", marginLeft: "auto", color: "#836EF9", fontSize: 24 }}>
+          <div style={{ display: "flex", marginLeft: "auto", color: "#6BF2C0", fontSize: 24 }}>
             testnet.vessel.wtf
           </div>
         </div>

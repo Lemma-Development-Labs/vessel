@@ -1,27 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Archivo, IBM_Plex_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { Providers } from "@/lib/providers";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AppShell } from "@/components/shell";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const sans = Instrument_Sans({
+// Two faces, as on vessel.wtf: Archivo (variable width) for everything set in words,
+// IBM Plex Mono for every number, address, label and control.
+const sans = Archivo({
   variable: "--font-sans",
   subsets: ["latin"],
+  axes: ["wdth"],
   display: "swap",
 });
 
 const mono = IBM_Plex_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -63,14 +60,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#070B10",
+  themeColor: "#05070A",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <ErrorBoundary>

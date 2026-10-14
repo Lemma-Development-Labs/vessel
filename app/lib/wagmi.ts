@@ -5,7 +5,9 @@ import { walletConnect } from "wagmi/connectors/walletConnect";
 import { defineChain, fallback, type Chain } from "viem";
 
 import { foundry } from "viem/chains";
-import { CHAIN_ID } from "./addresses";
+import { RELEASE } from "./book/release";
+
+const CHAIN_ID = RELEASE.chainId;
 
 /**
  * Multicall3 at its canonical cross-chain address. Verified deployed on Monad
