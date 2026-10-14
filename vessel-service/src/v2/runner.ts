@@ -18,7 +18,7 @@ import type { Manifest } from "../vendor/verify/read.ts";
 import { migrateJournal } from "./journal.ts";
 import { RejectedError, TimeoutError, tick, type ChainPort, type KeeperDeps } from "./keeper.ts";
 import { POLICY_VERSION, allowlist, decide, engineCashNeed, type Observed, type PolicyConfig } from "./policy.ts";
-import { HEDGE_POLICY_VERSION, decideHedge, defaultHedgeConfig, engineAllowlist, type HedgeObserved } from "./hedge.ts";
+import { HEDGE_POLICY_VERSION, decideHedge, defaultHedgeConfig, engineAllowlist, type HedgeConfig, type HedgeObserved } from "./hedge.ts";
 
 /** Monad bills the gas LIMIT: estimate + 10%, hard cap (see OPS.md gas notes). */
 const GAS_CAP = 2_000_000n;
@@ -258,6 +258,13 @@ export async function startV2Keeper(opts: {
   const chainPort = viemChainPort(opts.pc, opts.chain, opts.rpcUrl, pk);
   const controller = opts.manifest.contracts.TrancheController as Address;
   const hedged = opts.manifest.contracts.HedgedEngine as Address | undefined;
+  // V2_HEDGE_MIN_MOVE_MICRO (USDC base units, 10,000–100,000,000): the smallest hedge trade worth
+  // sending. The engine's slice cap is 0.5% of its value, so the default 1 USDC needs a ~200 USDC
+  // engine before spot trades start; testnet can set 100,000 (0.10 USDC) to hedge a small book.
+  const hedgeCfg: HedgeConfig = {
+    ...defaultHedgeConfig,
+    minMove: BigInt(envInt("V2_HEDGE_MIN_MOVE_MICRO", Number(defaultHedgeConfig.minMove), 10_000, 100_000_000)),
+  };
   const cfg: PolicyConfig = {
     settleEverySec: BigInt(process.env.V2_SETTLE_EVERY_SEC ?? "3600"),
     batchSize: 10n,
@@ -285,7 +292,7 @@ export async function startV2Keeper(opts: {
           if (next || !hedged || !o.engineWired) return next;
           const { need, available } = engineCashNeed(o, cfg);
           const h = await observeHedge(opts.pc, hedged, o.now, need > available ? need - available : 0n);
-          return decideHedge(h, defaultHedgeConfig, hedged);
+          return decideHedge(h, hedgeCfg, hedged);
         });
         if (entry) {
           const fields = { action: entry.action, id: entry.client_request_id, nonce: entry.planned_nonce, state: entry.state };

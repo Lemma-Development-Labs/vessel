@@ -164,8 +164,13 @@ export function decideHedge(o: HedgeObserved, cfg: HedgeConfig, engine: Address)
   }
 
   // 3. Margin toward target: spot value × (1 + buffer). Spot target S = V / (2 + buffer).
-  const spotTarget = (o.value * BPS) / (2n * BPS + cfg.marginBufferBps);
-  const marginTarget = o.value - spotTarget;
+  // Perpl keeps an account only above its minimum, so margin never targets below it (plus the
+  // conversion budget); spot gets what is left. A small book therefore hedges a small spot leg
+  // instead of opening the account and then trying to withdraw below the venue's floor.
+  const minMargin = (((o.minAccountOpen * o.fx) / E18) * (BPS + 2n * CONVERSION_BPS)) / BPS;
+  const halfSplitSpot = (o.value * BPS) / (2n * BPS + cfg.marginBufferBps);
+  const marginTarget = o.value - halfSplitSpot > minMargin ? o.value - halfSplitSpot : minMargin;
+  const spotTarget = o.value > marginTarget ? o.value - marginTarget : 0n;
   const marginNow = ((o.perplEquity + o.ausdCash) * o.fx) / E18;
   const opening = o.perplAccountId === 0n;
   const marginExcess = marginNow > marginTarget + 2n * cfg.minMove + slice;
@@ -185,7 +190,9 @@ export function decideHedge(o: HedgeObserved, cfg: HedgeConfig, engine: Address)
   } else if (marginExcess) {
     const excess = marginNow - marginTarget;
     if (usdcOfAusd(o.ausdCash) >= cfg.minMove) return toCash(minB(o.ausdCash, cfg.conversionChunk), "margin: excess AUSD to cash");
-    const free = minB(o.perplFree, (excess * E18) / o.fx);
+    // Never withdraw the account below Perpl's minimum.
+    const aboveMin = o.perplEquity > o.minAccountOpen ? o.perplEquity - o.minAccountOpen : 0n;
+    const free = minB(minB(o.perplFree, (excess * E18) / o.fx), aboveMin);
     if (usdcOfAusd(free) >= cfg.minMove) return act("withdrawMargin", [free], "margin: withdraw excess");
   }
 

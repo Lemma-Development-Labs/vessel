@@ -1,6 +1,6 @@
 import { decodeFunctionData, toFunctionSelector } from "viem";
 import { describe, expect, it } from "vitest";
-import { decideHedge, defaultHedgeConfig, engineAllowlist, engineWriteAbi, floors, type HedgeObserved } from "../src/v2/hedge.ts";
+import { decideHedge, defaultHedgeConfig, engineAllowlist, engineWriteAbi, floors, type HedgeConfig, type HedgeObserved } from "../src/v2/hedge.ts";
 import { decide, engineCashNeed, type Observed, type PolicyConfig } from "../src/v2/policy.ts";
 
 const E = "0x00000000000000000000000000000000000000e1" as const;
@@ -115,7 +115,7 @@ describe("v2 hedge policy — single decisions", () => {
  * A minimal engine model: fills at the valuation price, Perpl at 1× (the whole notional posted).
  * Enough to show the policy converges and never asks for what the contract would refuse.
  */
-function simulate(start: HedgeObserved, ticks: number, onTick?: (o: HedgeObserved) => void) {
+function simulate(start: HedgeObserved, ticks: number, onTick?: (o: HedgeObserved) => void, c: HedgeConfig = cfg) {
   let o = { ...start };
   const usdcOf = (mon: bigint) => (mon * o.px) / 10n ** 30n;
   for (let i = 0; i < ticks; i++) {
@@ -123,7 +123,7 @@ function simulate(start: HedgeObserved, ticks: number, onTick?: (o: HedgeObserve
     o.priceAt = o.now;
     o.value = o.usdcCash + o.ausdCash + o.perplEquity + usdcOf(o.monQty);
     o.sliceCap = (o.value * 50n) / 10_000n > 100_000_000n ? 100_000_000n : (o.value * 50n) / 10_000n;
-    const p = decideHedge(o, cfg, E);
+    const p = decideHedge(o, c, E);
     if (!p) break;
     const d = decodeFunctionData({ abi: engineWriteAbi, data: p.calldata as `0x${string}` });
     const args = d.args as readonly bigint[];
@@ -244,5 +244,47 @@ describe("v2 controller policy with a hedged engine", () => {
     const p = decide(drained, pcfg, C);
     expect(p?.action).toBe("recallFromEngine");
     expect(p?.inputs).toMatchObject({ amount: "85000000" }); // target 15% of 900 = 135; holds 50
+  });
+});
+
+describe("v2 hedge policy — small testnet book (Perpl's 100 AUSD account minimum)", () => {
+  const small: HedgeConfig = { ...defaultHedgeConfig, minMove: 100_000n }; // 0.10 USDC
+  const smallBook = (usdc: bigint): HedgeObserved => ({
+    ...base(),
+    value: usdc,
+    usdcCash: usdc,
+    sliceCap: (usdc * 50n) / 10_000n,
+  });
+
+  it("never withdraws margin below the account minimum", () => {
+    // 102 USDC engine: account open with 101 AUSD; the 50/50 split would want ~50 back.
+    const o = { ...smallBook(102_000_000n), usdcCash: 1_000_000n, perplAccountId: 7n, perplFree: 101_000_000n, perplEquity: 101_000_000n };
+    const p = decideHedge(o, small, E);
+    if (p?.action === "withdrawMargin") {
+      const amt = decodeFunctionData({ abi: engineWriteAbi, data: p.calldata as `0x${string}` }).args![0] as bigint;
+      expect(101_000_000n - amt).toBeGreaterThanOrEqual(100_000_000n);
+    } else {
+      expect(p?.action).not.toBe("withdrawMargin");
+    }
+  });
+
+  it("a ~120 USDC engine opens the account and hedges a small spot leg, matched, never below the minimum", () => {
+    let minEquityAfterOpen: bigint | null = null;
+    const end = simulate(
+      smallBook(120_000_000n),
+      3_000,
+      (o) => {
+        if (o.perplAccountId > 0n) minEquityAfterOpen = minEquityAfterOpen === null || o.perplEquity < minEquityAfterOpen ? o.perplEquity : minEquityAfterOpen;
+      },
+      small,
+    );
+    expect(end.perplAccountId).toBeGreaterThan(0n);
+    expect(end.monQty).toBeGreaterThan(0n);
+    expect(end.shortLots).toBeGreaterThan(0n);
+    expect(end.monQty / E18 - end.shortLots).toBeLessThanOrEqual(1n);
+    expect(minEquityAfterOpen! >= 100_000_000n).toBe(true);
+    // Spot gets what is left after the minimum margin: about 120 − 100.4 − conversion costs.
+    const spot = (end.monQty * end.px) / 10n ** 30n;
+    expect(spot).toBeGreaterThan(15_000_000n);
   });
 });

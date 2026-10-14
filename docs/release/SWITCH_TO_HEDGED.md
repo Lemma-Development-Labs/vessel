@@ -61,7 +61,9 @@ npx -y @railway/cli variables --set "V2_MANIFEST_JSON=$(jq -c . ../deployments/t
 npx -y @railway/cli up --service vessel-v2 --detach
 ```
 
-`V2_KEEPER_PK` stays as it is (same operator). The quoter refuses to start if its key equals the
+`V2_KEEPER_PK` stays as it is (same operator). On testnet also set
+`V2_HEDGE_MIN_MOVE_MICRO=100000` (0.10 USDC), so a small book hedges: with it the engine opens its
+Perpl account and starts hedging at about 120 USDC of book, instead of about 200. The quoter refuses to start if its key equals the
 keeper's.
 
 Check, within 5 minutes:
