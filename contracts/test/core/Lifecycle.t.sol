@@ -326,9 +326,10 @@ contract LifecycleTest is Test {
         assertEq(bal.balanceOf(carl), 0, "later valid request funded");
         assertEq(escrow.poolBalance(c.exitKey(picky)), 0);
         assertGt(escrow.poolBalance(c.exitKey(fine)), 0);
-        vm.prank(bob);
-        c.cancelRedeem(picky);
-        assertEq(bal.lockedOf(bob), 0, "cancel releases the remainder");
+        // The unmet request ends itself and returns the units; it is never left locked behind the head.
+        (,,, TrancheController.ExitStatus st,,,) = c.exits(picky);
+        assertEq(uint8(st), uint8(TrancheController.ExitStatus.CANCELLED), "user-limited request cancelled");
+        assertEq(bal.lockedOf(bob), 0, "units released without a manual cancel");
     }
 
     function test_payout_blocked_below_projected_30pct_cover() public {

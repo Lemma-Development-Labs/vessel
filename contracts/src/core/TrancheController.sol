@@ -522,7 +522,11 @@ contract TrancheController is ReentrancyGuard {
         uint256 budget = _exitBudget();
         uint256 i = exitHead;
         uint256 end = exitQueue.length;
-        while (i < end && processed < maxItems && budget > 0) {
+        // Every queue slot visited counts against maxItems, including cancelled or emptied ones, so a batch
+        // is always bounded and exitHead always advances: request+cancel spam cannot make exits unprocessable.
+        uint256 scanned;
+        while (i < end && scanned < maxItems && budget > 0) {
+            scanned++;
             uint256 id = exitQueue[i];
             ExitRequest storage e = exits[id];
             if (e.status != ExitStatus.COOLING || e.units == 0) {
@@ -538,8 +542,14 @@ contract TrancheController is ReentrancyGuard {
             if (unitsBurn == 0) break;
             pay = _assetsFor(unitsBurn, supply); // never pay more than the burned units are worth
             if (pay * ACC < e.minAssetsPerUnitWad * unitsBurn) {
-                // A user minimum that cannot be met never blocks the queue.
+                // The holder's own minimum is not met: end this request and return the units (still in the
+                // book, still theirs) so it neither blocks the queue nor stays locked behind the head.
+                uint256 units = e.units;
+                e.units = 0;
+                e.status = ExitStatus.CANCELLED;
+                ballast.unlock(e.owner, units);
                 emit ExitUserLimited(id);
+                emit ExitCancelled(id, units);
                 i++;
                 continue;
             }
