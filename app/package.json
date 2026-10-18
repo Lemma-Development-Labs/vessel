@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
@@ -19,6 +20,7 @@
     "wagmi": "^3.7.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

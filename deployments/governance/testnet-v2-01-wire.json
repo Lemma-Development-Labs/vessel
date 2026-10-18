@@ -1,0 +1,13 @@
+{
+  "name": "Vessel v2 testnet 01 — wire engine, caps, reserve, simulated funding",
+  "salt": "testnet-v2-01-wire",
+  "notes": "Before scheduling: send 20 dUSD to the TimelockController (it funds the reserve seed). Stage cap 25,000 dUSD = the V1 ceiling; test dollars have no value.",
+  "calls": [
+    { "to": "TrancheController", "sig": "setEngine(address)", "args": ["@SimulatedEngine"] },
+    { "to": "TrancheController", "sig": "setStageCap(uint256)", "args": ["25000000000"] },
+    { "to": "TrancheController", "sig": "setCloseCost(uint256)", "args": ["1000000"] },
+    { "to": "DemoUSD", "sig": "approve(address,uint256)", "args": ["@AssetCustody", "20000000"] },
+    { "to": "TrancheController", "sig": "contributeReserve(uint256)", "args": ["20000000"] },
+    { "to": "SimulatedEngine", "sig": "setFundingRateBps(int256)", "args": ["1200"] }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@vessel/verify-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent Vessel verifier: reads the release manifest and chain state at a finalized block; no Vessel API or database",
+  "packageManager": "pnpm@10.33.3",
+  "bin": {
+    "vessel-verify": "src/cli.ts"
+  },
+  "scripts": {
+    "verify": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "tsx": "^4.23.15",
+    "viem": "^2.57.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^3.2.7"
+  }
+}

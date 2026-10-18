@@ -1,0 +1,213 @@
+import { createPublicClient, http, parseAbi, type Address, type PublicClient } from "viem";
+import type { HedgeSnapshot, Snapshot } from "./checks.ts";
+
+/**
+ * Read everything the checks need at ONE block, pinned by number and hash.
+ * Talks only to the RPC and the contracts named in the release manifest.
+ */
+
+const controllerAbi = parseAbi([
+  "function hullNav() view returns (uint256)",
+  "function ballastNav() view returns (uint256)",
+  "function reserveNav() view returns (uint256)",
+  "function treasuryLiability() view returns (uint256)",
+  "function lastActive() view returns (uint256)",
+  "function lifetimeAdmitted() view returns (uint256)",
+  "function pendingReserved() view returns (uint256)",
+  "function stageCap() view returns (uint256)",
+  "function impaired() view returns (bool)",
+  "function lossCarry() view returns (uint256)",
+  "function epoch() view returns (uint256)",
+  "function engine() view returns (address)",
+]);
+const custodyAbi = parseAbi(["function pending() view returns (uint256)", "function activeIdle() view returns (uint256)"]);
+const escrowAbi = parseAbi(["function totalFunded() view returns (uint256)"]);
+const erc20Abi = parseAbi([
+  "function balanceOf(address) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+]);
+const hedgedAbi = parseAbi([
+  "function usdc() view returns (address)",
+  "function ausd() view returns (address)",
+  "function usdcCash() view returns (uint256)",
+  "function ausdCash() view returns (uint256)",
+  "function monQty() view returns (uint256)",
+  "function perplAccountId() view returns (uint256)",
+  "function perpl() view returns (address)",
+  "function perpId() view returns (uint256)",
+  "function perpLotScale() view returns (uint256)",
+  "function valuation() view returns (address)",
+  "function sliceCap() view returns (uint256)",
+  "function spot() view returns (address)",
+]);
+const valuationAbi = parseAbi([
+  "function prices() view returns (uint256, uint256, uint256)",
+  "function isIndependent() view returns (bool)",
+]);
+const perplAbi = parseAbi([
+  "function getAccountByAddr(address) view returns ((uint256 accountId, uint256 balanceCNS, uint256 lockedBalanceCNS, uint8 frozen, address accountAddr, (uint256, uint256, uint256, uint256) positions))",
+  "function getPosition(uint256, uint256) view returns ((uint256 accountId, uint256 nextNodeId, uint256 prevNodeId, uint8 positionType, uint256 depositCNS, uint256 pricePNS, uint256 lotLNS, uint256 entryBlock, int256 pnlCNS, int256 deltaPnlCNS, int256 premiumPnlCNS), uint256, bool)",
+]);
+
+/** HedgedEngine: its ledger, what it actually holds, and its Perpl account read from the exchange. */
+async function readHedge(pc: PublicClient, engine: Address, at: { blockNumber: bigint }): Promise<HedgeSnapshot> {
+  const re = <T>(fn: string) => pc.readContract({ address: engine, abi: hedgedAbi, functionName: fn as never, ...at }) as Promise<T>;
+  const [usdc, ausd, usdcCash, ausdCash, monQty, accountId, perpl, perpId, lotScale, valuation, sliceCap] = await Promise.all([
+    re<Address>("usdc"), re<Address>("ausd"), re<bigint>("usdcCash"), re<bigint>("ausdCash"), re<bigint>("monQty"),
+    re<bigint>("perplAccountId"), re<Address>("perpl"), re<bigint>("perpId"), re<bigint>("perpLotScale"),
+    re<Address>("valuation"), re<bigint>("sliceCap"),
+  ]);
+  const bal = (token: Address) => pc.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [engine], ...at });
+  // The spot asset is native MON, or on testnet the vMON stand-in (ADR-010). Engines deployed before
+  // ADR-010 have no spot() and are native.
+  const spot = await re<Address>("spot").catch(() => "0x0000000000000000000000000000000000000000" as Address);
+  const testSpot = spot !== "0x0000000000000000000000000000000000000000";
+  const [usdcBalance, ausdBalance, monBalance, [px, fx, priceAt], independent] = await Promise.all([
+    bal(usdc),
+    bal(ausd),
+    testSpot ? bal(spot) : pc.getBalance({ address: engine, ...at }),
+    pc.readContract({ address: valuation, abi: valuationAbi, functionName: "prices", ...at }),
+    pc.readContract({ address: valuation, abi: valuationAbi, functionName: "isIndependent", ...at }),
+  ]);
+  let perplFree = 0n;
+  let perplDeposit = 0n;
+  let perplPnl = 0n;
+  let shortLots = 0n;
+  if (accountId > 0n) {
+    const acct = await pc.readContract({ address: perpl, abi: perplAbi, functionName: "getAccountByAddr", args: [engine], ...at });
+    if (acct.accountId !== accountId) throw new Error(`Perpl account for ${engine} is ${acct.accountId}, engine records ${accountId}`);
+    const [pos] = await pc.readContract({ address: perpl, abi: perplAbi, functionName: "getPosition", args: [perpId, accountId], ...at });
+    perplFree = acct.balanceCNS;
+    if (pos.lotLNS > 0n) {
+      perplDeposit = pos.depositCNS;
+      perplPnl = pos.pnlCNS;
+      shortLots = pos.positionType === 1 ? pos.lotLNS : 0n;
+    }
+  }
+  return {
+    usdcCash, ausdCash, monQty, usdcBalance, ausdBalance, monBalance,
+    perplAccountId: accountId, perplFree, perplDeposit, perplPnl, shortLots, perpLotScale: lotScale,
+    px, fx, priceAt, independent, sliceCap, testSpot,
+  };
+}
+
+const engineAbi = parseAbi([
+  "function value() view returns (uint256, uint256)",
+  "function isSimulated() view returns (bool)",
+  "function book() view returns (uint256)",
+  "function pot() view returns (uint256)",
+  "function fundingRateBps() view returns (int256)",
+]);
+
+export interface Manifest {
+  schemaVersion: number;
+  environment: string;
+  chainId: number;
+  contracts: Record<string, Address>;
+}
+
+/** The book's asset entry: Circle `USDC` (ADR-009 deployments) or the earlier testnet `DemoUSD`. */
+export function bookAssetKey(m: Manifest): "USDC" | "DemoUSD" {
+  return m.contracts.USDC ? "USDC" : "DemoUSD";
+}
+
+export function parseManifest(raw: unknown): Manifest {
+  const m = raw as Manifest;
+  if (m?.schemaVersion !== 1) throw new Error("manifest schemaVersion must be 1");
+  for (const k of ["TrancheController", "AssetCustody", "ClaimEscrow", "BallastToken"]) {
+    if (!m.contracts?.[k]) throw new Error(`manifest missing contracts.${k}`);
+  }
+  if (!m.contracts.USDC && !m.contracts.DemoUSD) throw new Error("manifest missing the book asset (contracts.USDC or contracts.DemoUSD)");
+  return m;
+}
+
+/**
+ * Public Monad RPCs cap requests per second (testnet: 15/s, JSON-RPC error
+ * -32011, which viem does not retry) and count every call inside a batch, so
+ * batching does not help. Space requests out so a snapshot's parallel reads
+ * stay under the cap.
+ */
+export function pacedFetch(perSecond = 10): typeof fetch {
+  const gapMs = 1000 / perSecond;
+  let next = 0;
+  return async (input, init) => {
+    const now = Date.now();
+    const at = now > next ? now : next;
+    next = at + gapMs;
+    if (at > now) await new Promise((r) => setTimeout(r, at - now));
+    return fetch(input, init);
+  };
+}
+
+export function client(rpcUrl: string, perSecond = 10): PublicClient {
+  return createPublicClient({ transport: http(rpcUrl, { fetchFn: pacedFetch(perSecond) }) });
+}
+
+export async function readSnapshot(pc: PublicClient, m: Manifest, blockTag: "finalized" | "latest" = "finalized"): Promise<Snapshot> {
+  const chainId = await pc.getChainId();
+  if (chainId !== m.chainId) throw new Error(`RPC is chain ${chainId}, manifest says ${m.chainId}`);
+  const block = await pc.getBlock({ blockTag });
+  const at = { blockNumber: block.number! };
+  const C = m.contracts.TrancheController!;
+  const code = await pc.getCode({ address: C, ...at });
+  if (!code || code === "0x") {
+    throw new Error(
+      `TrancheController ${C} has no code at ${blockTag} block ${block.number} — the deployment is not ${blockTag === "finalized" ? "finalized yet (retry later or pass --latest)" : "on this chain"}`,
+    );
+  }
+  const asset = m.contracts[bookAssetKey(m)]!;
+  const rc = <T>(fn: string) =>
+    pc.readContract({ address: C, abi: controllerAbi, functionName: fn as never, ...at }) as Promise<T>;
+
+  const [hullNav, ballastNav, reserveNav, treasuryLiability, lastActive, lifetimeAdmitted, pendingReserved, stageCap, impaired, lossCarry, epoch, engineAddr] =
+    await Promise.all([
+      rc<bigint>("hullNav"), rc<bigint>("ballastNav"), rc<bigint>("reserveNav"), rc<bigint>("treasuryLiability"),
+      rc<bigint>("lastActive"), rc<bigint>("lifetimeAdmitted"), rc<bigint>("pendingReserved"), rc<bigint>("stageCap"),
+      rc<boolean>("impaired"), rc<bigint>("lossCarry"), rc<bigint>("epoch"), rc<Address>("engine"),
+    ]);
+  const bal = (who: Address) => pc.readContract({ address: asset, abi: erc20Abi, functionName: "balanceOf", args: [who], ...at });
+  const [pending, activeIdle, custodyBal, totalFunded, escrowBal, symbol, decimals, ballastSupply] = await Promise.all([
+    pc.readContract({ address: m.contracts.AssetCustody!, abi: custodyAbi, functionName: "pending", ...at }),
+    pc.readContract({ address: m.contracts.AssetCustody!, abi: custodyAbi, functionName: "activeIdle", ...at }),
+    bal(m.contracts.AssetCustody!),
+    pc.readContract({ address: m.contracts.ClaimEscrow!, abi: escrowAbi, functionName: "totalFunded", ...at }),
+    bal(m.contracts.ClaimEscrow!),
+    pc.readContract({ address: asset, abi: erc20Abi, functionName: "symbol", ...at }),
+    pc.readContract({ address: asset, abi: erc20Abi, functionName: "decimals", ...at }),
+    pc.readContract({ address: m.contracts.BallastToken!, abi: erc20Abi, functionName: "totalSupply", ...at }),
+  ]);
+
+  let engine: Snapshot["engine"] = { present: false };
+  if (engineAddr !== "0x0000000000000000000000000000000000000000") {
+    const [value, observedAt] = await pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "value", ...at });
+    const simulated = await pc
+      .readContract({ address: engineAddr, abi: engineAbi, functionName: "isSimulated", ...at })
+      .catch(() => false);
+    engine = { present: true, simulated, value, observedAt };
+    if (simulated) {
+      const [book, pot, rate] = await Promise.all([
+        pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "book", ...at }),
+        pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "pot", ...at }),
+        pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "fundingRateBps", ...at }),
+      ]);
+      engine = { ...engine, book, pot, fundingRateBps: rate };
+    } else if (m.contracts.HedgedEngine && m.contracts.HedgedEngine.toLowerCase() === engineAddr.toLowerCase()) {
+      engine = { ...engine, hedge: await readHedge(pc, engineAddr, at) };
+    }
+  }
+
+  return {
+    chainId,
+    blockNumber: block.number!,
+    blockHash: block.hash!,
+    blockTimestamp: block.timestamp,
+    asset: { symbol, decimals },
+    controller: { hullNav, ballastNav, reserveNav, treasuryLiability, lastActive, lifetimeAdmitted, pendingReserved, stageCap, impaired, lossCarry, epoch },
+    custody: { pending, activeIdle, tokenBalance: custodyBal },
+    escrow: { totalFunded, tokenBalance: escrowBal },
+    engine,
+    ballastSupply,
+  };
+}
