@@ -31,7 +31,12 @@ contract TrancheController is ReentrancyGuard {
     uint256 public constant HULL_TERM = 28 days;
     uint256 public constant SUBSCRIPTION_WINDOW = 72 hours;
     uint256 public constant EXIT_COOLDOWN = 48 hours;
-    uint256 public constant MAX_SUBSCRIBERS = 25;
+    uint256 public constant MAX_SUBSCRIBERS = 25; // live (escrowed) subscriptions per series
+    uint256 public constant MAX_SUBSCRIPTION_SLOTS = 100; // request slots per series, cancelled ones included
+    uint256 public constant MIN_HULL_SUBSCRIPTION = 10e6; // no dust series (review CORE-1)
+    uint256 public constant ACTIVATION_GRACE = 7 days; // after it, an unactivated subscription can be cancelled (CORE-4)
+    uint256 public constant WRITE_OFF_DELAY = 30 days; // recoveries can still reach Hull this long after termination (CORE-3)
+    uint256 public constant IMPAIRMENT_DUST = 100; // a rounding-sized senior shortfall can't keep the book impaired
     uint256 public constant MAX_HULL_RATE_BPS = 1_500; // 15% cap (spec §8)
     uint256 public constant MIN_IDLE_BPS = 1_000; // 10% of A stays idle (spec §10)
     uint256 public constant RESERVE_TARGET_BPS = 200;
@@ -152,6 +157,7 @@ contract TrancheController is ReentrancyGuard {
         uint256 recognizedCoupon;
         uint256 accPerUnit; // cumulative USDC funded per principal unit (1e18)
         uint256[] requests;
+        uint256 live; // escrowed subscriptions (cancelled ones don't hold a subscriber slot: CORE-1)
     }
 
     mapping(uint256 => Series) internal series_;
@@ -183,6 +189,9 @@ contract TrancheController is ReentrancyGuard {
     error JuniorWipedOut();
     error NotMatured();
     error EngineAlreadySet();
+    error BelowMinimum();
+    error ReceiverMustBeSender();
+    error TooEarly();
 
     event EngineSet(address engine);
     event StageCapSet(uint256 cap);
@@ -222,6 +231,8 @@ contract TrancheController is ReentrancyGuard {
     event Deployed(uint256 amount);
     event Recalled(uint256 amount);
     event TreasuryPaid(uint256 amount);
+    event ImpairmentEnded(uint256 epoch, uint256 shortfallWrittenOff);
+    event TreasuryWrittenDown(uint256 epoch, uint256 amount);
 
     constructor(
         IERC20 usdc_,
@@ -285,6 +296,7 @@ contract TrancheController is ReentrancyGuard {
     }
 
     function setCloseCost(uint256 cost) external onlyGovernance {
+        if (cost > ABSOLUTE_LIFETIME_CAP) revert AboveCeiling(); // unbounded, it overflows cover math (CORE-5)
         closeCost = cost;
     }
 
@@ -296,6 +308,7 @@ contract TrancheController is ReentrancyGuard {
     /// @notice Pre-funded reserve / team seed. Counts against the lifetime budget (spec §19).
     function contributeReserve(uint256 assets) external onlyGovernance nonReentrant notPaused(ADMISSION) {
         if (assets == 0) revert ZeroAmount();
+        if (impaired) revert BookImpaired(); // money into a bricked book would be written off (CORE-3)
         if (lifetimeAdmitted + pendingReserved + assets > stageCap) revert CapExceeded();
         _settle();
         custody.receiveActive(msg.sender, assets);
@@ -324,7 +337,25 @@ contract TrancheController is ReentrancyGuard {
         emit SeriesOpened(id, rateBps, termsHash, s.subscriptionEnd);
     }
 
-    function payTreasury(uint256 amount) external onlyGovernance nonReentrant {
+    /// @notice Cancel a series still in its subscription window (e.g. filled with blocking requests):
+    ///         every escrowed subscription becomes refundable and the next series can open (CORE-1).
+    function cancelSeries(uint256 seriesId) external onlyGovernance nonReentrant {
+        Series storage s = series_[seriesId];
+        if (s.state != SeriesState.SUBSCRIPTION_OPEN) revert BadSeries();
+        uint256 n = s.requests.length;
+        for (uint256 k = 0; k < n; k++) {
+            uint256 id = s.requests[k];
+            if (deposits[id].status == ReqStatus.ESCROWED) _makeRefundable(id, "series cancelled");
+        }
+        s.live = 0;
+        s.state = SeriesState.CANCELLED;
+        if (activeSeries == seriesId) activeSeries = 0;
+        emit SeriesCancelled(seriesId, "governance");
+    }
+
+    function payTreasury(uint256 amount) external onlyGovernance nonReentrant notPaused(SETTLEMENT) {
+        // settle first: a loss since the last epoch may impair the book or write the liability down (CORE-6)
+        _settle();
         if (impaired) revert BookImpaired();
         uint256 sid = activeSeries;
         if (sid != 0 && series_[sid].state == SeriesState.MATURED_UNWINDING) revert SeriesBusy();
@@ -347,6 +378,9 @@ contract TrancheController is ReentrancyGuard {
     ) external nonReentrant notPaused(ADMISSION) returns (uint256 id) {
         if (assets == 0) revert ZeroAmount();
         if (receiver == address(0)) revert ZeroAddress();
+        // the beta allowance is charged to whoever pays, so the payer must also be who holds the claim:
+        // otherwise a wallet can hold more than its cap, or a prepared transaction can pay someone else (CORE-7, SDK-1)
+        if (receiver != msg.sender) revert ReceiverMustBeSender();
         if (deadline <= block.timestamp) revert DeadlinePassed();
         if (impaired) revert BookImpaired();
         uint256 allowance = allowanceOf[msg.sender];
@@ -359,8 +393,10 @@ contract TrancheController is ReentrancyGuard {
             Series storage s = series_[seriesId];
             if (s.state != SeriesState.SUBSCRIPTION_OPEN) revert BadSeries();
             if (block.timestamp >= s.subscriptionEnd) revert WindowClosed();
-            if (s.requests.length >= MAX_SUBSCRIBERS) revert TooManySubscribers();
+            if (assets < MIN_HULL_SUBSCRIPTION) revert BelowMinimum();
+            if (s.live >= MAX_SUBSCRIBERS || s.requests.length >= MAX_SUBSCRIPTION_SLOTS) revert TooManySubscribers();
             s.requests.push(id);
+            s.live++;
         } else {
             if (seriesId != 0) revert BadSeries();
             ballastQueue.push(id);
@@ -390,11 +426,15 @@ contract TrancheController is ReentrancyGuard {
         if (d.status != ReqStatus.ESCROWED) revert BadStatus();
         if (d.tranche == Tranche.HULL) {
             // The ordered set freezes when the window closes, not when someone calls activate:
-            // a late cancel could otherwise change who is admitted under the cover limit.
+            // a late cancel could otherwise change who is admitted under the cover limit. But if
+            // activation hasn't happened ACTIVATION_GRACE after the window (stale valuation, a pause),
+            // the subscriber can leave: escrowed money must never be stuck behind activation (CORE-4).
             Series storage s = series_[d.seriesId];
-            if (s.state != SeriesState.SUBSCRIPTION_OPEN || block.timestamp >= s.subscriptionEnd) {
-                revert BadStatus();
-            }
+            if (s.state != SeriesState.SUBSCRIPTION_OPEN) revert BadStatus();
+            bool inWindow = block.timestamp < s.subscriptionEnd;
+            bool stuck = block.timestamp >= uint256(s.subscriptionEnd) + ACTIVATION_GRACE;
+            if (!inWindow && !stuck) revert BadStatus();
+            s.live--;
         }
         _makeRefundable(id, "cancelled");
     }
@@ -578,7 +618,10 @@ contract TrancheController is ReentrancyGuard {
         }
         uint256 bound = Coverage.payoutBound(hullNav, ballastNav, cFuture, closeCost);
         uint256 idle = custody.activeIdle();
-        uint256 liquid = idle > treasuryLiability ? idle - treasuryLiability : 0;
+        uint256 reserved = treasuryLiability;
+        // while a series is unwinding, Hull's allocation is owed first: Ballast exits can't take it (CORE-8)
+        if (sid != 0 && series_[sid].state == SeriesState.MATURED_UNWINDING) reserved += hullNav;
+        uint256 liquid = idle > reserved ? idle - reserved : 0;
         return bound < liquid ? bound : liquid;
     }
 
@@ -672,14 +715,40 @@ contract TrancheController is ReentrancyGuard {
         amount = hullNav < liquid ? hullNav : liquid;
         if (amount == 0) return 0;
         hullNav -= amount;
+        // once impaired, hullCap is the remaining senior entitlement: what is funded comes off it, so a
+        // later recovery tops Hull up only to what is still owed, not past it (review CORE-2)
+        if (impaired) hullCap = hullCap > amount ? hullCap - amount : 0;
         lastActive -= amount;
         s.accPerUnit += (amount * ACC) / s.principal;
         custody.toEscrow(amount);
         escrow.fund(_seriesKey(seriesId), address(0), amount);
         emit SeriesFunded(seriesId, amount, s.accPerUnit);
-        if (hullNav == 0 && !impaired) {
-            s.state = SeriesState.CLAIMABLE;
+        if (hullNav == 0) {
+            // the senior entitlement is met (within rounding dust): impairment ends and the series closes (CORE-3)
+            if (impaired && hullCap <= IMPAIRMENT_DUST) _endImpairment(hullCap);
+            if (!impaired) s.state = SeriesState.CLAIMABLE;
         }
+    }
+
+    /// @notice If recoveries never cover Hull's remaining entitlement, governance can, WRITE_OFF_DELAY after
+    ///         termination and once everything attributable to Hull has been funded, declare the shortfall
+    ///         final. The series becomes claimable, the book leaves impairment, and Ballast and the reserve
+    ///         are no longer stranded behind a debt that can't be paid (review CORE-3).
+    function writeOffShortfall(uint256 seriesId) external onlyGovernance nonReentrant notPaused(SETTLEMENT) {
+        Series storage s = series_[seriesId];
+        if (!impaired || s.state != SeriesState.MATURED_UNWINDING) revert BadSeries();
+        if (block.timestamp < uint256(s.termination) + WRITE_OFF_DELAY) revert TooEarly();
+        _settle();
+        if (hullNav != 0) revert SeriesBusy(); // fund what is attributable to Hull first
+        _endImpairment(hullCap);
+        s.state = SeriesState.CLAIMABLE;
+    }
+
+    function _endImpairment(uint256 shortfall) private {
+        impaired = false;
+        hullCap = 0;
+        reserveCap = 0;
+        emit ImpairmentEnded(epoch, shortfall);
     }
 
     function claimHull(uint256 seriesId) external nonReentrant returns (uint256 amount) {
@@ -723,8 +792,10 @@ contract TrancheController is ReentrancyGuard {
         emit Deployed(amount);
     }
 
-    /// @notice Reducing exposure is always allowed, even while risk increase is paused.
-    function recallFromEngine(uint256 amount) external onlyOperator nonReentrant {
+    /// @notice Reducing exposure is always allowed, even while risk increase is paused. Governance (the
+    ///         timelocked Safe) can recall too, so engine USDC is never stranded by a lost keeper key (ENG-2).
+    function recallFromEngine(uint256 amount) external nonReentrant {
+        if (msg.sender != operator && msg.sender != governance) revert NotOperator();
         custody.fromEngine(amount);
         emit Recalled(amount);
     }
@@ -736,18 +807,30 @@ contract TrancheController is ReentrancyGuard {
 
     /// @notice A = activeIdle + engine value − unpaid treasury liability.
     function activeAssets() public view returns (uint256) {
+        uint256 gross = _grossAssets();
+        return gross > treasuryLiability ? gross - treasuryLiability : 0;
+    }
+
+    function _grossAssets() private view returns (uint256) {
         uint256 engineValue;
         if (address(engine) != address(0)) {
             uint256 observedAt;
             (engineValue, observedAt) = engine.value();
             if (observedAt + maxValuationAge < block.timestamp) revert StaleValuation();
         }
-        uint256 gross = custody.activeIdle() + engineValue;
-        return gross > treasuryLiability ? gross - treasuryLiability : 0;
+        return custody.activeIdle() + engineValue;
     }
 
     function _settle() private {
-        uint256 a = activeAssets();
+        // If the gross book has fallen below the unpaid treasury fees, those fees were charged on gains that
+        // are gone: write the liability down to what is there rather than flooring A at zero and letting a
+        // later recovery refill the treasury before Hull (review SIM-4: never hide insolvency).
+        uint256 gross = _grossAssets();
+        if (gross < treasuryLiability) {
+            emit TreasuryWrittenDown(epoch + 1, treasuryLiability - gross);
+            treasuryLiability = gross;
+        }
+        uint256 a = gross - treasuryLiability;
         int256 g = int256(a) - int256(lastActive);
         uint256 coupon;
         uint256 sid = activeSeries;

@@ -18,7 +18,7 @@ observation tags (§5) live in `packages/domain`. How the contracts encode them:
 |---|---|---|
 | Hull series | `SeriesState` enum, same names | `DRAFT` is implicit (terms are passed to `openSeries`, which opens the window) |
 | Subscription | `ReqStatus`: `ESCROWED → ADMITTED \| REFUNDABLE → REFUNDED` | `REQUESTED` and `ESCROWED` are one step (funds move in the request tx); `CLAIMED_REFUND` is named `REFUNDED` |
-| Ballast exit | `ExitStatus`: `COOLING → FUNDED \| CANCELLED`; `units` = still-exposed remainder | `ELIGIBLE` is derived (`now ≥ requestedAt + 48 h`); `PARTIALLY_FUNDED` is `COOLING` with `funded > 0`; `USER_LIMITED` is an event (`ExitUserLimited`), the request stays queued |
+| Ballast exit | `ExitStatus`: `COOLING → FUNDED \| CANCELLED`; `units` = still-exposed remainder | `ELIGIBLE` is derived (`now ≥ requestedAt + 48 h`); `PARTIALLY_FUNDED` is `COOLING` with `funded > 0`; `USER_LIMITED` is an event (`ExitUserLimited`): the request is cancelled and its units unlocked (`ExitCancelled`), so it neither blocks the queue nor stays locked behind the head |
 | Pause | bitmask `ADMISSION=1, RISK_INCREASE=2, SETTLEMENT=4, CLAIMS=8` | guardian pauses; only governance resumes |
 
 ## 1. Hull series (S2)
@@ -27,12 +27,14 @@ observation tags (§5) live in `packages/domain`. How the contracts encode them:
 |---|---|---|
 | — | `DRAFT` | governance proposes terms (rate derivation published, terms hash fixed) |
 | `DRAFT` | `SUBSCRIPTION_OPEN` | previous series `CLOSED`; reserve ≥ 2% pre-funded; 30-day real rate history present |
-| `SUBSCRIPTION_OPEN` | `ACTIVE` | 72 h window ended; ordered eligible set frozen; projected junior cover ≥ 30%; activation atomic (never partial); ≤ 25 subscribers |
-| `SUBSCRIPTION_OPEN` | `CANCELLED` | activation conditions fail → all subscriptions `REFUNDABLE` |
+| `SUBSCRIPTION_OPEN` | `ACTIVE` | 72 h window ended; ordered eligible set frozen; projected junior cover ≥ 30%; activation atomic (never partial); ≤ 25 live subscribers (a cancelled request frees its slot), each ≥ 10 USDC, ≤ 100 request slots per series |
+| `SUBSCRIPTION_OPEN` | `CANCELLED` | activation conditions fail, or governance `cancelSeries` → all escrowed subscriptions `REFUNDABLE` |
+| `SUBSCRIPTION_OPEN` | (subscriber leaves) | inside the window, or once the window ended + 7 days with no activation (stale valuation, a pause): the subscription becomes `REFUNDABLE`; a refund never needs settlement |
 | `ACTIVE` | `MATURED_UNWINDING` | `now ≥ activation + 28 d`; coupon accrual stops at maturity |
 | `ACTIVE` | `IMPAIRED` | settlement reduces Hull below principal + accrued coupon, or emergency termination (accrual stops at the recorded time; entitlement frozen) |
 | `MATURED_UNWINDING` | `CLAIMABLE` | hedge closed in paired slices, collateral returned, all holders funded pro-rata into `ClaimEscrow` |
-| `IMPAIRED` | `CLAIMABLE` | recoveries distributed by cumulative per-unit accounting |
+| `IMPAIRED` | `MATURED_UNWINDING` | emergency termination (`matureSeries`); recoveries restore Hull only up to its remaining entitlement (`hullCap` falls by every amount funded) |
+| `MATURED_UNWINDING` (impaired) | `CLAIMABLE` | Hull's remaining entitlement funded (within 100 base units), or governance `writeOffShortfall` ≥ 30 days after termination once everything attributable to Hull is funded; the book then leaves impairment |
 | `CLAIMABLE` | `CLOSED` | every claim and recovery reconciled |
 
 No mid-series entry, no early redemption, no rollover, no transfers in the beta.

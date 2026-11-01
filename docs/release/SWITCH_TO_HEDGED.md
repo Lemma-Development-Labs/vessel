@@ -97,4 +97,5 @@ On chain nothing needs undoing for the old book: it is untouched. For the new on
 3. **App:** revert the merge on `main` (or do not merge until steps 3 and 5 look right).
 4. **Unwind the hedge** if needed: governance can call every reducing engine function
    (`closeShort`, `sellSpot`, `withdrawMargin`, `convertToCash`) through the timelock, then
-   `recallFromEngine` returns USDC to custody.
+   `recallFromEngine` returns USDC to custody. It can be called by the operator or by governance (the
+   timelocked Safe), so engine USDC is recoverable even if the keeper key is lost.
