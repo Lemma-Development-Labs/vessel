@@ -16,7 +16,7 @@ import { pgSql, pgliteSql, type Sql } from "../auth/sql.ts";
 import { envInt } from "../addresses.ts";
 import { pgSsl } from "../db.ts";
 import type { Manifest } from "../vendor/verify/read.ts";
-import { migrateJournal } from "./journal.ts";
+import { migrateJournal, releaseLease } from "./journal.ts";
 import { RejectedError, TimeoutError, tick, type ChainPort, type KeeperDeps } from "./keeper.ts";
 import { POLICY_VERSION, allowlist, decide, engineCashNeed, type Observed, type PolicyConfig } from "./policy.ts";
 import { HEDGE_POLICY_VERSION, decideHedge, defaultHedgeConfig, engineAllowlist, type HedgeConfig, type HedgeObserved } from "./hedge.ts";
@@ -49,6 +49,7 @@ const viewAbi = parseAbi([
   "function exits(uint256) view returns (address, address, uint64, uint8, uint256, uint256, uint256)",
   "function EXIT_COOLDOWN() view returns (uint256)",
   "function ballastUnitValue(uint256) view returns (uint256)",
+  "function pauses() view returns (address)",
 ]);
 const custodyAbi = parseAbi(["function activeIdle() view returns (uint256)"]);
 const engineAbi = parseAbi(["function value() view returns (uint256, uint256)"]);
@@ -171,6 +172,11 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
     "SELECT max(updated_at) AS at FROM action_journal WHERE account = $1 AND action = 'settle' AND state = 'CONFIRMED'",
     [account],
   );
+  const guardian = await rc<Address>("pauses");
+  const pausedFlags = await Promise.all(
+    [1, 2, 4].map((dim) => pc.readContract({ address: guardian, abi: guardianAbi, functionName: "isPaused", args: [dim] })),
+  );
+  const pausedMask = pausedFlags.reduce((m, p, i) => (p ? m | (1 << i) : m), 0);
   const rejected = await sql.query<{ action: string }>(
     "SELECT DISTINCT action FROM action_journal WHERE account = $1 AND state = 'REJECTED' AND updated_at > now() - interval '30 minutes'",
     [account],
@@ -194,6 +200,7 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
     lastSettleAt: last?.at ? BigInt(Math.floor(last.at.getTime() / 1000)) : 0n,
     readyExitDemand,
     recentlyRejected: rejected.map((r) => r.action),
+    pausedMask,
   };
 }
 
@@ -249,8 +256,32 @@ export async function observeHedge(pc: PublicClient, engine: Address, now: bigin
   };
 }
 
+/** What the keeper loop knows about itself, for /v2/health (review E2E-08). */
+export interface KeeperStatus {
+  lastTickAt: number | null; // unix seconds, last completed tick (ok or not)
+  lastOkAt: number | null; // last tick that didn't throw
+  failStreak: number;
+  intervalSec: number;
+  /** the last controller observation: pending exits and when the head became payable */
+  pendingExits: bigint | null;
+  headExitReadyAt: bigint | null;
+  pausedMask: number | null;
+}
+
 export interface V2KeeperHandle {
-  stop(): void;
+  /** stop after the tick in progress and release the lease, so the next instance signs at once */
+  stop(): Promise<void>;
+  status(): KeeperStatus;
+}
+
+/**
+ * A signer outside local needs the shared, durable journal: with an in-process one, two instances (a rolling
+ * deploy, a second replica) each keep their own lease and both sign — seen as alternating nonces (review E2E-05).
+ */
+export function assertDurableJournal(environment: "local" | "testnet" | "mainnet", env = process.env): void {
+  if (environment !== "local" && !env.DATABASE_URL?.trim()) {
+    throw new Error(`v2 signers on ${environment} require DATABASE_URL: an in-process journal lets two instances sign at once`);
+  }
 }
 
 /**
@@ -282,6 +313,7 @@ export async function startV2Keeper(opts: {
     return null;
   }
   if (!/^0x[0-9a-fA-F]{64}$/.test(pk)) throw new Error("V2_KEEPER_PK must be 0x + 64 hex chars");
+  assertDurableJournal(opts.environment);
   const sql = opts.sql;
   await migrateJournal(sql);
 
@@ -312,11 +344,15 @@ export async function startV2Keeper(opts: {
   };
   const intervalMs = envInt("V2_KEEPER_INTERVAL_MS", 30_000, 1_000, 3_600_000);
   let running = true;
+  const status: KeeperStatus = { lastTickAt: null, lastOkAt: null, failStreak: 0, intervalSec: intervalMs / 1000, pendingExits: null, headExitReadyAt: null, pausedMask: null };
   const loop = async () => {
     while (running) {
       try {
         const entry = await tick(deps, async () => {
           const o = await observe(opts.pc, opts.manifest, sql, chainPort.address);
+          status.pendingExits = o.pendingExits;
+          status.headExitReadyAt = o.headExitReadyAt;
+          status.pausedMask = o.pausedMask ?? 0;
           // Controller obligations come first; the hedge acts only when the controller has nothing to do.
           const next = decide(o, cfg, controller);
           if (next || !hedged || !o.engineWired) return next;
@@ -329,17 +365,30 @@ export async function startV2Keeper(opts: {
           if (entry.state === "REJECTED") opts.log.warn(fields, "v2 keeper action refused by node");
           else opts.log.info(fields, "v2 keeper action sent");
         }
+        status.lastOkAt = Math.floor(Date.now() / 1000);
+        status.failStreak = 0;
       } catch (err) {
+        status.failStreak++;
         opts.log.error({ err }, "v2 keeper tick failed");
       }
-      await new Promise((r) => setTimeout(r, intervalMs));
+      status.lastTickAt = Math.floor(Date.now() / 1000);
+      if (running) await new Promise<void>((r) => {
+        wake = r;
+        setTimeout(r, intervalMs);
+      });
     }
   };
-  void loop();
+  let wake: () => void = () => {};
+  const done = loop();
   opts.log.info({ keeper: chainPort.address, controller, hedgedEngine: hedged ?? null, policy: deps.policyVersion }, "v2 keeper started");
   return {
-    stop() {
+    async stop() {
       running = false;
+      wake();
+      await done; // never release while a tick may still be signing
+      const released = await releaseLease(sql, chainPort.address, deps.holderId).catch(() => false);
+      opts.log.info({ released }, "v2 keeper stopped; lease released");
     },
+    status: () => ({ ...status }),
   };
 }

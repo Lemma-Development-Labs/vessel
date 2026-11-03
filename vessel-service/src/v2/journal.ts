@@ -105,6 +105,19 @@ export async function migrateJournal(sql: Sql): Promise<void> {
  * over only after the current lease is older than `staleAfterMs`; taking over
  * bumps the fencing token. Returns this holder's token.
  */
+/**
+ * Give the lease up on a clean shutdown (SIGTERM, redeploy): the heartbeat is set to the epoch so the next
+ * instance takes over at once with the next fencing token, instead of waiting out the stale window — every
+ * restart used to black the keeper out for 5 minutes (review E2E-07). Only the current holder can release.
+ */
+export async function releaseLease(sql: Sql, account: string, holderId: string): Promise<boolean> {
+  const rows = await sql.query<{ account: string }>(
+    "UPDATE writer_lease SET heartbeat_at = 'epoch' WHERE account = $1 AND holder_id = $2 RETURNING account",
+    [account, holderId],
+  );
+  return rows.length > 0;
+}
+
 export async function acquireLease(
   sql: Sql,
   account: string,

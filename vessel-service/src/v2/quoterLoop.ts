@@ -3,7 +3,7 @@ import { erc20Abi, parseAbi, type Address, type Chain, type Hex, type PublicClie
 import type { Sql } from "../auth/sql.ts";
 import { envInt } from "../addresses.ts";
 import type { Manifest } from "../vendor/verify/read.ts";
-import { migrateJournal } from "./journal.ts";
+import { migrateJournal, releaseLease } from "./journal.ts";
 import { tick, type KeeperDeps } from "./keeper.ts";
 import {
   QUOTER_POLICY_VERSION,
@@ -16,7 +16,7 @@ import {
   type QuoteMarket,
   type QuoteObserved,
 } from "./quoter.ts";
-import { viemChainPort } from "./runner.ts";
+import { assertDurableJournal, viemChainPort } from "./runner.ts";
 
 /** Kuru's testnet MarginAccount (docs.kuru.io Contract-addresses, checked on chain 2026-10-05). */
 const KURU_TESTNET_MARGIN = "0xd029C2D98ff85D8F64799017fE00a59B1159CE02" as const;
@@ -131,7 +131,8 @@ export async function observeQuotes(
 }
 
 export interface V2QuoterHandle {
-  stop(): void;
+  /** stop after the tick in progress and release the lease (review E2E-07) */
+  stop(): Promise<void>;
 }
 
 /**
@@ -157,6 +158,7 @@ export async function startV2Quoter(opts: {
   }
   await migrateJournal(opts.sql);
 
+  assertDurableJournal(opts.manifest.environment as "local" | "testnet" | "mainnet");
   const chainPort = viemChainPort(opts.pc, opts.chain, opts.rpcUrl, pk);
   const seeder = chainPort.address as Address;
   const deps: KeeperDeps = {
@@ -207,14 +209,21 @@ export async function startV2Quoter(opts: {
       } catch (err) {
         opts.log.error({ err }, "kuru quoter tick failed");
       }
-      await new Promise((r) => setTimeout(r, intervalMs));
+      if (running) await new Promise<void>((r) => {
+        wake = r;
+        setTimeout(r, intervalMs);
+      });
     }
   };
-  void loop();
+  let wake: () => void = () => {};
+  const done = loop();
   opts.log.info({ seeder, markets: [venues.kuruMonUsdc, venues.kuruMonAusd], policy: QUOTER_POLICY_VERSION }, "kuru quoter started");
   return {
-    stop() {
+    async stop() {
       running = false;
+      wake();
+      await done;
+      await releaseLease(opts.sql, seeder, deps.holderId).catch(() => false);
     },
   };
 }

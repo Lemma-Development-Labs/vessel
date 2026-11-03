@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { formatEther, parseEther, type Address, type PublicClient } from "viem";
 import type { Sql } from "../auth/sql.ts";
+import type { KeeperStatus } from "./runner.ts";
 
 /**
  * v2 operational health: the keeper's and the quoter's gas, and whether each is still acting.
@@ -24,6 +25,10 @@ export interface OpsInput {
   /** an idle signer is degraded after this long without a confirmed action */
   keeperIdleAfterSec: number;
   quoterIdleAfterSec: number;
+  /** the keeper loop's own view (review E2E-08); omitted when this process runs no keeper */
+  keeperLoop?: KeeperStatus | null;
+  /** journal entries whose outcome has been unknown for more than 10 minutes */
+  staleUnknown?: number;
 }
 
 export interface OpsReport {
@@ -31,6 +36,7 @@ export interface OpsReport {
   degraded: string[];
   keeper: SignerView | null;
   quoter: SignerView | null;
+  pauses?: string[];
 }
 
 interface SignerView {
@@ -65,11 +71,25 @@ export function evaluateOps(i: OpsInput): OpsReport {
   };
   check("v2 keeper", i.keeper, i.minKeeperWei, i.keeperIdleAfterSec);
   check("kuru quoter", i.quoter, i.minQuoterWei, i.quoterIdleAfterSec);
+  // Health used to stay green through every wedge, a stale mark and an hour of stalled exits: gas and
+  // idleness alone can't see a loop that runs but fails, or exits it never funds (review E2E-08).
+  const k = i.keeperLoop;
+  if (k) {
+    if (k.lastTickAt !== null && i.now - k.lastTickAt > 3 * k.intervalSec + 60) degraded.push(`v2 keeper loop stalled: last tick ${i.now - k.lastTickAt}s ago`);
+    if (k.failStreak >= 3) degraded.push(`v2 keeper ticks failing: ${k.failStreak} in a row`);
+    if (k.pendingExits && k.pendingExits > 0n && k.headExitReadyAt && i.now - Number(k.headExitReadyAt) > 3600) {
+      degraded.push(`exits past cooldown unfunded for ${((i.now - Number(k.headExitReadyAt)) / 3600).toFixed(1)}h (${k.pendingExits} queued)`);
+    }
+  }
+  if (i.staleUnknown && i.staleUnknown > 0) degraded.push(`${i.staleUnknown} keeper action(s) with an unknown outcome for > 10 min — inspect the journal`);
+  const mask = k?.pausedMask ?? 0;
+  const pauses = [[1, "ADMISSION"], [2, "RISK_INCREASE"], [4, "SETTLEMENT"]].filter(([b]) => mask & (b as number)).map(([, n]) => n as string);
   return {
     ok: degraded.length === 0,
     degraded,
     keeper: i.keeper ? view(i.keeper, i.minKeeperWei, i.now) : null,
     quoter: i.quoter ? view(i.quoter, i.minQuoterWei, i.now) : null,
+    ...(k ? { pauses } : {}),
   };
 }
 
@@ -82,6 +102,7 @@ export interface OpsDeps {
   minQuoterWei?: bigint;
   keeperIdleAfterSec?: number;
   quoterIdleAfterSec?: number;
+  keeperStatus?: () => KeeperStatus | null;
 }
 
 async function signer(d: OpsDeps, address: Address | null): Promise<SignerState | null> {
@@ -100,8 +121,16 @@ async function signer(d: OpsDeps, address: Address | null): Promise<SignerState 
 }
 
 export async function readOps(d: OpsDeps): Promise<OpsReport> {
-  const [keeper, quoter] = await Promise.all([signer(d, d.keeper), signer(d, d.quoter)]);
+  const [keeper, quoter, unknown] = await Promise.all([
+    signer(d, d.keeper),
+    signer(d, d.quoter),
+    d.sql
+      .query<{ n: number }>("SELECT count(*)::int AS n FROM action_journal WHERE state = 'UNKNOWN' AND updated_at < now() - interval '10 minutes'")
+      .catch(() => [{ n: 0 }]),
+  ]);
   return evaluateOps({
+    keeperLoop: d.keeperStatus?.() ?? null,
+    staleUnknown: unknown[0]?.n ?? 0,
     now: Math.floor(Date.now() / 1000),
     keeper,
     quoter,

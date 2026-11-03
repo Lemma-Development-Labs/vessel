@@ -291,7 +291,9 @@ state.
 | --- | --- | --- |
 | `RPC_URL` | Dedicated endpoint. Archive access required by the indexer. | Provider dashboard. |
 | `CHAIN_ID` | `10143`. Boot fails if it disagrees with `ADDRESSES.json` or the chain. | Not secret. |
-| `DATABASE_URL` | Postgres. Unset ⇒ in-memory store, lost on restart. | Railway/Neon; rotate by rolling the DB password. |
+| `DATABASE_URL` | Postgres. Unset ⇒ in-memory store, lost on restart. **Required for the v2 keeper and quoter on testnet/mainnet**: without it they refuse to start, because a per-process journal lets two instances sign at once. | Railway/Neon; rotate by rolling the DB password. |
+| `RPC_MAX_RPS` | Total request rate to `RPC_URL` (default 10). | Not secret. |
+| `RPC_KEEPER_RPS` | The part of `RPC_MAX_RPS` reserved for the v2 keeper and quoter (default 4), so API traffic and the indexer can't starve them. | Not secret. |
 | `KEEPER_PK` | **Gas-only key.** `crank()` is permissionless, so this key can never move user funds — see §3. | Generate fresh; fund with MON only. |
 | `CRANK_INTERVAL_SEC` | Default 300. | Not secret. |
 | `CONFIRMATIONS` | Reorg depth the indexer stays behind head. | Not secret. |
@@ -380,8 +382,13 @@ the v2 book use **`GET /v2/health`** (`vessel-service/src/v2/ops.ts`):
 | Kuru quoter gas | seeder balance < 1 MON |
 | v2 keeper idle | no confirmed action for 3 h (it settles at least hourly) |
 | Kuru quoter idle | no confirmed action for 45 min (it refreshes every 15 min) |
+| v2 keeper loop stalled | no tick for 3 intervals + 60 s |
+| v2 keeper ticks failing | 3 or more failed ticks in a row |
+| exits past cooldown unfunded | the head of the exit queue has been payable for more than 1 h |
+| unknown outcomes | a journal entry has been `UNKNOWN` for more than 10 min |
 
-It returns 200 when healthy and 503 with the reasons otherwise, and the service logs `v2 ops
+The report also lists active pauses (`pauses`). It is computed at most every 5 s and rate-limited
+per IP. It returns 200 when healthy and 503 with the reasons otherwise, and the service logs `v2 ops
 degraded` every 10 minutes while anything is wrong. Point any uptime monitor (for example a free
 UptimeRobot or Better Stack HTTP check) at
 `https://vessel-v2-production.up.railway.app/v2/health` to get an email on 503. Fund the address

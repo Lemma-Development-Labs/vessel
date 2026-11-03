@@ -61,7 +61,21 @@ export interface Observed {
   lastSettleAt: bigint;
   /** actions refused (e.g. over their gas cap) in the last 30 min: skipped so one can't stall the rest */
   recentlyRejected?: readonly string[];
+  /** PauseGuardian dimensions paused now (ADMISSION 1, RISK_INCREASE 2, SETTLEMENT 4); omitted → none */
+  pausedMask?: number;
 }
+
+/** The pause dimensions each controller action checks (TrancheController's notPaused modifiers). */
+const PAUSE_DIMS: Record<string, number> = {
+  settle: 4,
+  processDepositBatch: 1 | 4,
+  processExitBatch: 4,
+  activateSeries: 1 | 2 | 4,
+  matureSeries: 4,
+  fundSeries: 4,
+  deployToEngine: 2,
+  recallFromEngine: 0, // reducing exposure is never paused
+};
 
 export interface PolicyConfig {
   settleEverySec: bigint;
@@ -112,7 +126,9 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   });
   const sid = o.activeSeries;
   // An action refused recently (over its gas cap, say) is skipped, so it can't stall everything after it (E2E-03).
-  const ok = (action: string) => !(o.recentlyRejected ?? []).includes(action);
+  // Nor is an action the current pause would revert: under a RISK_INCREASE pause the keeper used to re-send
+  // deployToEngine every tick, starving settlement and the hedge (review E2E-10).
+  const ok = (action: string) => !(o.recentlyRejected ?? []).includes(action) && ((o.pausedMask ?? 0) & (PAUSE_DIMS[action] ?? 0)) === 0;
 
   // 1. Series lifecycle first: time-bound obligations.
   if (sid > 0n && o.seriesState === SUBSCRIPTION_OPEN && o.now >= o.subscriptionEnd && ok("activateSeries")) {
@@ -121,7 +137,7 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   if (sid > 0n && ((o.seriesState === ACTIVE && o.now >= o.maturity) || o.seriesState === IMPAIRED) && ok("matureSeries")) {
     return plan(`mature:${sid}`, "matureSeries", call("matureSeries", [sid]), { series: sid.toString() });
   }
-  if (sid > 0n && o.seriesState === MATURED_UNWINDING && o.hullNav > 0n) {
+  if (sid > 0n && o.seriesState === MATURED_UNWINDING && o.hullNav > 0n && ok("fundSeries")) {
     const liquid = o.activeIdle > o.treasuryLiability ? o.activeIdle - o.treasuryLiability : 0n;
     if (liquid < o.hullNav && o.engineValue > 0n) {
       // Recall only what the engine holds as cash; the hedge policy unwinds the rest first.
@@ -154,7 +170,7 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   if (o.engineWired && !o.impaired && o.seriesState !== MATURED_UNWINDING) {
     // never deploy cash the cooled exits are waiting for
     const target = idleTarget(o, cfg) + (o.readyExitDemand ?? 0n);
-    if (o.activeIdle > target + cfg.minMove) {
+    if (o.activeIdle > target + cfg.minMove && ok("deployToEngine")) {
       const amount = o.activeIdle - target;
       return plan(`deploy:${o.now / 900n}`, "deployToEngine", call("deployToEngine", [amount]), { amount: amount.toString() });
     }
@@ -167,7 +183,7 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   }
 
   // 4. Regular settlement so income is recognized and visible.
-  if (o.now - o.lastSettleAt >= cfg.settleEverySec) {
+  if (o.now - o.lastSettleAt >= cfg.settleEverySec && ok("settle")) {
     return plan(`settle:${o.now / cfg.settleEverySec}`, "settle", call("settle"), {});
   }
   return null;

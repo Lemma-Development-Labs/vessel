@@ -4,10 +4,10 @@ import Fastify from "fastify";
 import { decodeFunctionData, parseEther, toFunctionSelector, type PublicClient } from "viem";
 import { describe, expect, it } from "vitest";
 import { pgliteSql, type Sql } from "../src/auth/sql.ts";
-import { acquireLease, markState, migrateJournal, persistAction } from "../src/v2/journal.ts";
-import { v2HealthRoutes } from "../src/v2/ops.ts";
+import { FencedError, acquireLease, markState, migrateJournal, persistAction, releaseLease } from "../src/v2/journal.ts";
+import { evaluateOps, v2HealthRoutes } from "../src/v2/ops.ts";
 import { controllerWriteAbi, decide, engineCashNeed, type Observed, type PolicyConfig } from "../src/v2/policy.ts";
-import { gasCapFor } from "../src/v2/runner.ts";
+import { assertDurableJournal, gasCapFor, type KeeperStatus } from "../src/v2/runner.ts";
 
 /** Regression tests for the 25 Oct review's keeper findings (E2E-01, E2E-02, E2E-03, SVC-01). */
 const C = "0x00000000000000000000000000000000000000c1" as const;
@@ -123,5 +123,87 @@ describe("SVC-01: a health-check flood can't reach the keeper's RPC", () => {
     expect(codes.slice(0, 3).every((c) => c !== 429)).toBe(true);
     expect(codes[3]).toBe(429);
     await app.close();
+  });
+});
+
+describe("E2E-10: the keeper respects the pause", () => {
+  const excessIdle = (): Observed => ({ ...base(), activeIdle: 400_000_000n, engineValue: 600_000_000n });
+
+  it("under a RISK_INCREASE pause it no longer re-sends deployToEngine; recall stays allowed", () => {
+    expect(fn(excessIdle())?.functionName).toBe("deployToEngine");
+    expect(decide({ ...excessIdle(), pausedMask: 2 }, cfg, C)).toBeNull();
+    const short = { ...base(), activeIdle: 0n, engineValue: 1_000_000_000n, pausedMask: 2 };
+    expect(fn(short)?.functionName).toBe("recallFromEngine");
+  });
+
+  it("under a SETTLEMENT pause, exits and settlement wait", () => {
+    const o = { ...base(), activeIdle: 600_000_000n, pendingExits: 1n, headExitReadyAt: 1_799_000_000n, lastSettleAt: 0n, pausedMask: 4 };
+    const r = fn(o);
+    expect(r?.functionName).not.toBe("processExitBatch");
+    expect(r?.functionName).not.toBe("settle");
+  });
+});
+
+describe("E2E-05 / E2E-07: one signer, and no blackout on restart", () => {
+  it("a signer outside local refuses an in-process journal", () => {
+    expect(() => assertDurableJournal("testnet", {})).toThrow(/DATABASE_URL/);
+    expect(() => assertDurableJournal("mainnet", { DATABASE_URL: "" })).toThrow(/DATABASE_URL/);
+    expect(() => assertDurableJournal("testnet", { DATABASE_URL: "postgres://db/x" })).not.toThrow();
+    expect(() => assertDurableJournal("local", {})).not.toThrow();
+  });
+
+  it("a released lease is taken over at once, with the next fencing token; only the holder can release", async () => {
+    const sql: Sql = pgliteSql(new PGlite());
+    await migrateJournal(sql);
+    const account = "0x00000000000000000000000000000000000000a2";
+    const now = new Date("2026-11-03T09:00:00Z");
+    const t1 = await acquireLease(sql, account, "old:1", now, 300_000);
+    await expect(acquireLease(sql, account, "new:2", now, 300_000)).rejects.toBeInstanceOf(FencedError);
+    expect(await releaseLease(sql, account, "someone-else")).toBe(false);
+    expect(await releaseLease(sql, account, "old:1")).toBe(true); // SIGTERM
+    const t2 = await acquireLease(sql, account, "new:2", now, 300_000); // no 5-minute wait
+    expect(t2).toBe(t1 + 1n);
+    await sql.close();
+  });
+});
+
+describe("E2E-08: health turns red when the book isn't working", () => {
+  const healthy = () => ({
+    now: 1_800_000_000,
+    keeper: { address: "0xk", balanceWei: parseEther("5"), lastActionAt: 1_800_000_000 - 60 },
+    quoter: null,
+    minKeeperWei: parseEther("2"),
+    minQuoterWei: parseEther("1"),
+    keeperIdleAfterSec: 3 * 3600,
+    quoterIdleAfterSec: 3 * 900,
+  });
+  const loop = (o: Partial<KeeperStatus> = {}): KeeperStatus => ({
+    lastTickAt: 1_800_000_000 - 20,
+    lastOkAt: 1_800_000_000 - 20,
+    failStreak: 0,
+    intervalSec: 30,
+    pendingExits: 0n,
+    headExitReadyAt: 0n,
+    pausedMask: 0,
+    ...o,
+  });
+
+  it("green when the loop ticks, nothing is stuck and nothing is unknown", () => {
+    const r = evaluateOps({ ...healthy(), keeperLoop: loop(), staleUnknown: 0 });
+    expect(r).toMatchObject({ ok: true, degraded: [], pauses: [] });
+  });
+
+  it("red for a stalled loop, failing ticks, exits stuck past cooldown, and unknown outcomes; pauses are shown", () => {
+    const r = evaluateOps({
+      ...healthy(),
+      keeperLoop: loop({ lastTickAt: 1_800_000_000 - 600, failStreak: 4, pendingExits: 46n, headExitReadyAt: 1_800_000_000n - 7_200n, pausedMask: 2 }),
+      staleUnknown: 2,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.degraded.join("\n")).toMatch(/loop stalled: last tick 600s ago/);
+    expect(r.degraded.join("\n")).toMatch(/ticks failing: 4 in a row/);
+    expect(r.degraded.join("\n")).toMatch(/exits past cooldown unfunded for 2.0h \(46 queued\)/);
+    expect(r.degraded.join("\n")).toMatch(/2 keeper action\(s\) with an unknown outcome/);
+    expect(r.pauses).toEqual(["RISK_INCREASE"]);
   });
 });

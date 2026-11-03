@@ -51,11 +51,11 @@ async function main(): Promise<void> {
   const rpsKeeper = Math.min(Number(process.env.RPC_KEEPER_RPS ?? "4"), rpsTotal - 1);
   const publicClient = createPublicClient({
     chain: vesselChain(rpcUrl, chainId),
-    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsTotal - rpsKeeper) }),
+    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsTotal - rpsKeeper), timeout: 10_000 }), // a hung RPC fails, not hangs (E2E-08)
   });
   const keeperClient = createPublicClient({
     chain: vesselChain(rpcUrl, chainId),
-    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsKeeper) }),
+    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsKeeper), timeout: 10_000 }),
   });
   const store = await initDb();
 
@@ -79,7 +79,13 @@ async function main(): Promise<void> {
     pk && /^0x[0-9a-fA-F]{64}$/.test(pk.trim()) ? privateKeyToAccount(pk.trim() as `0x${string}`).address : null;
   const v2Ops: OpsDeps | undefined =
     v2Manifest && v2Sql
-      ? { client: publicClient, sql: v2Sql, keeper: addressOf(process.env.V2_KEEPER_PK), quoter: addressOf(process.env.V2_QUOTER_PK) }
+      ? {
+          client: publicClient,
+          sql: v2Sql,
+          keeper: addressOf(process.env.V2_KEEPER_PK),
+          quoter: addressOf(process.env.V2_QUOTER_PK),
+          keeperStatus: () => v2Keeper?.status() ?? null, // read at request time; the keeper starts below
+        }
       : undefined;
 
   const api = await startApi({
@@ -125,8 +131,8 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
     keeper?.stop();
-    v2Keeper?.stop();
-    v2Quoter?.stop();
+    // finish the tick in progress and release the leases before the journal closes (review E2E-07)
+    await Promise.all([v2Keeper?.stop(), v2Quoter?.stop()]);
     if (opsTimer) clearInterval(opsTimer);
     v2Indexer?.stop();
     indexer?.stop();
