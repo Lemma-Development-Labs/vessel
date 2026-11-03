@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBook } from "@/lib/book/context";
+import { TX_KEY } from "@/lib/book/pending";
 import { depositDeadline, planDeposit, previewUnits } from "@/lib/book/plan";
 import { RULES, type Series, type TrancheKind } from "@/lib/book/types";
 import { COPY } from "@/lib/copy";
@@ -115,6 +116,7 @@ export function DepositScreen() {
         ) : (
           <Button
             variant="ghost"
+            loading={v.inFlight.includes(TX_KEY.faucet)}
             onClick={() => void v.faucet()}
             tooltip={
               capReached
@@ -231,6 +233,7 @@ export function DepositScreen() {
           <div className="mt-4">
             <Button
               className="w-full"
+              loading={v.inFlight.includes(TX_KEY.deposit)}
               disabled={!canSubmit}
               tooltip={plan.kind === "ok" ? (v.wrongNetwork ? "Switch to Monad testnet first" : undefined) : plan.reason}
               onClick={submit}

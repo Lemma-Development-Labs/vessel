@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useBook } from "@/lib/book/context";
+import { TX_KEY } from "@/lib/book/pending";
 import { exitPhase, freeBallastUnits, previewAssets, previewUnits, withSlippage } from "@/lib/book/plan";
 import { PAUSE, RULES, type ExitRequest } from "@/lib/book/types";
 import { COPY } from "@/lib/copy";
 import { formatDusd, formatDusd4, formatShares, formatTs, parseDusd } from "@/lib/format";
-import { mapLive } from "@/lib/live";
+import { map2, mapLive } from "@/lib/live";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { Val } from "@/components/live";
 import { ConnectButton } from "@/components/connect";
@@ -115,8 +116,15 @@ export function WithdrawScreen() {
           className="num mt-2 w-full bg-transparent text-[clamp(1.75rem,10vw,2.5rem)] tracking-[-0.01em] outline-none"
         />
         <p className="num mt-2 text-sm text-dim">
-          Locks {formatShares(units)} units · worth ≈ {formatDusd(expected)} {ASSET.symbol} today · minimum accepted{" "}
-          {formatDusd(withSlippage(expected))} {ASSET.symbol}
+          {/* Rule 0: a failed wallet or book read shows its reason, never "0.00". */}
+          <Val of={map2(v.wallet, v.book, () => null)}>
+            {() => (
+              <>
+                Locks {formatShares(units)} units · worth ≈ {formatDusd(expected)} {ASSET.symbol} today · minimum accepted{" "}
+                {formatDusd(withSlippage(expected))} {ASSET.symbol}
+              </>
+            )}
+          </Val>
         </p>
       </div>
 
@@ -126,6 +134,7 @@ export function WithdrawScreen() {
         ) : null}
         <Button
           className="w-full"
+          loading={v.inFlight.includes(TX_KEY.redeem)}
           disabled={blocked !== null}
           tooltip={blocked ?? undefined}
           onClick={() => {
@@ -220,12 +229,12 @@ function ExitRow({ e, now }: { e: ExitRequest; now: bigint }) {
       </div>
       <div className="mt-4 flex flex-wrap justify-end gap-2 empty:hidden">
         {phase.kind === "claimable" ? (
-          <Button loading={busy} onClick={() => run(() => v.claimExit(e.id))}>
+          <Button loading={busy || v.inFlight.includes(TX_KEY.claimExit(e.id))} onClick={() => run(() => v.claimExit(e.id))}>
             Claim {formatDusd(phase.amount)}
           </Button>
         ) : null}
         {e.status === "COOLING" && e.units > 0n ? (
-          <Button variant="ghost" loading={busy} onClick={() => run(() => v.cancelRedeem(e.id))}>
+          <Button variant="ghost" loading={busy || v.inFlight.includes(TX_KEY.cancelRedeem(e.id))} onClick={() => run(() => v.cancelRedeem(e.id))}>
             Cancel
           </Button>
         ) : null}

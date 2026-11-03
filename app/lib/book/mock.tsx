@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { ok, unavailable, type Live } from "../live";
 import type { Toast } from "../copy";
 import { BookContext } from "./context";
+import { TX_KEY, sendBlocked } from "./pending";
 import { previewAssets } from "./plan";
 import type {
   BookEvidence,
@@ -131,14 +132,26 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
   }, []);
   const dismissToast = useCallback((id: string) => setToasts((xs) => xs.filter((t) => t.id !== id)), []);
 
+  // Same send lock as the chain provider, so the demo shows the same busy buttons.
+  const sending = useRef(new Set<string>());
+  const [inFlight, setInFlight] = useState<string[]>([]);
   const tx = useCallback(
-    (label: string, mutate: (r: Raw) => Raw) =>
+    (label: string, key: string, mutate: (r: Raw) => Raw) =>
       new Promise<boolean>((resolve) => {
+        const blocked = sendBlocked(key, sending.current, []);
+        if (blocked) {
+          push({ kind: "info", text: blocked });
+          return resolve(false);
+        }
+        sending.current.add(key);
+        setInFlight([...sending.current]);
         const p = push({ kind: "pending", text: `${label}…` });
         setTimeout(() => {
           setRaw((r) => mutate({ ...r, block: r.block + 3n }));
           dismissToast(p);
           push({ kind: "success", text: `${label} confirmed` });
+          sending.current.delete(key);
+          setInFlight([...sending.current]);
           resolve(true);
         }, TX_MS);
       }),
@@ -179,15 +192,16 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
       reconnecting: error,
       isMock: true,
       toasts,
+      inFlight,
       connectors: [{ id: "mock", name: "Demo wallet", ready: true }],
 
       faucet: () =>
-        tx("Faucet", (r) => ({
+        tx("Faucet", TX_KEY.faucet, (r) => ({
           ...r,
           wallet: { ...r.wallet, cash: r.wallet.cash + d(100), faucetRemaining: r.wallet.faucetRemaining - d(100), faucetCooldownSec: 3600 },
         })),
       requestDeposit: ({ tranche, seriesId, assets, minOut, deadline }) =>
-        tx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", (r) => ({
+        tx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", TX_KEY.deposit, (r) => ({
           ...r,
           nextDeposit: r.nextDeposit + 1n,
           wallet: { ...r.wallet, cash: r.wallet.cash - assets, reserved: r.wallet.reserved + assets },
@@ -199,7 +213,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           ],
         })),
       cancelDeposit: (id) =>
-        tx("Cancel request", (r) => {
+        tx("Cancel request", TX_KEY.cancelDeposit(id), (r) => {
           const dep = r.deposits.find((x) => x.id === id);
           if (!dep) return r;
           return {
@@ -210,7 +224,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           };
         }),
       claimRefund: (id) =>
-        tx("Claim refund", (r) => {
+        tx("Claim refund", TX_KEY.claimRefund(id), (r) => {
           const dep = r.deposits.find((x) => x.id === id);
           if (!dep) return r;
           return {
@@ -220,14 +234,14 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           };
         }),
       requestRedeem: (units) =>
-        tx("Request Ballast exit", (r) => ({
+        tx("Request Ballast exit", TX_KEY.redeem, (r) => ({
           ...r,
           nextExit: r.nextExit + 1n,
           wallet: { ...r.wallet, ballastLocked: r.wallet.ballastLocked + units },
           exits: [{ id: r.nextExit, owner: ME, receiver: ME, requestedAt: r.now, status: "COOLING", units, funded: 0n, claimable: 0n }, ...r.exits],
         })),
       cancelRedeem: (id) =>
-        tx("Cancel exit", (r) => {
+        tx("Cancel exit", TX_KEY.cancelRedeem(id), (r) => {
           const e = r.exits.find((x) => x.id === id);
           if (!e) return r;
           return {
@@ -237,7 +251,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           };
         }),
       claimExit: (id) =>
-        tx("Claim exit", (r) => {
+        tx("Claim exit", TX_KEY.claimExit(id), (r) => {
           const e = r.exits.find((x) => x.id === id);
           if (!e) return r;
           return {
@@ -247,7 +261,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
           };
         }),
       claimHull: (sid) =>
-        tx("Claim Hull payout", (r) => {
+        tx("Claim Hull payout", TX_KEY.claimHull(sid), (r) => {
           const s = r.series.find((x) => x.id === sid);
           if (!s) return r;
           return {
@@ -262,7 +276,7 @@ export function MockBookProvider({ demo, children }: { demo: string | null; chil
       switchNetwork: async () => undefined,
       dismissToast,
     };
-  }, [connected, demo, dismissToast, error, raw, toasts, tx]);
+  }, [connected, demo, dismissToast, error, inFlight, raw, toasts, tx]);
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;
 }

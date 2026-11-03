@@ -77,7 +77,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <span data-testid="network-banner" className="font-medium">{BANNER.text}</span>
-        <span className="hidden text-steel sm:inline">
+        {/* every width: a phone must also be told what is simulated (review APP-3) */}
+        <span className="text-steel">
           {engine === null || engine.simulated ? " · strategy engine simulated" : SPOT_TEST ? " · spot leg simulated (vMON)" : ""}
         </span>
         {v.reconnecting ? (
@@ -119,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Docs ↗
             </a>
             {/* Only a read of simulated=false earns the hedged chip; unread, unwired or simulated is SIM. */}
-            {engine && !engine.simulated ? <Badge kind="hedged" /> : <Badge kind="sim" />}
+            {engine && !engine.simulated ? <Badge kind={SPOT_TEST ? "hedged-sim" : "hedged"} /> : <Badge kind="sim" />}
             <NetworkPill />
             <SessionChip />
             {v.connected ? (

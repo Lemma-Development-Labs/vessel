@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useBook } from "@/lib/book/context";
+import { TX_KEY } from "@/lib/book/pending";
 import { SERIES_LABEL, canCancelDeposit, depositLabel } from "@/lib/book/plan";
 import type { DepositRequest, Series } from "@/lib/book/types";
 import { formatBps, formatDusd, formatDusd4, formatShares, formatTs } from "@/lib/format";
@@ -179,7 +180,7 @@ function HullRow({ s }: { s: Series }) {
       </div>
       {s.myClaimable > 0n ? (
         <Button
-          loading={busy}
+          loading={busy || v.inFlight.includes(TX_KEY.claimHull(s.id))}
           onClick={() => {
             setBusy(true);
             void v.claimHull(s.id).finally(() => setBusy(false));
@@ -212,11 +213,11 @@ function RequestRow({ d, canCancel }: { d: DepositRequest; canCancel: boolean })
       <td className="num px-4 py-3 text-dim">{d.status === "ESCROWED" ? formatTs(d.deadline) : "—"}</td>
       <td className="px-4 py-2 text-right">
         {d.status === "REFUNDABLE" ? (
-          <Button variant="ghost" loading={busy} onClick={() => run(() => v.claimRefund(d.id))}>
+          <Button variant="ghost" loading={busy || v.inFlight.includes(TX_KEY.claimRefund(d.id))} onClick={() => run(() => v.claimRefund(d.id))}>
             Claim refund
           </Button>
         ) : canCancel ? (
-          <Button variant="ghost" loading={busy} onClick={() => run(() => v.cancelDeposit(d.id))}>
+          <Button variant="ghost" loading={busy || v.inFlight.includes(TX_KEY.cancelDeposit(d.id))} onClick={() => run(() => v.cancelDeposit(d.id))}>
             Cancel
           </Button>
         ) : null}

@@ -210,6 +210,8 @@ export interface BookProvider {
   reconnecting: boolean;
   isMock: boolean;
   toasts: Toast[];
+  /** Action keys (`TX_KEY`) sending or still confirming; a key in here refuses a second send. */
+  inFlight: string[];
   connectors: { id: string; name: string; ready: boolean }[];
 
   /** Each action resolves true once the transaction is confirmed, false if it failed or was rejected. */

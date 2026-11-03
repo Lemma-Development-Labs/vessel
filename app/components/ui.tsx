@@ -121,7 +121,7 @@ export function Badge({
   compact,
   venue,
 }: {
-  kind: "testnet" | "sim" | "verified" | "hedged";
+  kind: "testnet" | "sim" | "verified" | "hedged" | "hedged-sim";
   compact?: boolean;
   /**
    * Venue name as READ FROM CHAIN. The hedged badge used to hardcode
@@ -151,6 +151,16 @@ export function Badge({
             <span className="hidden sm:inline">SIMULATED ENGINE</span>
           </>
         )}
+      </span>
+    );
+  }
+  // The testnet hedged book: the Perpl short is real, the spot leg is the vMON stand-in (ADR-010). A
+  // simulated venue is always an amber outlined chip (app/CLAUDE.md), at every width: phones used to see
+  // only a green "● HEDGED" (review APP-3).
+  if (kind === "hedged-sim") {
+    return (
+      <span className="num inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-amber/50 px-2 py-1 text-[10.5px] tracking-[0.12em] text-amber sm:px-2.5">
+        HEDGED · SPOT SIM
       </span>
     );
   }

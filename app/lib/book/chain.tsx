@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WaitForTransactionReceiptTimeoutError, encodeAbiParameters, keccak256, type Abi } from "viem";
 import {
@@ -19,7 +19,8 @@ import { statsUrl } from "../stats";
 import { EXPLORER, TARGET_CHAIN_ID, vesselChain } from "../wagmi";
 import { BookContext } from "./context";
 import { V2 } from "./release";
-import { RECONCILE_GIVE_UP_SEC, forgetPending, pendingFor, rememberPending, type PendingTx } from "./pending";
+import { parseBookEvidence, parseHistory, serviceReason } from "./service";
+import { RECONCILE_GIVE_UP_SEC, TX_KEY, forgetPending, pendingFor, rememberPending, sendBlocked, type PendingTx } from "./pending";
 import {
   EXIT_STATUSES,
   REQ_STATUSES,
@@ -152,6 +153,8 @@ function range(from: bigint, toExclusive: bigint): bigint[] {
 }
 
 type Snapshot = {
+  /** the wallet this snapshot was read for (null: none connected) */
+  owner: string | null;
   clock: { number: bigint; timestamp: bigint };
   book: Live<BookState>;
   engine: Live<EngineState | null>;
@@ -182,7 +185,10 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
   const reads = useQuery({
     queryKey: ["book", address],
     enabled: !!pc,
-    placeholderData: keepPreviousData,
+    // Keep the previous data only while refetching the same wallet: across a wallet switch it showed the
+    // previous wallet's balances, requests and claims under the new address, and the deposit plan acted
+    // on them (review APP-1).
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === address ? prev : undefined),
     refetchInterval: 6_000,
     queryFn: async (): Promise<Snapshot> => {
       if (!pc) throw new Error("rpc");
@@ -410,7 +416,16 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      return { clock: { number: blockNumber, timestamp: block.timestamp }, book, engine, series, wallet, myDeposits, myExits };
+      // Series, requests and exits are scanned by counters from the book read. If it failed, those counters
+      // are placeholders (1, 1, 0) and the lists would render as an empty, live-looking "no requests" and
+      // 0.00 (review APP-2, Rule 0): mark them unavailable for the same reason instead.
+      if (book.status !== "ok") {
+        const why = `book read failed: ${book.reason}`;
+        series = unavailable(why);
+        myDeposits = unavailable(why);
+        myExits = unavailable(why);
+      }
+      return { owner: address ?? null, clock: { number: blockNumber, timestamp: block.timestamp }, book, engine, series, wallet, myDeposits, myExits };
     },
   });
 
@@ -423,33 +438,30 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       const now = Math.floor(Date.now() / 1000);
       const get = async (path: string) => {
         const r = await fetch(`${api}${path}`, { cache: "no-store" });
-        const body = (await r.json()) as Record<string, unknown>;
-        return { okStatus: r.ok, body };
+        const body: unknown = await r.json();
+        return { okStatus: r.ok, body: body as Record<string, unknown> | null };
       };
       let ev: Live<BookEvidence>;
       let hist: Live<BookHistoryRow[]>;
       try {
         const { okStatus, body } = await get("/v1/book");
-        ev = okStatus
-          ? ok(
-              {
-                status: body.status as BookEvidence["status"],
-                blockNumber: (body.blockNumber as string | null) ?? null,
-                blockHash: (body.blockHash as string | null) ?? null,
-                checks: (body.checks as BookEvidence["checks"]) ?? [],
-              },
-              "stats",
-              now,
-            )
-          : unavailable(`independent check — ${String(body.reason ?? body.error ?? "service unavailable")}`);
+        const p = parseBookEvidence(body);
+        ev = !okStatus
+          ? unavailable(`independent check — ${serviceReason(body)}`)
+          : p.ok
+            ? ok(p.value, "stats", now)
+            : unavailable(`independent check — ${p.reason}`);
       } catch {
         ev = unavailable("independent check — service unreachable");
       }
       try {
         const { okStatus, body } = await get("/v1/history?limit=50");
-        hist = okStatus
-          ? ok((body.data as BookHistoryRow[]) ?? [], "stats", now)
-          : unavailable(`event history — ${String(body.reason ?? body.error ?? "service unavailable")}`);
+        const p = parseHistory(body);
+        hist = !okStatus
+          ? unavailable(`event history — ${serviceReason(body)}`)
+          : p.ok
+            ? ok(p.value, "stats", now)
+            : unavailable(`event history — ${p.reason}`);
       } catch {
         hist = unavailable("event history — service unreachable");
       }
@@ -493,13 +505,25 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
     [dismissToast, pc, push, reads],
   );
 
+  // Keys sending right now. The ref is the lock (checked synchronously, so a double click can't pass it);
+  // the state mirrors it for the buttons.
+  const sending = useRef(new Set<string>());
+  const [inFlight, setInFlight] = useState<string[]>([]);
+
   const runTx = useCallback(
-    async (label: string, fn: () => Promise<`0x${string}`>): Promise<boolean> => {
+    async (label: string, key: string, fn: () => Promise<`0x${string}`>): Promise<boolean> => {
+      const blocked = sendBlocked(key, sending.current, pendingFor(address, TARGET_CHAIN_ID));
+      if (blocked) {
+        push({ kind: "info", text: blocked });
+        return false;
+      }
+      sending.current.add(key);
+      setInFlight([...sending.current]);
       const pending = push({ kind: "pending", text: `${label}…` });
       let tx: PendingTx | undefined;
       try {
         const hash = await fn();
-        tx = { hash, label, chainId: TARGET_CHAIN_ID, account: address ?? "", submittedAt: Math.floor(Date.now() / 1000) };
+        tx = { hash, label, key, chainId: TARGET_CHAIN_ID, account: address ?? "", submittedAt: Math.floor(Date.now() / 1000) };
         // Remembered before waiting, so a reload mid-confirmation reconciles instead of forgetting.
         if (address) rememberPending(tx);
         const receipt = await pc?.waitForTransactionReceipt({ hash, timeout: 120_000 });
@@ -519,6 +543,10 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
         const text = decodeVesselError(err);
         if (text) push({ kind: "error", text });
         return false;
+      } finally {
+        // A timed-out send stays blocked through its remembered pending entry, not this lock.
+        sending.current.delete(key);
+        setInFlight([...sending.current]);
       }
     },
     [address, dismissToast, pc, push, reads, watchPending],
@@ -554,7 +582,8 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<BookProvider>(() => {
-    const d = reads.data;
+    // never show one wallet's snapshot under another address (APP-1)
+    const d = reads.data && reads.data.owner === (address ?? null) ? reads.data : undefined;
     const down = "RPC read did not return";
     const ev = evidence.data;
     const noApi = "no evidence service configured (NEXT_PUBLIC_STATS_URL)";
@@ -576,14 +605,16 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
       reconnecting: reads.isError,
       isMock: false,
       toasts,
+      // Sending now, plus anything remembered as still confirming (after a timeout or a reload); refreshed with each read.
+      inFlight: [...new Set([...inFlight, ...pendingFor(address, TARGET_CHAIN_ID).map((p) => p.key ?? p.label)])],
       connectors: connectors.map((c) => ({ id: c.id, name: c.name, ready: true })),
 
       faucet: async () => {
         if (ASSET.kind !== "demo") return false; // Circle USDC comes from faucet.circle.com, linked in the UI
-        return runTx("Faucet", () => send(ASSET.address, dusdAbi, "faucet", [], CEIL.faucet));
+        return runTx("Faucet", TX_KEY.faucet, () => send(ASSET.address, dusdAbi, "faucet", [], CEIL.faucet));
       },
       requestDeposit: ({ tranche, seriesId, assets, minOut, deadline }) =>
-        runTx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", async () => {
+        runTx(tranche === "hull" ? "Subscribe to Hull" : "Request Ballast deposit", TX_KEY.deposit, async () => {
           if (!pc || !address) throw new Error("connect a wallet first");
           const allowance = (await pc.readContract({
             address: ASSET.address, abi: assetAbi, functionName: "allowance", args: [address, V2.AssetCustody],
@@ -594,16 +625,16 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
           }
           return send(C, controllerAbi, "requestDeposit", [tranche === "hull" ? 0 : 1, seriesId, assets, address, minOut, deadline], CEIL.request);
         }),
-      cancelDeposit: (id) => runTx("Cancel request", () => send(C, controllerAbi, "cancelDeposit", [id], CEIL.cancel)),
-      claimRefund: (id) => runTx("Claim refund", () => send(C, controllerAbi, "claimRefund", [id], CEIL.claim)),
+      cancelDeposit: (id) => runTx("Cancel request", TX_KEY.cancelDeposit(id), () => send(C, controllerAbi, "cancelDeposit", [id], CEIL.cancel)),
+      claimRefund: (id) => runTx("Claim refund", TX_KEY.claimRefund(id), () => send(C, controllerAbi, "claimRefund", [id], CEIL.claim)),
       requestRedeem: (units, minAssets) =>
-        runTx("Request Ballast exit", () => {
+        runTx("Request Ballast exit", TX_KEY.redeem, () => {
           if (!address) throw new Error("connect a wallet first");
           return send(C, controllerAbi, "requestBallastRedeem", [units, address, minAssets], CEIL.request);
         }),
-      cancelRedeem: (id) => runTx("Cancel exit", () => send(C, controllerAbi, "cancelRedeem", [id], CEIL.cancel)),
-      claimExit: (id) => runTx("Claim exit", () => send(V2.ClaimEscrow, escrowAbi, "claim", [exitKey(id)], CEIL.claim)),
-      claimHull: (sid) => runTx("Claim Hull payout", () => send(C, controllerAbi, "claimHull", [sid], CEIL.claim)),
+      cancelRedeem: (id) => runTx("Cancel exit", TX_KEY.cancelRedeem(id), () => send(C, controllerAbi, "cancelRedeem", [id], CEIL.cancel)),
+      claimExit: (id) => runTx("Claim exit", TX_KEY.claimExit(id), () => send(V2.ClaimEscrow, escrowAbi, "claim", [exitKey(id)], CEIL.claim)),
+      claimHull: (sid) => runTx("Claim Hull payout", TX_KEY.claimHull(sid), () => send(C, controllerAbi, "claimHull", [sid], CEIL.claim)),
 
       connect: async (connectorId?: string) => {
         try {
@@ -641,7 +672,7 @@ export function ChainBookProvider({ children }: { children: ReactNode }) {
     };
   }, [
     address, api, connectAsync, connectors, disconnect, dismissToast, evidence.data, isConnected, pc,
-    reads.data, reads.isError, reads.isLoading, runTx, send, switchChainAsync, toasts, wrongNetwork,
+    inFlight, reads.data, reads.isError, reads.isLoading, runTx, send, switchChainAsync, toasts, wrongNetwork,
   ]);
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;

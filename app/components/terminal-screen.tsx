@@ -9,6 +9,7 @@ import { PAUSE, RULES, type BookState, type EngineState } from "@/lib/book/types
 import { formatBlock, formatBps, formatDusd, formatDusd4, formatMonPrice, formatTs, formatWmon } from "@/lib/format";
 import { HEDGED, SPOT_SYMBOL, SPOT_TEST, VENUE_LABEL } from "@/lib/book/asset";
 import { Badge } from "@/components/ui";
+import { SectionBoundary } from "@/components/section-boundary";
 import { map2, mapLive } from "@/lib/live";
 import { Unavailable, Val } from "@/components/live";
 import { MockNotice, TxLink, formatDuration, useNow } from "@/components/book-ui";
@@ -70,14 +71,14 @@ export function TerminalScreen() {
       </nav>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <BookPanel />
-        <RiskPanel />
-        <HedgePanel />
-        <CarryPanel />
-        <SeriesPanel />
-        <TapePanel />
+        <SectionBoundary name="Book"><BookPanel /></SectionBoundary>
+        <SectionBoundary name="Risk"><RiskPanel /></SectionBoundary>
+        <SectionBoundary name="Hedge"><HedgePanel /></SectionBoundary>
+        <SectionBoundary name="Carry"><CarryPanel /></SectionBoundary>
+        <SectionBoundary name="Series"><SeriesPanel /></SectionBoundary>
+        <SectionBoundary name="Tape"><TapePanel /></SectionBoundary>
         <div className="lg:col-span-2">
-          <OpportunitiesPanel />
+          <SectionBoundary name="Opportunities"><OpportunitiesPanel /></SectionBoundary>
         </div>
       </div>
 
@@ -251,8 +252,11 @@ function HedgePanel() {
 function HedgedPanel() {
   const v = useBook();
   const h = mapLive(v.engine, (e) => e?.hedge ?? null);
+  // From the engine read, not a constant: "hedged" only when the read succeeded and says so (review APP-3)
+  const hedgedNow = v.engine.status === "ok" && v.engine.value !== null && !v.engine.value.simulated;
+  const tag = hedgedNow ? <Badge kind={SPOT_TEST ? "hedged-sim" : "hedged"} compact venue={VENUE_LABEL} /> : <Badge kind="sim" compact />;
   return (
-    <Panel id="hedge" title="HEDGE" tag={<Badge kind="hedged" compact venue={VENUE_LABEL} />}>
+    <Panel id="hedge" title="HEDGE" tag={tag}>
       <Val of={h}>
         {(x) =>
           x === null ? (

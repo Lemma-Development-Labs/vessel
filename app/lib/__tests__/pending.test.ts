@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { forgetPending, loadPending, pendingFor, rememberPending, type PendingTx } from "../book/pending";
+import { TX_KEY, forgetPending, loadPending, pendingFor, rememberPending, sendBlocked, type PendingTx } from "../book/pending";
 
 class MemStore {
   data = new Map<string, string>();
@@ -64,5 +64,29 @@ describe("pending transaction memory", () => {
     const all = loadPending(s);
     expect(all).toHaveLength(20);
     expect(all.at(-1)?.label).toBe("tx 30");
+  });
+});
+
+describe("APP-4: one send per action", () => {
+  it("a second click while the first is in the wallet is refused", () => {
+    const sending = new Set([TX_KEY.deposit]);
+    expect(sendBlocked(TX_KEY.deposit, sending, [])).toMatch(/Already sending/);
+    expect(sendBlocked(TX_KEY.redeem, sending, [])).toBeNull(); // other actions are not held up
+  });
+
+  it("an action still confirming (after a timeout or a reload) can't be sent again; other ids can", () => {
+    const s = new MemStore();
+    rememberPending(tx(1, { label: "Request Ballast deposit", key: TX_KEY.deposit }), s);
+    rememberPending(tx(2, { label: "Cancel request", key: TX_KEY.cancelDeposit(7n) }), s);
+    const pending = pendingFor(tx(1).account, 10143, s);
+    expect(sendBlocked(TX_KEY.deposit, new Set(), pending)).toBe("Request Ballast deposit is still confirming — wait for it before sending again");
+    expect(sendBlocked(TX_KEY.cancelDeposit(7n), new Set(), pending)).not.toBeNull();
+    expect(sendBlocked(TX_KEY.cancelDeposit(8n), new Set(), pending)).toBeNull();
+    forgetPending(tx(1).hash, s);
+    expect(sendBlocked(TX_KEY.deposit, new Set(), pendingFor(tx(1).account, 10143, s))).toBeNull();
+  });
+
+  it("entries saved before keys existed still block by label", () => {
+    expect(sendBlocked("Claim exit", new Set(), [tx(3, { label: "Claim exit" })])).not.toBeNull();
   });
 });

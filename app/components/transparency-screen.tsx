@@ -10,6 +10,7 @@ import { verificationOf } from "@/lib/verification";
 import { EXPLORER } from "@/lib/wagmi";
 import { AddressChip, Badge, Card } from "@/components/ui";
 import { Val } from "@/components/live";
+import { SectionBoundary } from "@/components/section-boundary";
 import { MockNotice, PageHead, SectionLabel, TxLink, formatDuration } from "@/components/book-ui";
 
 export function TransparencyScreen() {
@@ -26,6 +27,7 @@ export function TransparencyScreen() {
         {RELEASE.environment} · {RELEASE.status}
       </p>
 
+      <SectionBoundary name="Book">
       <section className="mt-10">
         <h2 className="display text-lg">Book</h2>
         <Card className="mt-4 grid grid-cols-2 gap-px overflow-hidden md:grid-cols-4">
@@ -44,7 +46,9 @@ export function TransparencyScreen() {
         </Card>
         <Val of={v.book}>{(b) => <Cover b={b} />}</Val>
       </section>
+      </SectionBoundary>
 
+      <SectionBoundary name="Engine and caps">
       <section className="mt-10 grid gap-6 md:grid-cols-2">
         <div>
           <h2 className="display text-lg">Strategy engine</h2>
@@ -61,7 +65,7 @@ export function TransparencyScreen() {
                     <div>
                       <SectionLabel>MODE</SectionLabel>
                       <div className="mt-1.5">
-                        {e.simulated ? <Badge kind="sim" /> : <Badge kind="hedged" venue={VENUE_LABEL} />}
+                        {e.simulated ? <Badge kind="sim" /> : SPOT_TEST ? <Badge kind="hedged-sim" /> : <Badge kind="hedged" venue={VENUE_LABEL} />}
                       </div>
                     </div>
                     <div>
@@ -140,7 +144,9 @@ export function TransparencyScreen() {
           </Card>
         </div>
       </section>
+      </SectionBoundary>
 
+      <SectionBoundary name="Independent check">
       <section className="mt-10">
         <h2 className="display text-lg">Independent check</h2>
         <Card className="mt-4 p-5">
@@ -186,7 +192,9 @@ export function TransparencyScreen() {
           </pre>
         </Card>
       </section>
+      </SectionBoundary>
 
+      <SectionBoundary name="Event history">
       <section className="mt-10">
         <h2 className="display text-lg">Event history</h2>
         <Card className="mt-4 overflow-x-auto">
@@ -234,7 +242,9 @@ export function TransparencyScreen() {
           balances above are read from the contracts directly.
         </p>
       </section>
+      </SectionBoundary>
 
+      <SectionBoundary name="Governance">
       <section className="mt-10">
         <h2 className="display text-lg">Governance</h2>
         <Card className="mt-4 divide-y divide-white/6">
@@ -248,7 +258,9 @@ export function TransparencyScreen() {
           <Role name="Operator (keeper)" addr={ROLES.operator} note="admits queues, moves idle cash, settles — allowlisted calls only" />
         </Card>
       </section>
+      </SectionBoundary>
 
+      <SectionBoundary name="Contracts">
       <section id="contracts" className="mt-12">
         <h2 className="display text-lg">Contracts</h2>
         <div className="mt-4 overflow-hidden rounded-[2px] border border-line">
@@ -270,6 +282,7 @@ export function TransparencyScreen() {
           verification run confirmed it. Anything not checked says so.
         </p>
       </section>
+      </SectionBoundary>
     </div>
   );
 }

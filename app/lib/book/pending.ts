@@ -15,7 +15,32 @@ export type PendingTx = {
   account: string;
   /** Unix seconds when the wallet returned the hash. */
   submittedAt: number;
+  /** Which action it was (see `TX_KEY`); older entries fall back to the label. */
+  key?: string;
 };
+
+/** One key per action (per request id where there is one): a key that is sending or confirming can't be sent again. */
+export const TX_KEY = {
+  faucet: "faucet",
+  deposit: "requestDeposit",
+  redeem: "requestRedeem",
+  cancelDeposit: (id: bigint) => `cancelDeposit:${id}`,
+  claimRefund: (id: bigint) => `claimRefund:${id}`,
+  cancelRedeem: (id: bigint) => `cancelRedeem:${id}`,
+  claimExit: (id: bigint) => `claimExit:${id}`,
+  claimHull: (seriesId: bigint) => `claimHull:${seriesId}`,
+} as const;
+
+/**
+ * Why a send must not start now, or null. A double click, or a click while the
+ * wallet prompt is open, would otherwise send the same action twice; so would a
+ * click while an earlier one is still confirming ("unknown means reconcile").
+ */
+export function sendBlocked(key: string, sending: ReadonlySet<string>, pending: readonly PendingTx[]): string | null {
+  if (sending.has(key)) return "Already sending — confirm or reject it in your wallet";
+  const p = pending.find((t) => (t.key ?? t.label) === key);
+  return p ? `${p.label} is still confirming — wait for it before sending again` : null;
+}
 
 const KEY = "vessel.pendingTx.v1";
 /** After this long without a receipt, stop polling and tell the user to check the explorer. */
@@ -41,7 +66,8 @@ function isPending(x: unknown): x is PendingTx {
     typeof o.label === "string" &&
     typeof o.chainId === "number" &&
     typeof o.account === "string" &&
-    typeof o.submittedAt === "number"
+    typeof o.submittedAt === "number" &&
+    (o.key === undefined || typeof o.key === "string")
   );
 }
 
