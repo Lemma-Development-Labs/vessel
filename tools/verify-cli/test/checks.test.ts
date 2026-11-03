@@ -14,7 +14,7 @@ const healthy = (): Snapshot => ({
   },
   custody: { pending: 0n, activeIdle: 200_000_000n, tokenBalance: 200_000_000n },
   escrow: { totalFunded: 0n, tokenBalance: 0n },
-  engine: { present: true, simulated: true, value: 800_000_000n, observedAt: 1_790_000_000n, book: 800_000_000n, pot: 200_000_000n, fundingRateBps: 1200n },
+  engine: { present: true, simulated: true, manifestKind: "SimulatedEngine", value: 800_000_000n, observedAt: 1_790_000_000n, book: 800_000_000n, pot: 200_000_000n, fundingRateBps: 1200n },
   ballastSupply: 900_000_000_000_000_000_000n,
 });
 
@@ -101,7 +101,7 @@ describe("hedged engine checks", () => {
   const hedged = (h = hedge()): Snapshot => {
     const s = healthy();
     s.asset = { symbol: "USDC", decimals: 6 };
-    s.engine = { present: true, simulated: false, value: recomputeEngineValue(h), observedAt: 1_790_000_000n, hedge: h };
+    s.engine = { present: true, simulated: false, manifestKind: "HedgedEngine", value: recomputeEngineValue(h), observedAt: 1_790_000_000n, hedge: h };
     return s;
   };
 
@@ -165,12 +165,43 @@ describe("hedged engine with a vMON spot leg (ADR-010)", () => {
       shortLots: 650n, perpLotScale: 1n, px: 26_000_000_000_000_000n, fx: 10n ** 18n,
       priceAt: 1n, independent: false, sliceCap: 4_000_000n, testSpot: true,
     };
-    s.engine = { present: true, simulated: false, value: recomputeEngineValue(h), observedAt: 1n, hedge: h };
+    s.engine = { present: true, simulated: false, manifestKind: "HedgedEngine", value: recomputeEngineValue(h), observedAt: 1n, hedge: h };
     const out = evaluate(s);
     const engine = out.find((c) => c.id === "engine")!;
     expect(engine.verdict).toBe("SIMULATED");
     expect(engine.summary).toMatch(/vMON/);
     expect(out.find((c) => c.id === "engine.backing")?.verdict).toBe("PASS");
     expect(out.find((c) => c.id === "hedge.gap")?.verdict).toBe("PASS");
+  });
+});
+
+import { absentOk, isAbsentFunction } from "../src/read.ts";
+
+describe("review VER-1 / VER-2: no stronger claim from a failed read or an unlisted engine", () => {
+  it("an engine the manifest doesn't name is a MISMATCH, not INFO", () => {
+    const s = healthy();
+    s.engine = { ...(s.engine as Extract<Snapshot["engine"], { present: true }>), manifestKind: null };
+    expect(verdictOf(s, "engine.manifest")).toBe("MISMATCH");
+    expect(overall(evaluate(s))).toBe("MISMATCH");
+  });
+
+  it("an engine that isn't the kind the manifest names is a MISMATCH", () => {
+    const s = healthy(); // a SimulatedEngine in the manifest…
+    s.engine = { ...(s.engine as Extract<Snapshot["engine"], { present: true }>), simulated: false }; // …that says it isn't
+    expect(verdictOf(s, "engine.manifest")).toBe("MISMATCH");
+  });
+
+  it("a missing function falls back; any other read failure propagates (the CLI then exits 2)", async () => {
+    // the shapes viem throws: a call to a function the contract lacks reverts with no reason and no data
+    const absent = Object.assign(new Error("reverted"), { name: "ContractFunctionExecutionError", cause: { name: "ContractFunctionRevertedError", raw: "0x" } });
+    const zero = Object.assign(new Error("no data"), { name: "ContractFunctionExecutionError", cause: { name: "ContractFunctionZeroDataError" } });
+    const timeout = Object.assign(new Error("took too long"), { name: "TimeoutError" });
+    const http = Object.assign(new Error("502"), { name: "ContractFunctionExecutionError", cause: { name: "HttpRequestError" } });
+    const realRevert = Object.assign(new Error("reverted"), { name: "ContractFunctionExecutionError", cause: { name: "ContractFunctionRevertedError", reason: "Paused" } });
+    expect(isAbsentFunction(absent)).toBe(true);
+    expect(isAbsentFunction(zero)).toBe(true);
+    for (const e of [timeout, http, realRevert]) expect(isAbsentFunction(e)).toBe(false);
+    await expect(absentOk(Promise.reject(absent), false)).resolves.toBe(false);
+    await expect(absentOk(Promise.reject(timeout), false)).rejects.toThrow("took too long");
   });
 });

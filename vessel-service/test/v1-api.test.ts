@@ -34,7 +34,7 @@ const snap = (): Snapshot => ({
   },
   custody: { pending: 0n, activeIdle: 200_000_000n, tokenBalance: 200_000_000n },
   escrow: { totalFunded: 0n, tokenBalance: 0n },
-  engine: { present: true, simulated: true, value: 800_000_000n, observedAt: 1_790_766_658n },
+  engine: { present: true, simulated: true, manifestKind: "SimulatedEngine", value: 800_000_000n, observedAt: 1_790_766_658n },
   ballastSupply: 900n * 10n ** 18n,
 });
 

@@ -33,6 +33,8 @@ export interface Snapshot {
     | {
         present: true;
         simulated: boolean;
+        /** which release-manifest entry this address is (VER-2): null when the manifest doesn't name it */
+        manifestKind: "HedgedEngine" | "SimulatedEngine" | null;
         value: bigint;
         observedAt: bigint;
         book?: bigint;
@@ -157,6 +159,18 @@ export function evaluate(snap: Snapshot): Check[] {
     out.push({ id: "engine", verdict: "INFO", summary: "no engine wired", values: {} });
   } else {
     const e = snap.engine;
+    // The controller's engine must be one the release manifest names, and be the kind it names it as: a
+    // tampered manifest or a swapped engine used to pass as INFO (review VER-2).
+    if (e.manifestKind === null) {
+      out.push({ id: "engine.manifest", verdict: "MISMATCH", summary: "the controller's engine is not in the release manifest", values: {} });
+    } else if ((e.manifestKind === "SimulatedEngine") !== e.simulated) {
+      out.push({
+        id: "engine.manifest",
+        verdict: "MISMATCH",
+        summary: `the manifest names this engine ${e.manifestKind}, but it reports simulated=${e.simulated}`,
+        values: {},
+      });
+    }
     out.push({
       id: "engine",
       verdict: e.simulated || e.hedge?.testSpot ? "SIMULATED" : "INFO",

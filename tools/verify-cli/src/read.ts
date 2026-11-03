@@ -52,6 +52,29 @@ const perplAbi = parseAbi([
 ]);
 
 /** HedgedEngine: its ledger, what it actually holds, and its Perpl account read from the exchange. */
+/**
+ * A read that may fall back only when the function genuinely isn't on the contract (an older deployment):
+ * a revert with no reason and no data, or a call that returns nothing. Every other failure — timeout,
+ * transport, RPC error — propagates, and the run ends UNVERIFIED (exit 2). Swallowing those used to turn
+ * a failed read into a stronger claim ("MON spot bought on Kuru", OVERALL PASS) (review VER-1).
+ */
+export async function absentOk<T>(read: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await read;
+  } catch (err) {
+    if (isAbsentFunction(err)) return fallback;
+    throw err;
+  }
+}
+
+export function isAbsentFunction(err: unknown): boolean {
+  for (let e = err as { name?: string; cause?: unknown; reason?: string; raw?: string; data?: unknown } | undefined; e; e = e.cause as typeof e) {
+    if (e.name === "ContractFunctionZeroDataError") return true;
+    if (e.name === "ContractFunctionRevertedError") return !e.reason && !e.data && (e.raw === undefined || e.raw === "0x");
+  }
+  return false;
+}
+
 async function readHedge(pc: PublicClient, engine: Address, at: { blockNumber: bigint }): Promise<HedgeSnapshot> {
   const re = <T>(fn: string) => pc.readContract({ address: engine, abi: hedgedAbi, functionName: fn as never, ...at }) as Promise<T>;
   const [usdc, ausd, usdcCash, ausdCash, monQty, accountId, perpl, perpId, lotScale, valuation, sliceCap] = await Promise.all([
@@ -62,7 +85,7 @@ async function readHedge(pc: PublicClient, engine: Address, at: { blockNumber: b
   const bal = (token: Address) => pc.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [engine], ...at });
   // The spot asset is native MON, or on testnet the vMON stand-in (ADR-010). Engines deployed before
   // ADR-010 have no spot() and are native.
-  const spot = await re<Address>("spot").catch(() => "0x0000000000000000000000000000000000000000" as Address);
+  const spot = await absentOk(re<Address>("spot"), "0x0000000000000000000000000000000000000000" as Address);
   const testSpot = spot !== "0x0000000000000000000000000000000000000000";
   const [usdcBalance, ausdBalance, monBalance, [px, fx, priceAt], independent] = await Promise.all([
     bal(usdc),
@@ -182,10 +205,10 @@ export async function readSnapshot(pc: PublicClient, m: Manifest, blockTag: "fin
   let engine: Snapshot["engine"] = { present: false };
   if (engineAddr !== "0x0000000000000000000000000000000000000000") {
     const [value, observedAt] = await pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "value", ...at });
-    const simulated = await pc
-      .readContract({ address: engineAddr, abi: engineAbi, functionName: "isSimulated", ...at })
-      .catch(() => false);
-    engine = { present: true, simulated, value, observedAt };
+    const simulated = await absentOk(pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "isSimulated", ...at }), false);
+    const is = (k: string) => (m.contracts[k] ?? "").toLowerCase() === engineAddr.toLowerCase();
+    const manifestKind = is("HedgedEngine") ? "HedgedEngine" : is("SimulatedEngine") ? "SimulatedEngine" : null;
+    engine = { present: true, simulated, manifestKind, value, observedAt };
     if (simulated) {
       const [book, pot, rate] = await Promise.all([
         pc.readContract({ address: engineAddr, abi: engineAbi, functionName: "book", ...at }),

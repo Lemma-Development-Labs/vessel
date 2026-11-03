@@ -28,7 +28,8 @@ async function main(): Promise<number> {
   const tag = process.argv.includes("--latest") ? "latest" : "finalized";
   const snap = await readSnapshot(client(rpc), manifest, tag);
   const checks = evaluate(snap);
-  const verdict = overall(checks);
+  // A pass over a simulated engine is reported as SIMULATED, not PASS (review VER-4); exit stays 0.
+  const verdict = overall(checks) === "PASS" && checks.some((c) => c.verdict === "SIMULATED") ? "SIMULATED" : overall(checks);
 
   if (process.argv.includes("--json")) {
     const envelope = {
