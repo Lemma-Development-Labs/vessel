@@ -44,10 +44,18 @@ async function main(): Promise<void> {
   );
   await assertRpcChainIds(runtime.rpcUrls, runtime.chainId);
   log.info({ environment: runtime.environment, chainId: runtime.chainId }, "config guards passed");
+  // One RPC budget, split in two (review SVC-01): the keeper and quoter get their own paced client, so API
+  // traffic (health checks, /v1 reads) and the indexer can never use up the rate the keeper needs. Together
+  // they stay under the public RPC's per-second cap (RPC_MAX_RPS, the total; raise it on a private RPC).
+  const rpsTotal = Number(process.env.RPC_MAX_RPS ?? "10");
+  const rpsKeeper = Math.min(Number(process.env.RPC_KEEPER_RPS ?? "4"), rpsTotal - 1);
   const publicClient = createPublicClient({
     chain: vesselChain(rpcUrl, chainId),
-    // Paced under the public RPC's per-second cap (see pacedFetch); raise RPC_MAX_RPS on a private RPC.
-    transport: http(rpcUrl, { fetchFn: pacedFetch(Number(process.env.RPC_MAX_RPS ?? "10")) }),
+    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsTotal - rpsKeeper) }),
+  });
+  const keeperClient = createPublicClient({
+    chain: vesselChain(rpcUrl, chainId),
+    transport: http(rpcUrl, { fetchFn: pacedFetch(rpsKeeper) }),
   });
   const store = await initDb();
 
@@ -98,7 +106,7 @@ async function main(): Promise<void> {
     v2Keeper = await startV2Keeper({
       manifest: v2Manifest,
       sql: v2Sql,
-      pc: publicClient,
+      pc: keeperClient,
       chain: vesselChain(rpcUrl, chainId),
       rpcUrl,
       environment: runtime.environment,
@@ -108,7 +116,7 @@ async function main(): Promise<void> {
   // Testnet only, and only with its own key (V2_QUOTER_PK): quotes Vessel's Kuru markets around the Perpl mark.
   let v2Quoter: V2QuoterHandle | null = null;
   if (v2Manifest && v2Sql) {
-    v2Quoter = await startV2Quoter({ manifest: v2Manifest, sql: v2Sql, pc: publicClient, chain: vesselChain(rpcUrl, chainId), rpcUrl, log });
+    v2Quoter = await startV2Quoter({ manifest: v2Manifest, sql: v2Sql, pc: keeperClient, chain: vesselChain(rpcUrl, chainId), rpcUrl, log });
   }
 
   let keeper: KeeperHandle | undefined;

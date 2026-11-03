@@ -177,11 +177,25 @@ export async function persistAction(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'PERSISTED') RETURNING *`,
       [
         e.clientRequestId, e.account, e.token.toString(), e.policyVersion, e.action, e.target, e.calldata,
-        e.plannedNonce.toString(), JSON.stringify(e.inputs), (e.value ?? 0n).toString(),
+        e.plannedNonce.toString(), JSON.stringify(jsonbSafe(e.inputs)), (e.value ?? 0n).toString(),
       ],
     );
     return row!;
   });
+}
+
+/**
+ * Strings bound for jsonb, cleaned: Postgres rejects the NUL escape (\u0000), and a revert reason carrying
+ * one used to make this UPDATE throw, leaving the entry PERSISTED so the next tick re-sent its stale,
+ * price-bound calldata (review E2E-02). Other control characters go too; they only ever arrive in
+ * error text.
+ */
+export function jsonbSafe(v: unknown): unknown {
+  // eslint-disable-next-line no-control-regex
+  if (typeof v === "string") return v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+  if (Array.isArray(v)) return v.map(jsonbSafe);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, jsonbSafe(x)]));
+  return v;
 }
 
 export async function markState(
@@ -190,10 +204,15 @@ export async function markState(
   state: JournalState,
   patch: { txHash?: string; result?: object } = {},
 ): Promise<void> {
-  await sql.query(
-    `UPDATE action_journal SET state = $2, tx_hash = COALESCE($3, tx_hash), result = COALESCE($4, result), updated_at = now() WHERE id = $1`,
-    [id, state, patch.txHash ?? null, patch.result ? JSON.stringify(patch.result) : null],
-  );
+  const q = `UPDATE action_journal SET state = $2, tx_hash = COALESCE($3, tx_hash), result = COALESCE($4, result), updated_at = now() WHERE id = $1`;
+  const result = patch.result ? JSON.stringify(jsonbSafe(patch.result)) : null;
+  try {
+    await sql.query(q, [id, state, patch.txHash ?? null, result]);
+  } catch (err) {
+    // The state change is what matters for safety: if the detail can't be stored, store the state without it.
+    if (result === null) throw err;
+    await sql.query(q, [id, state, patch.txHash ?? null, JSON.stringify({ reason: "unstorable result text" })]);
+  }
 }
 
 export async function openEntries(sql: Sql, account: string): Promise<JournalEntry[]> {

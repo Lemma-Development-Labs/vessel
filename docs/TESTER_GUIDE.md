@@ -71,7 +71,10 @@ book is full), it becomes a refund you can claim from **Portfolio**.
 
 Messages you may see:
 - *"Hull is full for now — Ballast capacity must grow first (20% floor)"*: Hull can only grow
-  while Ballast stays at least 20% of the book. Try Ballast, or wait for more Ballast.
+  while Ballast would still cover at least **30%** of the book after the full term's Hull coupon
+  (and an allowance for closing the hedge) is charged to it, and while the reserve holds at least
+  2% of the book. (20% is the level at which the team intervenes, not the admission rule.) Try
+  Ballast, or wait for more Ballast.
 - *"Above your beta allowance"*: each invited address has a lifetime limit.
 
 ## 4. Watch it work
@@ -95,7 +98,8 @@ you may see the book's money held as cash in the engine. That is expected.
    you will accept.
 3. After the cooldown, the keeper funds exits in order, unwinding part of the hedge if it needs
    cash. An exit can be paid in parts. If it waits, you may see *"Exit queued by the floor"*:
-   Ballast protects Hull, so exits pause while Ballast is at its 20% floor.
+   Ballast protects Hull, so an exit is paid only as far as Ballast would still cover at least 30%
+   of the book afterwards, counting the Hull coupon still to come.
 4. When it shows as claimable in **Portfolio**, **claim** it to receive USDC in your wallet.
 
 ### Hull

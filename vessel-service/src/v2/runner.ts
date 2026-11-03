@@ -5,6 +5,7 @@ import {
   createWalletClient,
   http,
   parseAbi,
+  toFunctionSelector,
   type Address,
   type Chain,
   type Hex,
@@ -20,8 +21,19 @@ import { RejectedError, TimeoutError, tick, type ChainPort, type KeeperDeps } fr
 import { POLICY_VERSION, allowlist, decide, engineCashNeed, type Observed, type PolicyConfig } from "./policy.ts";
 import { HEDGE_POLICY_VERSION, decideHedge, defaultHedgeConfig, engineAllowlist, type HedgeConfig, type HedgeObserved } from "./hedge.ts";
 
-/** Monad bills the gas LIMIT: estimate + 10%, hard cap (see OPS.md gas notes). */
-const GAS_CAP = 2_000_000n;
+/**
+ * Monad bills the gas LIMIT: estimate + 10%, capped per action (see OPS.md gas notes). Activating a full
+ * series (25 subscribers, up to 100 request slots) needs ~2M on its own, so one flat 2M cap refused it
+ * every time and, as policy step 1, stalled everything behind it (review E2E-03).
+ */
+const GAS_CAP_DEFAULT = 2_000_000n;
+const GAS_CAPS = new Map<string, bigint>([
+  [toFunctionSelector("activateSeries(uint256)"), 6_000_000n],
+  [toFunctionSelector("processExitBatch(uint256)"), 3_000_000n],
+  [toFunctionSelector("processDepositBatch(uint256)"), 3_000_000n],
+]);
+export const gasCapFor = (data: string): bigint => GAS_CAPS.get(data.slice(0, 10).toLowerCase()) ?? GAS_CAP_DEFAULT;
+const EXIT_SCAN = 50n; // exits scanned from the head for the demand estimate
 const RECEIPT_TIMEOUT_MS = 60_000;
 
 const viewAbi = parseAbi([
@@ -36,6 +48,7 @@ const viewAbi = parseAbi([
   "function engine() view returns (address)",
   "function exits(uint256) view returns (address, address, uint64, uint8, uint256, uint256, uint256)",
   "function EXIT_COOLDOWN() view returns (uint256)",
+  "function ballastUnitValue(uint256) view returns (uint256)",
 ]);
 const custodyAbi = parseAbi(["function activeIdle() view returns (uint256)"]);
 const engineAbi = parseAbi(["function value() view returns (uint256, uint256)"]);
@@ -80,7 +93,8 @@ export function viemChainPort(pc: PublicClient, chain: Chain, rpcUrl: string, pk
         throw new RejectedError(`estimate failed: ${firstLine(err)}`);
       }
       const gas = (est * 11n) / 10n;
-      if (gas > GAS_CAP) throw new RejectedError(`gas ${gas} above cap ${GAS_CAP}`);
+      const cap = gasCapFor(tx.data);
+      if (gas > cap) throw new RejectedError(`gas ${gas} above cap ${cap}`);
       let hash: Hex;
       try {
         hash = await wallet.sendTransaction({ to: tx.to as Address, data: tx.data as Hex, value: tx.value ?? 0n, nonce: Number(tx.nonce), gas, chain });
@@ -126,6 +140,7 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
   const series = sid > 0n ? await rc<readonly [number, bigint, Hex, bigint, bigint, bigint, bigint, bigint, bigint, bigint]>("seriesInfo", [sid]) : null;
   const activeIdle = await pc.readContract({ address: m.contracts.AssetCustody as Address, abi: custodyAbi, functionName: "activeIdle" });
   let headExitReadyAt = 0n;
+  let readyExitDemand = 0n;
   if (exitLen > eHead) {
     // exitHead is a queue position; exits() is keyed by id. requestBallastRedeem pushes ids in
     // creation order starting at 1, so position i always holds id i + 1.
@@ -134,6 +149,15 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
       rc<bigint>("EXIT_COOLDOWN"),
     ]);
     headExitReadyAt = head[2] + cooldown;
+    // What the cooled exits at the head are worth now: the cash they wait for (review E2E-01). FIFO by
+    // time, so the scan stops at the first one still cooling; bounded so a long queue stays cheap.
+    for (let pos = eHead; pos < exitLen && pos < eHead + EXIT_SCAN; pos++) {
+      const e = pos === eHead ? head : await rc<readonly [Address, Address, bigint, number, bigint, bigint, bigint]>("exits", [pos + 1n]);
+      const COOLING = 1;
+      if (e[3] !== COOLING || e[4] === 0n) continue;
+      if (e[2] + cooldown > block.timestamp) break;
+      readyExitDemand += await rc<bigint>("ballastUnitValue", [e[4]]);
+    }
   }
   const engineValue =
     engineAddr === "0x0000000000000000000000000000000000000000"
@@ -145,6 +169,10 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
     : undefined;
   const [last] = await sql.query<{ at: Date | null }>(
     "SELECT max(updated_at) AS at FROM action_journal WHERE account = $1 AND action = 'settle' AND state = 'CONFIRMED'",
+    [account],
+  );
+  const rejected = await sql.query<{ action: string }>(
+    "SELECT DISTINCT action FROM action_journal WHERE account = $1 AND state = 'REJECTED' AND updated_at > now() - interval '30 minutes'",
     [account],
   );
   return {
@@ -164,6 +192,8 @@ export async function observe(pc: PublicClient, m: Manifest, sql: Sql, account: 
     treasuryLiability,
     engineWired: engineAddr !== "0x0000000000000000000000000000000000000000",
     lastSettleAt: last?.at ? BigInt(Math.floor(last.at.getTime() / 1000)) : 0n,
+    readyExitDemand,
+    recentlyRejected: rejected.map((r) => r.action),
   };
 }
 

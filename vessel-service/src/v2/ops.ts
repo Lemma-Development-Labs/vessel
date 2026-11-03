@@ -113,13 +113,25 @@ export async function readOps(d: OpsDeps): Promise<OpsReport> {
   });
 }
 
-/** GET /v2/health — 200 when healthy, 503 with the reasons otherwise. Never cached. */
-export function v2HealthRoutes(d: OpsDeps): FastifyPluginAsync {
+/**
+ * GET /v2/health — 200 when healthy, 503 with the reasons otherwise. Not cached by clients, but computed at
+ * most once per 5 s (shared by concurrent callers) and rate-limited per IP: each computation reads the chain,
+ * and an unlimited flood starved the keeper's RPC budget (review SVC-01).
+ */
+export function v2HealthRoutes(d: OpsDeps, opts: { cacheMs?: number; rateLimit?: { max: number; timeWindow: number } } = {}): FastifyPluginAsync {
+  const cacheMs = opts.cacheMs ?? 5_000;
+  let cached: { at: number; r: OpsReport } | null = null;
+  let inflight: Promise<OpsReport> | null = null;
   return async (app) => {
-    app.get("/v2/health", async (_req, reply) => {
-      const r = await readOps(d);
+    app.get("/v2/health", { config: { rateLimit: opts.rateLimit ?? { max: 60, timeWindow: 60_000 } } }, async (_req, reply) => {
+      if (!cached || Date.now() - cached.at > cacheMs) {
+        inflight ??= readOps(d).finally(() => {
+          inflight = null;
+        });
+        cached = { at: Date.now(), r: await inflight };
+      }
       reply.header("Cache-Control", "no-store");
-      return reply.code(r.ok ? 200 : 503).send(r);
+      return reply.code(cached.r.ok ? 200 : 503).send(cached.r);
     });
   };
 }

@@ -55,8 +55,12 @@ export interface Observed {
   engineCash?: bigint;
   treasuryLiability: bigint;
   engineWired: boolean;
+  /** USDC the cooled exits at the queue head are worth now (`ballastUnitValue`); omitted → 0 */
+  readyExitDemand?: bigint;
   /** keeper memory (from the journal) */
   lastSettleAt: bigint;
+  /** actions refused (e.g. over their gas cap) in the last 30 min: skipped so one can't stall the rest */
+  recentlyRejected?: readonly string[];
 }
 
 export interface PolicyConfig {
@@ -87,10 +91,15 @@ export function engineCashNeed(o: Observed, cfg: PolicyConfig): { need: bigint; 
     const liquid = o.activeIdle > o.treasuryLiability ? o.activeIdle - o.treasuryLiability : 0n;
     return { need: liquid < o.hullNav ? min(o.hullNav - liquid, o.engineValue) : 0n, available };
   }
-  const a = o.activeIdle + o.engineValue - o.treasuryLiability;
-  const target = (a * cfg.idleTargetBps) / 10_000n + o.treasuryLiability;
+  // idle has to cover its target and the exits that have finished cooling (review E2E-01)
+  const target = idleTarget(o, cfg) + (o.readyExitDemand ?? 0n);
   const deficit = target > o.activeIdle ? target - o.activeIdle : 0n;
   return { need: deficit > cfg.minMove ? min(deficit, o.engineValue) : 0n, available };
+}
+
+function idleTarget(o: Observed, cfg: PolicyConfig): bigint {
+  const a = o.activeIdle + o.engineValue - o.treasuryLiability;
+  return (a * cfg.idleTargetBps) / 10_000n + o.treasuryLiability;
 }
 
 export function decide(o: Observed, cfg: PolicyConfig, controller: Address): PlannedAction | null {
@@ -102,12 +111,14 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
     inputs: { ...inputs, policyVersion: POLICY_VERSION },
   });
   const sid = o.activeSeries;
+  // An action refused recently (over its gas cap, say) is skipped, so it can't stall everything after it (E2E-03).
+  const ok = (action: string) => !(o.recentlyRejected ?? []).includes(action);
 
   // 1. Series lifecycle first: time-bound obligations.
-  if (sid > 0n && o.seriesState === SUBSCRIPTION_OPEN && o.now >= o.subscriptionEnd) {
+  if (sid > 0n && o.seriesState === SUBSCRIPTION_OPEN && o.now >= o.subscriptionEnd && ok("activateSeries")) {
     return plan(`activate:${sid}`, "activateSeries", call("activateSeries", [sid]), { series: sid.toString() });
   }
-  if (sid > 0n && (o.seriesState === ACTIVE && o.now >= o.maturity || o.seriesState === IMPAIRED)) {
+  if (sid > 0n && ((o.seriesState === ACTIVE && o.now >= o.maturity) || o.seriesState === IMPAIRED) && ok("matureSeries")) {
     return plan(`mature:${sid}`, "matureSeries", call("matureSeries", [sid]), { series: sid.toString() });
   }
   if (sid > 0n && o.seriesState === MATURED_UNWINDING && o.hullNav > 0n) {
@@ -123,14 +134,17 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
   }
 
   // 2. Queues.
-  if (o.pendingBallastDeposits > 0n && !o.impaired) {
+  if (o.pendingBallastDeposits > 0n && !o.impaired && ok("processDepositBatch")) {
     return plan(`deposits:${o.now / 300n}`, "processDepositBatch", call("processDepositBatch", [cfg.batchSize]), {
       pending: o.pendingBallastDeposits.toString(),
     });
   }
   // Exits fill only after their cooldown, in order: calling earlier settles and stops at the head,
-  // which costs gas every time and moves nobody's money.
-  if (o.pendingExits > 0n && !o.impaired && o.now >= o.headExitReadyAt) {
+  // which costs gas every time and moves nobody's money. And only with cash to pay them: an exit batch
+  // with nothing liquid is a no-op that used to win every tick, so the refill below (the only path
+  // that unwinds the hedge) never ran and large exits were never funded (review E2E-01).
+  const exitLiquid = o.activeIdle > o.treasuryLiability ? o.activeIdle - o.treasuryLiability : 0n;
+  if (o.pendingExits > 0n && !o.impaired && o.now >= o.headExitReadyAt && exitLiquid > cfg.minMove && ok("processExitBatch")) {
     return plan(`exits:${o.now / 900n}`, "processExitBatch", call("processExitBatch", [cfg.batchSize]), {
       pending: o.pendingExits.toString(),
     });
@@ -138,8 +152,8 @@ export function decide(o: Observed, cfg: PolicyConfig, controller: Address): Pla
 
   // 3. Keep the idle buffer near target (never below the on-chain 10% floor).
   if (o.engineWired && !o.impaired && o.seriesState !== MATURED_UNWINDING) {
-    const a = o.activeIdle + o.engineValue - o.treasuryLiability;
-    const target = (a * cfg.idleTargetBps) / 10_000n + o.treasuryLiability;
+    // never deploy cash the cooled exits are waiting for
+    const target = idleTarget(o, cfg) + (o.readyExitDemand ?? 0n);
     if (o.activeIdle > target + cfg.minMove) {
       const amount = o.activeIdle - target;
       return plan(`deploy:${o.now / 900n}`, "deployToEngine", call("deployToEngine", [amount]), { amount: amount.toString() });

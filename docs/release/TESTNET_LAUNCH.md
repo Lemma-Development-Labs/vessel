@@ -56,6 +56,12 @@ Status as of 2026-10-14. ✅ done · ⬜ open.
   (300 s apart). Send each tester the guide and the app link.
 - ⬜ **Hull series 1** (`testnet-v2h-02-open-series-1`), when there is enough Ballast for 30% cover
   and testers are ready to subscribe. It opens a 72 h window.
+  **Top up the reserve first.** Activation admits a subscription only while the reserve is at least
+  2% of the book *including* the new Hull (`reserve ≥ 2% × (H + B + R + y)`). The 20 USDC seed covers a
+  book of at most ~1,000 USDC: above that, every subscription is refunded with reason `"reserve"`.
+  Before `v2h-02`, have the Safe call `contributeReserve` so the reserve is ≥ 2% of the planned book
+  (e.g. 60 USDC for a 3,000 USDC book with Hull). Coverage also needs ≥ 30% *projected* Ballast cover
+  after the full-term coupon and `closeCost`.
 
 ## E. Housekeeping (before or soon after launch)
 
