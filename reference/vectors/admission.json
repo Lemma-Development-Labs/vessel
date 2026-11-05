@@ -1,0 +1,54 @@
+{
+  "unit": "USDC:6",
+  "cap": "1000000000",
+  "steps": [
+    {
+      "op": "reserve",
+      "id": "native",
+      "amount": "400000000",
+      "ok": true
+    },
+    {
+      "op": "reserve",
+      "id": "remote",
+      "amount": "600000000",
+      "ok": true
+    },
+    {
+      "op": "reserve",
+      "id": "overflow",
+      "amount": "1",
+      "ok": false
+    },
+    {
+      "op": "admit",
+      "id": "remote",
+      "amount": "597000000",
+      "ok": true
+    },
+    {
+      "op": "admit",
+      "id": "remote",
+      "amount": "597000000",
+      "ok": false
+    },
+    {
+      "op": "refund",
+      "id": "native",
+      "ok": true
+    },
+    {
+      "op": "reserve",
+      "id": "next",
+      "amount": "403000000",
+      "ok": true
+    },
+    {
+      "op": "admit",
+      "id": "next",
+      "amount": "403000000",
+      "ok": true
+    }
+  ],
+  "finalAdmitted": "1000000000"
+}

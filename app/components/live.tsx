@@ -91,7 +91,7 @@ export function SourceChip({ source }: { source: "chain" | "stats" | "mock" | "n
       : source === "mock"
         ? "demo data · not chain state"
         : "history unavailable";
-  const tone = source === "mock" ? "text-amber border-amber/30" : "text-steel border-white/10";
+  const tone = source === "mock" ? "text-amber border-amber/30" : "text-steel border-ink/10";
   return (
     <span
       className={`num inline-flex items-center rounded-md border px-2 py-1 text-[10px] tracking-[0.1em] ${tone}`}
@@ -116,7 +116,7 @@ export function SourceChip({ source }: { source: "chain" | "stats" | "mock" | "n
 export function ChartUnavailable({ reason, className = "" }: { reason: string; className?: string }) {
   return (
     <div
-      className={`flex min-h-[32px] items-center justify-center rounded-md border border-dashed border-white/10 px-2 py-2 ${className}`}
+      className={`flex min-h-[32px] items-center justify-center rounded-md border border-dashed border-ink/10 px-2 py-2 ${className}`}
       data-live="unavailable"
     >
       <span className="num text-[10px] leading-tight text-steel/60" title={reason}>

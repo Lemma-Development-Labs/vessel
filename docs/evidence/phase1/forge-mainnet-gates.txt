@@ -1,0 +1,4 @@
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 362.98s (362.98s CPU time)
+
+Ran 25 test suites in 363.00s (382.71s CPU time): 112 tests passed, 0 failed, 6 skipped (118 total tests)
+exit=0

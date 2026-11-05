@@ -27,6 +27,9 @@ import {
 } from "./addresses.ts";
 import { fundingApr7dBps, type Store } from "./db.ts";
 import { getIndexerStatus } from "./indexer.ts";
+import { authRoutes, type AuthRouteDeps } from "./auth/routes.ts";
+import { v1Routes, type V1Deps } from "./v2/api.ts";
+import { v2HealthRoutes, type OpsDeps } from "./v2/ops.ts";
 import { getKeeperStatus, getLastSuccessfulCrank } from "./keeper.ts";
 
 const log = pino({ name: "api", level: process.env.LOG_LEVEL ?? "info" });
@@ -62,6 +65,12 @@ export async function startApi(opts: {
   publicClient?: PublicClient;
   addrs?: VesselAddresses;
   keeperAddress?: `0x${string}`;
+  /** SIWE auth routes (docs/AUTH.md). Omitted → auth is not served. */
+  auth?: AuthRouteDeps;
+  /** v2 evidence API (/v1/*). Omitted → not served. */
+  v1?: V1Deps;
+  /** v2 keeper/quoter gas and liveness (/v2/health). Omitted → not served. */
+  v2Ops?: OpsDeps;
 }): Promise<ApiHandle> {
   const rpcUrl = getRpcUrl();
   const chainId = getChainId();
@@ -110,8 +119,8 @@ export async function startApi(opts: {
     methods: ["GET", "HEAD"],
   });
 
-  // global:false — only routes that opt in via config.rateLimit are limited,
-  // so /health stays available to the platform healthcheck under load.
+  // global:false — only routes that opt in via config.rateLimit are limited. The platform probes /live,
+  // which is never limited; /health is limited and cached (review SVC-01).
   await app.register(rateLimit, {
     global: false,
     max: rlMax,
@@ -125,6 +134,21 @@ export async function startApi(opts: {
     { allowedOrigins, rateLimitMax: rlMax, rateLimitWindowSec: rlWindowSec },
     "cors allowlist + rate limit configured",
   );
+
+  if (opts.v1) {
+    await app.register(v1Routes({ ...opts.v1, rateLimit: { max: rlMax, timeWindow: rlWindowSec * 1000 } }));
+    log.info({ environment: opts.v1.manifest.environment, controller: opts.v1.manifest.contracts.TrancheController }, "v1 evidence routes registered");
+  }
+
+  if (opts.v2Ops) {
+    await app.register(v2HealthRoutes(opts.v2Ops));
+    log.info({ keeper: opts.v2Ops.keeper, quoter: opts.v2Ops.quoter }, "v2 health route registered");
+  }
+
+  if (opts.auth) {
+    await app.register(authRoutes(opts.auth));
+    log.info({ domain: opts.auth.settings.domain, origin: opts.auth.settings.origin }, "auth routes registered");
+  }
 
   app.addHook("onSend", async (req, reply, payload) => {
     if (req.method === "GET") {
@@ -150,7 +174,7 @@ export async function startApi(opts: {
    */
   app.get("/live", async () => ({ ok: true, uptimeSec: Math.floor(process.uptime()) }));
 
-  app.get("/health", async (_req, reply) => {
+  const computeHealth = async (): Promise<{ code: number; body: unknown }> => {
     const now = Math.floor(Date.now() / 1000);
     const errors: Record<string, string> = {};
     const degraded: string[] = [];
@@ -229,6 +253,16 @@ export async function startApi(opts: {
         `keeper gas runway ${ks.cranksRemaining} cranks < MIN_CRANKS_RUNWAY ${ks.minCranksRunway}`,
       );
     }
+    // Configured but not cranking is its own failure. Without this, a keeper
+    // that bailed out at preflight and then had its balance topped up would
+    // read healthy while nothing was settling the waterfall.
+    if (ks.configured && !ks.running) {
+      degraded.push(
+        ks.lastError
+          ? `keeper is not cranking: ${ks.lastError}`
+          : "keeper is configured but not cranking",
+      );
+    }
     if (ks.stuckTxHash) degraded.push(`keeper has a stuck crank tx ${ks.stuckTxHash}`);
 
     // ---- indexer ----------------------------------------------------------
@@ -299,7 +333,24 @@ export async function startApi(opts: {
     };
 
     // 503 so a platform healthcheck actually restarts a wedged process.
-    return reply.code(ok ? 200 : 503).send(body);
+    return { code: ok ? 200 : 503, body };
+  };
+
+  // Each /health does several RPC reads on the client the keeper also uses; unlimited and uncached, a
+  // flood starved the keeper (71 s /v1/book, indexer timeouts). Now: rate-limited, and at most one
+  // computation per 10 s whatever the request rate, shared by concurrent callers (review SVC-01).
+  let healthCache: { at: number; code: number; body: unknown } | null = null;
+  let healthInflight: Promise<{ code: number; body: unknown }> | null = null;
+  app.get("/health", rateLimitConfig, async (_req, reply) => {
+    if (!healthCache || Date.now() - healthCache.at > 10_000) {
+      healthInflight ??= computeHealth().finally(() => {
+        healthInflight = null;
+      });
+      const r = await healthInflight;
+      healthCache = { at: Date.now(), ...r };
+    }
+    reply.header("Cache-Control", "no-store");
+    return reply.code(healthCache.code).send(healthCache.body);
   });
 
   app.get("/stats", rateLimitConfig, async (_req, reply) => {

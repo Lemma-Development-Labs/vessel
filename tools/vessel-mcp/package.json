@@ -1,0 +1,30 @@
+{
+  "name": "@vessel/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public Vessel MCP server: read and verify the book over stdio; typed unsigned preparation only behind VESSEL_MCP_PREPARE=1. No keys, no submission.",
+  "packageManager": "pnpm@10.33.3",
+  "bin": {
+    "vessel-mcp": "src/server.ts"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1",
+    "tsx": "^4.23.15",
+    "viem": "^2.57.1",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^3.2.7"
+  }
+}

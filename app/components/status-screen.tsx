@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { pickShape, type Shape } from "@/lib/book/service";
 import { statsUrl } from "@/lib/stats";
 import { Card } from "@/components/ui";
 
@@ -47,6 +48,29 @@ type Health = {
   errors?: Record<string, string>;
 };
 
+/** `Health` as checked at fetch: a mistyped field is dropped (renders "—"), never rendered raw (review APP-7). */
+const HEALTH: Shape = {
+  ok: "boolean",
+  degraded: "string[]",
+  service: { version: "string", uptimeSec: "number", db: "string", chainId: "number", venue: "string" },
+  rpc: { ok: "boolean", blockNumber: "string" },
+  keeper: {
+    configured: "boolean",
+    running: "boolean",
+    address: "string",
+    balanceMon: "string",
+    gasLimit: "string",
+    gasPriceGwei: "string",
+    costPerCrankMon: "string",
+    cranksRemaining: "number",
+    minCranksRunway: "number",
+    stuckTxHash: "string",
+  },
+  indexer: { running: "boolean", confirmations: "number", cursor: "string", safeHead: "string", head: "string", lagBlocks: "number" },
+  protocol: { lastCrankTs: "number", secondsSinceLastCrank: "number", netDeltaPct: "number" },
+  errors: "record",
+};
+
 export function StatusScreen() {
   const url = statsUrl();
 
@@ -59,7 +83,7 @@ export function StatusScreen() {
       const res = await fetch(`${url}/health`, { cache: "no-store" });
       // A 503 is a real answer, not a failure — the service is telling us it is
       // degraded and exactly why, so we render that rather than an error state.
-      const body = (await res.json().catch(() => ({}))) as Health;
+      const body = pickShape(await res.json().catch(() => ({})), HEALTH) as Health;
       return { status: res.status, body };
     },
   });
@@ -133,7 +157,7 @@ function Report({ url, status, h }: { url: string; status: number; h: Health }) 
       </Card>
 
       <h2 className="display mt-8 text-lg">Keeper</h2>
-      <div className="mt-3 grid gap-px overflow-hidden rounded-2xl border border-line sm:grid-cols-2">
+      <div className="mt-3 grid gap-px overflow-hidden rounded-[2px] border border-line sm:grid-cols-2">
         <Row
           label="LAST CRANK"
           v={fmtAgo(h.protocol?.secondsSinceLastCrank)}
@@ -167,7 +191,7 @@ function Report({ url, status, h }: { url: string; status: number; h: Health }) 
       ) : null}
 
       <h2 className="display mt-8 text-lg">Indexer &amp; chain</h2>
-      <div className="mt-3 grid gap-px overflow-hidden rounded-2xl border border-line sm:grid-cols-2">
+      <div className="mt-3 grid gap-px overflow-hidden rounded-[2px] border border-line sm:grid-cols-2">
         <Row
           label="INDEXER LAG"
           v={h.indexer?.lagBlocks != null ? `${h.indexer.lagBlocks} blocks` : null}

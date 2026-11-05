@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { useVessel } from "@/lib/context";
+import { useBook } from "@/lib/book/context";
 import { MONAD_FAUCET_URL, WC_ENABLED, isMobileUA } from "@/lib/wagmi";
 import { Button, Card, Modal } from "@/components/ui";
+import { ASSET } from "@/lib/book/asset";
 
 /**
  * PHASE 3.1 / 3.3 — connecting, and onboarding someone who has never heard of
@@ -30,7 +31,7 @@ function useIsMobile(): boolean {
 }
 
 export function ConnectButton({ className = "" }: { className?: string }) {
-  const v = useVessel();
+  const v = useBook();
   const [open, setOpen] = useState(false);
   const mobile = useIsMobile();
 
@@ -42,9 +43,11 @@ export function ConnectButton({ className = "" }: { className?: string }) {
   return (
     <>
       <Button
-        className={className}
+        variant="mint"
+        className={`min-h-11 px-4 py-2.5 text-[11.5px] ${className}`}
         onClick={() => (single ? void v.connect() : setOpen(true))}
       >
+        <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
         Connect
       </Button>
       <WalletPicker open={open} onClose={() => setOpen(false)} mobile={mobile} />
@@ -61,7 +64,7 @@ function WalletPicker({
   onClose: () => void;
   mobile: boolean;
 }) {
-  const v = useVessel();
+  const v = useBook();
 
   // On a phone, WalletConnect is the option that actually works; put it first.
   // On desktop the injected wallet is one click, so it leads.
@@ -99,7 +102,7 @@ function WalletPicker({
       </div>
 
       {!WC_ENABLED ? (
-        <p className="num mt-4 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-[11px] leading-relaxed text-amber">
+        <p className="num mt-4 rounded-[2px] border border-amber/30 bg-amber/5 px-3 py-2 text-[11px] leading-relaxed text-amber">
           WalletConnect is not configured on this deployment
           (NEXT_PUBLIC_WC_PROJECT_ID is unset), so only a browser-extension
           wallet will work here. On a phone, that usually means no wallet at all.
@@ -107,14 +110,15 @@ function WalletPicker({
       ) : null}
 
       <p className="mt-4 text-sm text-dim">
-        You&apos;ll need testnet MON for gas before anything else — including the
-        dUSD faucet, which is itself a transaction.
+        {ASSET.kind === "usdc"
+          ? "You'll need testnet MON for gas before anything else: every deposit and exit is a transaction."
+          : "You'll need testnet MON for gas before anything else — including the dUSD faucet, which is itself a transaction."}
       </p>
       <a
         href={MONAD_FAUCET_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="num mt-2 inline-block text-[12px] text-purple"
+        className="num mt-2 inline-block text-[12px] text-hull"
       >
         Get testnet MON from the Monad faucet ↗
       </a>
@@ -128,12 +132,12 @@ function WalletPicker({
  * a tooltip.
  */
 export function GasFirstCard({ className = "" }: { className?: string }) {
-  const v = useVessel();
+  const v = useBook();
   if (!v.connected) return null;
 
-  // Only shown when we know the user has no dUSD — if the read failed we do
-  // not guess at their state.
-  const noDusd = v.dusdBalance.status === "ok" && v.dusdBalance.value === 0n;
+  // Only shown when we know the user has none of the book asset — if the read
+  // failed we do not guess at their state.
+  const noDusd = v.wallet.status === "ok" && v.wallet.value.cash === 0n;
   if (!noDusd) return null;
 
   return (
@@ -147,16 +151,26 @@ export function GasFirstCard({ className = "" }: { className?: string }) {
             href={MONAD_FAUCET_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-purple"
+            className="text-hull"
           >
             Testnet MON for gas ↗
           </a>{" "}
           — every transaction needs it, including step 2.
         </li>
-        <li>
-          <span className="num text-steel">2.</span> Then &ldquo;Get test dollars&rdquo; above for
-          100 dUSD to deposit.
-        </li>
+        {ASSET.kind === "usdc" ? (
+          <li>
+            <span className="num text-steel">2.</span> Then{" "}
+            <a href={ASSET.faucetUrl} target="_blank" rel="noopener noreferrer" className="text-hull">
+              test USDC from Circle&apos;s faucet ↗
+            </a>{" "}
+            — choose Monad Testnet; it sends 20 USDC every 2 hours.
+          </li>
+        ) : (
+          <li>
+            <span className="num text-steel">2.</span> Then &ldquo;Get test dollars&rdquo; above for
+            100 dUSD to deposit.
+          </li>
+        )}
       </ol>
     </Card>
   );

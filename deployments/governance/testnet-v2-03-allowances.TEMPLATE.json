@@ -1,0 +1,8 @@
+{
+  "name": "Vessel v2 testnet 03 — participant allowances",
+  "salt": "testnet-v2-03-allowances-CHANGE-ME",
+  "notes": "Copy to testnet-v2-03-allowances.json, replace each 0x… with a tester wallet, keep one call per wallet. 1,000 dUSD = the DemoUSD faucet lifetime cap.",
+  "calls": [
+    { "to": "TrancheController", "sig": "setAllowance(address,uint256)", "args": ["0x0000000000000000000000000000000000000001", "1000000000"] }
+  ]
+}

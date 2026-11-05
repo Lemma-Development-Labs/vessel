@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #070b10;
-  --bg2: #0b1118;
-  --panel: #0e131b;
-  --line: rgba(255, 255, 255, 0.12);
-  --text: #eaeef3;
-  --text-dim: rgba(234, 238, 243, 0.62);
-  --purple: #836ef9;
-  --purple-hover: #957fff;
-  --brass: #c9964b;
-  --steel: #8fa6bc;
-  --phosphor: #35d699;
-  --amber: #f0b35c;
-  --red: #e5646c;
-  --radius-card: 16px;
-  --radius-chip: 8px;
-  --radius-modal: 16px;
+  /* Vessel v2 system — the same tokens as vessel.wtf (vessel-landing/tokens.css). */
+  --bg: #05070a; /* void */
+  --bg2: #0b1015; /* raised panels */
+  --panel: #0b1015;
+  --line: rgba(244, 241, 234, 0.12);
+  --line-soft: rgba(244, 241, 234, 0.08);
+  --line-strong: rgba(244, 241, 234, 0.16);
+  --text: #f4f1ea; /* bone */
+  --text-dim: #a9b4c0;
+  --steel: #8a96a3; /* secondary text, labels */
+  --hull: #6bf2c0; /* delta: Hull, senior */
+  --ballast: #ff5b29; /* signal: Ballast, junior — one accent per view */
+  --phosphor: #6bf2c0; /* live / positive data */
+  --amber: #f0b35c; /* testnet / warnings */
+  --red: #e5646c; /* errors */
+  --deep: #2c5cff; /* atmosphere only, never type */
+  --radius-card: 2px;
+  --radius-chip: 2px;
+  --radius-modal: 4px;
 }
 
 @theme inline {
@@ -26,13 +29,13 @@
   --color-line: var(--line);
   --color-ink: var(--text);
   --color-dim: var(--text-dim);
-  --color-purple: var(--purple);
-  --color-brass: var(--brass);
   --color-steel: var(--steel);
+  --color-hull: var(--hull);
+  --color-ballast: var(--ballast);
   --color-phosphor: var(--phosphor);
   --color-amber: var(--amber);
   --color-red: var(--red);
-  --font-display: var(--font-display);
+  --font-display: var(--font-sans);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
@@ -44,12 +47,29 @@ body {
 }
 
 body {
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* The landing page's atmosphere — deep-blue glow top right, signal bottom left, mint below, over a
+   faint 64px grid — as a fixed layer behind the page (background-attachment: fixed is unreliable,
+   notably on iOS). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 45% at 76% 0%, rgba(44, 92, 255, 0.16), transparent 70%),
+    radial-gradient(50% 40% at 8% 90%, rgba(255, 91, 41, 0.1), transparent 70%),
+    radial-gradient(60% 50% at 50% 110%, rgba(107, 242, 192, 0.08), transparent 70%),
+    linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 64px 64px;
 }
 
 input:not(.num),
@@ -70,11 +90,15 @@ button {
 }
 
 .display {
-  font-family: var(--font-display), ui-sans-serif, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, sans-serif;
+  font-variation-settings: "wdth" 110;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
 }
 
 :focus-visible {
-  outline: 2px solid var(--purple);
+  outline: 2px solid var(--hull);
   outline-offset: 2px;
 }
 
@@ -183,7 +207,7 @@ button {
   background: linear-gradient(
     105deg,
     transparent 40%,
-    rgba(201, 150, 75, 0.12) 50%,
+    rgba(255, 91, 41, 0.12) 50%,
     transparent 60%
   );
   pointer-events: none;

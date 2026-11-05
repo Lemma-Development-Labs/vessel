@@ -1,0 +1,17 @@
+{
+  "name": "Vessel v2 testnet 02 \u2014 open Hull series 1 (8%, 28 days)",
+  "salt": "testnet-v2-02-series-1",
+  "notes": "Opens the 72 h subscription window when executed. termsHash = keccak256(terms) \u2014 re-derive with: cast keccak \"<terms>\". 8% is a TESTNET illustration: the real rate rule needs 30 days of measured funding (P03).",
+  "calls": [
+    {
+      "to": "TrancheController",
+      "sig": "openSeries(uint256,bytes32)",
+      "args": [
+        "800",
+        "0x7b515f07ec92bb7fb6a1e86ea8331ffa551f51123139c5658f186b03b5a5a7a8"
+      ]
+    }
+  ],
+  "terms": "Vessel testnet Hull series 1: senior claim, 8.00% simple annual rate subject to loss, 28-day term after activation, 72-hour subscription window, no early redemption, non-transferable, test dollars (dUSD) with no value, simulated engine.",
+  "termsHash": "0x7b515f07ec92bb7fb6a1e86ea8331ffa551f51123139c5658f186b03b5a5a7a8"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Vessel v2 testnet 03 — participant allowances, wave 1",
+  "salt": "testnet-v2-03-allowances-wave1",
+  "notes": "Wave 1: the team's first test wallet. 1,000 dUSD = the DemoUSD faucet lifetime cap. Later waves get their own spec file and salt.",
+  "calls": [
+    { "to": "TrancheController", "sig": "setAllowance(address,uint256)", "args": ["0xD80291d7959141228611A7Ab413d9c0140Bc6206", "1000000000"] }
+  ]
+}
