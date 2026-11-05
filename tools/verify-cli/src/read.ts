@@ -70,7 +70,13 @@ export async function absentOk<T>(read: Promise<T>, fallback: T): Promise<T> {
 export function isAbsentFunction(err: unknown): boolean {
   for (let e = err as { name?: string; cause?: unknown; reason?: string; raw?: string; data?: unknown } | undefined; e; e = e.cause as typeof e) {
     if (e.name === "ContractFunctionZeroDataError") return true;
-    if (e.name === "ContractFunctionRevertedError") return !e.reason && !e.data && (e.raw === undefined || e.raw === "0x");
+    if (e.name === "ContractFunctionRevertedError") {
+      // Empty revert data is the signature of a missing function. viem on Monad's RPC reports it as
+      // data "0x" with the generic reason "execution reverted"; a real revert carries a reason string or
+      // an error selector in its data.
+      const empty = (x: unknown) => x === undefined || x === null || x === "0x";
+      return empty(e.data) && empty(e.raw) && (!e.reason || e.reason === "execution reverted");
+    }
   }
   return false;
 }

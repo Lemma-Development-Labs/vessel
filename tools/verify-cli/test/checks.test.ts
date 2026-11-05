@@ -198,9 +198,17 @@ describe("review VER-1 / VER-2: no stronger claim from a failed read or an unlis
     const timeout = Object.assign(new Error("took too long"), { name: "TimeoutError" });
     const http = Object.assign(new Error("502"), { name: "ContractFunctionExecutionError", cause: { name: "HttpRequestError" } });
     const realRevert = Object.assign(new Error("reverted"), { name: "ContractFunctionExecutionError", cause: { name: "ContractFunctionRevertedError", reason: "Paused" } });
+    // exactly what viem threw for HedgedEngine.isSimulated() on Monad testnet, 2026-11-05: the verifier
+    // printed "could not verify" for a healthy hedged book because this shape wasn't recognised
+    const monadAbsent = Object.assign(new Error("reverted"), {
+      name: "ContractFunctionExecutionError",
+      cause: { name: "ContractFunctionRevertedError", data: "0x", reason: "execution reverted", cause: { name: "CallExecutionError" } },
+    });
+    const customError = Object.assign(new Error("reverted"), { name: "ContractFunctionExecutionError", cause: { name: "ContractFunctionRevertedError", raw: "0x3ee5aeb5" } });
     expect(isAbsentFunction(absent)).toBe(true);
     expect(isAbsentFunction(zero)).toBe(true);
-    for (const e of [timeout, http, realRevert]) expect(isAbsentFunction(e)).toBe(false);
+    expect(isAbsentFunction(monadAbsent)).toBe(true);
+    for (const e of [timeout, http, realRevert, customError]) expect(isAbsentFunction(e)).toBe(false);
     await expect(absentOk(Promise.reject(absent), false)).resolves.toBe(false);
     await expect(absentOk(Promise.reject(timeout), false)).rejects.toThrow("took too long");
   });
